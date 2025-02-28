@@ -1,0 +1,24 @@
+# Alphabet
+sos_token = "<SOS>"
+eos_token = "<EOS>"
+unk_token = "<UNK>"
+pad_token = "<PAD>"
+special_tokens = [sos_token, eos_token, unk_token, pad_token]
+
+# Audio
+sample_rate = 22050
+num_samples = 22050
+
+# Model hyperparameters
+load_model = False
+encoder_embedding_size = 300  # original=300
+decoder_embedding_size = 300  # original=300
+hidden_size = 1024  # original=256
+num_layers = 1
+encoder_dropout = 0.1  # 0.0 is equivalent to Identity function
+decoder_dropout = 0.1  # 0.0 is equivalent to Identity function
+
+# Training hyperparameters
+num_epochs = 50  # original=50. Note: must be >1 !!!
+learning_rate = 3e-4
+batch_size = 32  # original=32

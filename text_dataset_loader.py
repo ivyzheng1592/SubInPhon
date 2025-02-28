@@ -1,0 +1,125 @@
+# 2025/01/15
+# A script to load custom text dataset with self-defined class inherited from torch Dataset
+
+import re
+import pandas as pd
+import torch
+from torch.utils.data import Dataset, DataLoader
+from torch.nn.utils.rnn import pad_sequence
+import hyper_params as hp
+
+
+class Alphabet:
+    def __init__(self, name):
+        self.name = name
+        self.idx2char = {} # {index: char}
+        self.char2idx = {}  # {char: index}
+        self.char2count = {}  # {char: number of occurrences}
+
+    def __len__(self):
+        return len(self.idx2char)
+
+    # convert each word to a vector
+    def word2vec(self, word):
+        word_vector = [self.char2idx[hp.sos_token]]
+        word_vector.extend([self.char2idx[char] if char in self.char2idx
+                            else self.char2idx[hp.unk_token]
+                            for char in word])
+        word_vector.append(self.char2idx[hp.eos_token])
+        return word_vector
+
+    # build vocabulary with a list of words and special characters
+    def build_alphabet(self, words, specials):
+        # add special characters to vocabulary
+        self.idx2char.update({idx: char for idx, char in enumerate(specials)})
+        self.char2idx.update({char: idx for idx, char in enumerate(specials)})
+        idx = len(specials)
+
+        # add real characters to vocabulary
+        for word in words:
+            for char in word:
+                if char not in self.char2idx:
+                    self.idx2char[idx] = char
+                    self.char2idx[char] = idx
+                    self.char2count[char] = 1
+                    idx += 1
+                else:
+                    self.char2count[char] += 1
+
+
+class TextDataset(Dataset):
+    def __init__(self, annotations_file, special_tokens):
+        # get the list of ur and sr words
+        self.annotations = pd.read_csv(annotations_file)
+        self.ur = self.annotations["ur"]
+        self.sr = self.annotations["sr"]
+
+        # define special characters
+        self.specials = special_tokens
+
+        # build ur alphabet
+        self.ur_name = re.split('[/_.]', annotations_file)[2] + "_ur"
+        self.ur_alphabet = Alphabet(self.ur_name)
+        self.ur_alphabet.build_alphabet(self.ur, self.specials)
+
+        # build sr alphabet
+        self.sr_name = re.split('[/_.]', annotations_file)[2] + "_sr"
+        self.sr_alphabet = Alphabet(self.sr_name)
+        self.sr_alphabet.build_alphabet(self.sr, self.specials)
+
+    def __len__(self):
+        return len(self.annotations)
+
+    def __getitem__(self, index):
+        # get source word
+        source = self.ur[index]
+        source_vector = self.ur_alphabet.word2vec(source)
+        source_tensor = torch.tensor(source_vector)
+
+        # get target word
+        target = self.sr[index]
+        target_vector = self.sr_alphabet.word2vec(target)
+        target_tensor = torch.tensor(target_vector)
+
+        return source_tensor, target_tensor
+
+
+# a closure of customized collate_fn
+def get_collate_fn(pad_idx):
+    def collate_fn(batch):
+        sources = [item[0] for item in batch]
+        sources = pad_sequence(sources, batch_first=False, padding_value=pad_idx)
+
+        targets = [item[1] for item in batch]
+        targets = pad_sequence(targets, batch_first=False, padding_value=pad_idx)
+
+        return sources, targets
+
+    return collate_fn
+
+
+def get_dataloader(dataset, batch_size=hp.batch_size, shuffle=True):
+    pad_idx = dataset.specials.index(hp.pad_token)
+
+    collate_fn = get_collate_fn(pad_idx)
+
+    data_loader = DataLoader(
+        dataset=dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        collate_fn=collate_fn
+    )
+    return data_loader
+
+
+if __name__ == "__main__":
+    annotations_file = "Dataset/Cantonese_harmony.csv"
+    annotations = pd.read_csv(annotations_file)
+
+    text_dataset = TextDataset(annotations_file, hp.special_tokens)
+    print(text_dataset)
+
+    text_dataloader = get_dataloader(text_dataset)
+    dataiter = iter(text_dataloader)
+    source, target = next(dataiter)
+    print("Source:", source, "\nTarget:", target)
