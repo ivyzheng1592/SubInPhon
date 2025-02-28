@@ -40,7 +40,7 @@ for w in words:
           "--text '<speak><phoneme alphabet=\"ipa\" ph=\"" + w + "\"></phoneme></speak>' " \
           "--output-format mp3 " \
           "--voice-id Danielle " \
-          + folderName + w + ".mp3"
+          + folderName + "/" + w + ".mp3"
     os.system(cmd)
     print(cmd)
 
