@@ -1,10 +1,15 @@
+# created 2025/02/24 from previous project
+# A script to generate stimuli with Amazon Polly
+# updated 2025/02/26
+# Converting Polly mp3 output to wav
+
 import os
 from mp3_to_wav import convert_mp3_to_wav
 
 # open file and select the first 200 pairs to generate audio files
 fileName = "English_aud_harmony.csv"
 with open(fileName, "r") as file:
-    lines = file.readlines()[1:]
+    lines = file.readlines()[1:2]
 
 # store words in a list
 print(" - Reading word list:")

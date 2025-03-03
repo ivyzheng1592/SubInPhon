@@ -1,35 +1,47 @@
-# 2025/01/08 created w/ Aladdin Persson tutorial
-# 2025/01/15 updated w/ Ben Trevett tutorial
+# created 2025/03/03 w/ Ben Trevett tutorial
 
 import torch
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import random_split
-from torchvision import datasets
-from torchvision.transforms import ToTensor
+from torchsummary import summary
 import network
+from hyper_params import pad_token
 from text_dataset_loader import TextDataset, get_dataloader
 import hyper_params as hp
 
 
-def train_one_epoch(model, data_loader, loss_fn, optimiser, device):
-    for sources, targets in data_loader:
-        sources, targets = sources.to(device), targets.to(device)
+# training loop
+def train_fn(model, data_loader, optimizer, loss_fn, clip, teacher_forcing_ratio, device):
+    model.train()
+    epoch_loss = 0
 
-        predictions = model(sources)
-        loss = loss_fn(predictions, targets)  # calculate loss
-        optimiser.zero_grad()  # reset gradient at each iteration to 0
+    for i, (src, trg) in enumerate(data_loader):
+        src = src.to(device)
+        trg = trg.to(device)
+        # src = [src_length, batch_size]
+        # trg = [trg_length, batch_size]
+
+        optimizer.zero_grad()  # reset gradient at each iteration to 0
+
+        output = model(src, trg, teacher_forcing_ratio)
+        output_dim = output.shape[-1]
+        output = output[1:].view(-1, output_dim)
+        # output = [trg_length, batch_size, output_dim]
+        # -> output = [(trg_length - 1) * batch_size, output_dim]
+
+        trg = trg[1:].view(-1)
+        # trg = [trg_length, batch_size]
+        # -> trg = [(trg_length - 1) * batch_size]
+
+        loss = loss_fn(output, trg)  # calculate loss
         loss.backward()  # backpropagate loss
-        optimiser.step()  # update the weights
+        nn.utils.clip_grad_norm(model.parameters(), clip) # clip the gradients to prevent exploding
+        optimizer.step()  # update the weights
+        epoch_loss += loss.item()  # summarize the loss value
+        average_loss = epoch_loss / len(data_loader)  # average the loss value over all batches
 
-    print(f"Loss: {loss.item()}")
-
-
-def train(model, data_loader, loss_fn, optimiser, device, epochs):
-    for i in range(epochs):
-        print(f"Epoch {i+1}")
-        train_one_epoch(model, data_loader, loss_fn, optimiser, device)
-    print("Training is done.")
+    return average_loss
 
 
 def predict(model, source, target, class_mapping):
@@ -44,40 +56,43 @@ def predict(model, source, target, class_mapping):
 
 
 def main():
-    # preparing data and building vocabulary
-    print(" - Preparing dataset:")
-    annotation_file = "Dataset/English_txt_harmony.csv"
-    text_dataset = TextDataset(annotation_file, hp.special_tokens)
-
+    print(" - Loading dataset and building vocabulary:")
+    annotations_file = "Dataset/English_txt_harmony.csv"
+    text_dataset = TextDataset(annotations_file, hp.special_tokens)
     train_data, validation_data, test_data = random_split(text_dataset, [0.8, 0.1, 0.1])
+
+    print(" - Creating dataloader:")
     train_dataloader = get_dataloader(train_data)
     test_dataloader = get_dataloader(test_data)
 
-    # define input output size
-    encoder_input_size = len(text_dataset.ur_alphabet)
-    decoder_input_size = len(text_dataset.sr_alphabet)
-    output_size = len(text_dataset.sr_alphabet)
+    print(" - Initializing model:")
+    # model hyperparameters
+    encoder_input_dim = len(text_dataset.ur_alphabet)
+    decoder_input_dim = len(text_dataset.sr_alphabet)
+    output_dim = len(text_dataset.sr_alphabet)
 
-    # build model
+    # device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using {device} device")
 
-    writer = SummaryWriter(f'runs/Loss_plot')
-    step = 0
-
-    encoder_net = network.Encoder(encoder_input_size, hp.encoder_embedding_size,
-                                  hp.hidden_size, hp.num_layers, hp.encoder_dropout).to(device)
-    decoder_net = network.Decoder(decoder_input_size, hp.decoder_embedding_size,
-                                  hp.hidden_size, output_size, hp.num_layers, hp.decoder_dropout).to(device)
+    # networks
+    encoder_net = network.Encoder(encoder_input_dim, hp.encoder_embedding_dim,
+                                  hp.hidden_dim, hp.n_layers, hp.encoder_dropout).to(device)
+    decoder_net = network.Decoder(decoder_input_dim, hp.decoder_embedding_dim,
+                                  hp.hidden_dim, output_dim, hp.n_layers, hp.decoder_dropout).to(device)
     seq2seq = network.Seq2Seq(encoder_net, decoder_net).to(device)
+    summary(seq2seq, encoder_input_dim, hp.batch_size)
 
-    # instantiate loss function + optimizer
-    loss_fn = nn.CrossEntropyLoss(ignore_index=text_dataset.specials.index)
+    # optimizer and loss function
     optimizer = torch.optim.Adam(seq2seq.parameters(), lr=hp.learning_rate)
+    loss_fn = nn.CrossEntropyLoss(ignore_index=text_dataset.specials.index[pad_token])
 
-    # train model
+    #writer = SummaryWriter(f'runs/Loss_plot')
+    #step = 0
 
-    train(seq2seq, train_dataloader, loss_fn, optimizer, device, hp.num_epochs)
+    print(" - Training model:")
+    # train the model
+    train(seq2seq, train_dataloader, loss_fn, optimizer, device, hp.n_epochs)
 
     # save the model
     torch.save(seq2seq.state_dict(), "seq2seq.pth")

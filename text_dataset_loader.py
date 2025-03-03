@@ -113,13 +113,23 @@ def get_dataloader(dataset, batch_size=hp.batch_size, shuffle=True):
 
 
 if __name__ == "__main__":
-    annotations_file = "Dataset/Cantonese_harmony.csv"
+    print(" - Loading dataset:")
+    annotations_file = "Dataset/English_txt_harmony.csv"
     annotations = pd.read_csv(annotations_file)
+    print("Dataset size: ", len(annotations),
+          "\nSample data token:", annotations.iloc[0])
 
+    print(" - Building vocabulary:")
     text_dataset = TextDataset(annotations_file, hp.special_tokens)
-    print(text_dataset)
+    src, trg = text_dataset[0]
+    print("UR vocab size:", len(text_dataset.ur_alphabet),
+          "\nSR vocab size:", len(text_dataset.ur_alphabet),
+          "\nSample source:", src,
+          "\nSample target:", trg)
 
+    print(" - Creating dataloader:")
     text_dataloader = get_dataloader(text_dataset)
     dataiter = iter(text_dataloader)
     source, target = next(dataiter)
-    print("Source:", source, "\nTarget:", target)
+    print("Sample source:", source,
+          "\nSample target:", target)
