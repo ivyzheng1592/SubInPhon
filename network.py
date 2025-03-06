@@ -1,100 +1,142 @@
 # created 2025/01/07
 # updated 2025/03/03
-# An LSTM encoder-decoder with global attention based on Ben Trevett tutorial
+# An LSTM encoder-decoder with global attention based on Ben Trevett tutorial and Aladdin Persson tutorial
 
-import random
 import torch
 import torch.nn as nn
-import hyper_params as hp
-from torchsummary import summary
+import random
 
 
 class Encoder(nn.Module):
-    def __init__(self, input_dim, embedding_dim, encoder_hidden_dim, decoder_hidden_dim, n_layers, p):
+    def __init__(self, input_dim, embedding_dim, hidden_dim, n_layers, dropout):
         super(Encoder, self).__init__()
-        #self.hidden_dim = hidden_dim
-        #self.n_layers = n_layers
+
+        self.input_dim = input_dim
+        self.embedding_dim = embedding_dim
+        self.hidden_dim = hidden_dim
+        self.n_layers = n_layers
 
         self.embedding = nn.Embedding(input_dim, embedding_dim)  # map the input vocabulary to a d-dimensional space
-        self.rnn = nn.GRU(embedding_dim, encoder_hidden_dim, bidirectional=True)  # input embedding space and output hidden space
-        self.fc = nn.Linear(encoder_hidden_dim * 2, decoder_hidden_dim)  # select the better context vector from forward and backward
-        self.dropout = nn.Dropout(p)  # dropout with probability p, see https://arxiv.org/abs/1207.0580
+        self.rnn = nn.LSTM(embedding_dim, hidden_dim, n_layers, bidirectional=True)  # input embedding space, output hidden space
+        self.fc_hidden = nn.Linear(hidden_dim * 2, hidden_dim)  # select the better hidden from forward and backward
+        self.fc_cell = nn.Linear(hidden_dim * 2, hidden_dim)  # select the better cell from forward and backward
+        self.dropout = nn.Dropout(dropout)  # dropout probability, see https://arxiv.org/abs/1207.0580
 
-    def forward(self, x: torch.Tensor):
-        # x = [x_length, batch_size]
+    def forward(self, input: torch.Tensor):
+        # input = [input_len, batch_size]
 
-        embedding = self.dropout(self.embedding(x))
-        # embedding = [x_length, batch_size, embedding_dim]
+        embedding = self.dropout(self.embedding(input))
+        # embedding = [input_len, batch_size, embedding_dim]
 
         encoder_states, (hidden, cell) = self.rnn(embedding)
-        # encoder_states = [x_length, batch_size, hidden_dim * n_directions]
-        # hidden = [n_layers * n_directions, batch_size, hidden_dim]
-        # cell = [n_layers * n_directions, batch_size, hidden_dim]
         # encoder_states come from the top hidden layer
-        # hidden and cell are the context vectors
+        # hidden and cell are stacked from all forward and backward hidden layers
+        # encoder_states = [input_len, batch_size, hidden_dim * n_direction=2]
+        # hidden = [n_layers=1 * n_direction=2, batch_size, hidden_dim]
+        # cell = [n_layers=1 * n_direction=2, batch_size, hidden_dim]
 
-        # Use forward, backward cells and hidden through a linear layer
-        # so that it can be input to the decoder which is not bidirectional
-        # Also using index slicing ([idx:idx+1]) to keep the dimension
-        hidden = self.fc_hidden(torch.cat((hidden[0:1], hidden[1:2]), dim=2))
-        # hidden shape: (2, N, hidden_size)
-        cell = self.fc_cell(torch.cat((cell[0:1], cell[1:2]), dim=2))
+        # hidden [-2, :, : ] is the last of the forwards RNN
+        # hidden [-1, :, : ] is the last of the backwards RNN
+        hidden = self.fc_hidden(torch.cat((hidden[-2, :, :], hidden[-1, :, :]), dim=1))
+        hidden = self.fc_hidden(torch.cat((hidden[-2, :, :], hidden[-1, :, :]), dim=1))
+        # hidden = [batch_size, hidden_dim]
+        # cell = [batch_size, hidden_dim]
+        # ignoring hidden = torch.tanh(hidden) in Ben Trevett tutorial
 
         return encoder_states, hidden, cell
 
 
-class Decoder(nn.Module):
-    def __init__(self, input_dim, embedding_dim, hidden_dim, output_dim, n_layers, p):
-        # input_size and output_size should be the same
-        super(Decoder, self).__init__()
-        self.hidden_dim = hidden_dim
-        self.n_layers = n_layers
+class BahdanauAttention():
+    def __init__(self, hidden_dim):
+        super().__init__()
+        self.fc_energy = nn.Linear(hidden_dim * 3, hidden_dim)  # select the better from forward and backward encoder states and decoder hidden
+        self.fc_score = nn.Linear(hidden_dim, 1)  # output one score for each alignment
+        # ignoring bias=False in Ben Trevett tutorial
 
-        self.dropout = nn.Dropout(p)
-        #self.embedding = nn.Embedding(input_dim, embedding_dim)
-        self.embedding = nn.Embedding(output_dim, embedding_dim)
-        self.rnn = nn.LSTM(hidden_size * 2 + embedding_size, hidden_size, num_layers)  # input forward and backward encoder hidden states and context vector
+    def forward(self, hidden, encoder_states):
+        # hidden = [batch_size, hidden_dim]
+        # cell = [batch_size, hidden_dim]
+        # encoder_states = [input_len, batch_size, hidden_dim * 2]
 
-        self.energy = nn.Linear(hidden_size * 3, 1)  # calculate energy state
-        self.softmax = nn.Softmax(dim=0)  # calculate attention
-        self.relu = nn.ReLU()
-        self.fc = nn.Linear(hidden_dim, output_dim)
-
-    def forward(self, x, encoder_states, hidden, cell):
-        x = x.unsqueeze(0)
-        # x = [batch_size] -> x = [1, batch_size]
-
-        # Not applying Dropout on the embeddings!
-        # embedding = self.dropout(self.embedding(x))
-        embedding = self.embedding(x)
-        # embedding: (1, N, embedding_size)
-
-        sequence_length = encoder_states.shape[0]
-        h_reshaped = hidden.repeat(sequence_length, 1, 1)
-        # hidden_reshaped: (seq_length, N, hidden_size*2)
-
-        energy = self.relu(self.energy(torch.cat((h_reshaped, encoder_states), dim=2)))
-        # energy: (seq_length, N, 1)
-
-        attention = self.softmax(energy)
-        attention = attention.permute(1, 2, 0)
-        # attention: (seq_length, N, 1) -> (N, 1, seq_length)
+        input_len = encoder_states.shape[0]
+        hidden = hidden.unsqueeze(1).repeat(1, input_len, 1)
+        # hidden = [batch_size, input_len, hidden_dim]
         encoder_states = encoder_states.permute(1, 0, 2)
-        # encoder_states: (N, seq_length, hidden_size*2)
+        # encoder_states = [batch_size, input_len, hidden_dim * 2]
 
+        # construct a soft alignment between target decoder hidden (query) and encoder hidden of each input token (key)
+        # calculate a score for each input token
+        # calculate the weight of each input token by running the score through softmax
+        energy = torch.tanh(self.fc_energy(torch.cat((hidden, encoder_states), dim=2)))
+        # energy = [batch_size, input_len, hidden_dim]
+        score = self.fc_score(energy).squeeze(2)
+        # energy = [batch_size, input_len]
+        attention = torch.softmax(score, dim=1)
+        # attention = [batch_size, input_len]
+
+        return attention
+
+
+class Decoder(nn.Module):
+    def __init__(self, input_dim, embedding_dim, hidden_dim, output_dim, n_layers, dropout, attention):
+        super(Decoder, self).__init__()
+
+        self.input_dim = input_dim
+        self.embedding_dim = embedding_dim
+        self.hidden_dim = hidden_dim
+        self.output_dim = output_dim
+        self.n_layers = n_layers
+        assert (
+            self.input_dim == self.output_dim
+        ), "Decoder input dimension and output dimension must be the same!"
+
+        self.embedding = nn.Embedding(input_dim, embedding_dim)
+        self.rnn = nn.LSTM(hidden_dim * 2 + embedding_dim, hidden_dim, n_layers)  # input forward and backward encoder hidden states and embedding
+        self.fc_out = nn.Linear(hidden_dim * 3 + embedding_dim, output_dim)  # take into account context vector, decoder hidden, and embedding for the prediction
+        self.dropout = nn.Dropout(dropout)
+        self.attention = attention
+
+    def forward(self, input, encoder_states, hidden, cell):
+        # input = [batch_size]
+        # encoder_states = [input_len, batch_size, hidden_dim * 2]
+        # hidden = [1, batch_size, hidden_dim]
+        # cell = [1, batch_size, hidden_dim]
+
+        input = input.unsqueeze(0)
+        # input = [input_len=1, batch_size]
+
+        embedding = self.dropout(self.embedding(input))
+        # embedding = [1, batch_size, embedding_size]
+
+        # calculate the attention weight with target decoder hidden (query) and all encoder hidden (key)
+        # compute the context vector by multiplying the attention weight to each target embedding (value)
+        # concatenate the target embedding and the context vector as the rnn input
+        attention = self.attention(hidden, encoder_states).unsqueeze(1)
+        # attention = [batch_size, input_len] -> attention = [batch_size, 1, input_len]
+        encoder_states = encoder_states.permute(1, 0, 2)
+        # encoder_states = [batch_size, input_len, hidden_dim * 2]
         context_vector = torch.bmm(attention, encoder_states).permute(1, 0, 2)
-        # context_vector: (N, 1, hidden_size*2) -> (1, N, hidden_size*2)
+        # context_vector = [batch_size, 1, hidden_dim *2] -> context_vector = [1, batch_size, hidden_dim * 2]
+        rnn_input = torch.cat((embedding, context_vector), dim=2)
+        # rnn_input = [1, batch_size, hidden_dim * 2 + embedding_dim]
 
-        rnn_input = torch.cat((context_vector, embedding), dim=2)
-        # rnn_input: (1, N, hidden_size*2 + embedding_size)
+        decoder_state, (hidden, cell) = self.rnn(rnn_input, (hidden, cell))
+        # decoder_state = [1, batch_size, hidden_dim]
+        # hidden = [1, batch_size, hidden_dim]
+        # cell = [1, batch_size, hidden_dim]
+        assert (decoder_state == hidden).all()
 
-        outputs, (hidden, cell) = self.rnn(rnn_input, (hidden, cell))
-        # outputs shape: (1, N, hidden_size)
+        embedding = embedding.squeeze(0)
+        hidden = hidden.squeeze(0)
+        cell = cell.squeeze(0)
+        context_vector = context_vector.squeeze(0)
+        attention = attention.squeeze(0)
 
-        predictions = self.fc(outputs).squeeze(0)
-        # predictions: (N, output_size)
+        # the original manuscript uses all of embedding, decoder state, and context vector for the predictions
+        predictions = self.fc_out(torch.cat((embedding, decoder_state, context_vector), dim=1))
+        # predictions = [batch_size, output_dim]
 
-        return predictions, hidden, cell
+        return predictions, hidden, cell, attention
 
 
 class Seq2Seq(nn.Module):
@@ -111,35 +153,40 @@ class Seq2Seq(nn.Module):
         ), "Encoder and decoder must have equal number of layers!"
 
     def forward(self, src, trg, teacher_forcing_ratio=0.5):
-        #batch_size = src.shape[1]
-        batch_size = trg.shape[1]
-        # source shape: (trg_len, N)
-        trg_len = trg.shape[0]
-        # target shape:
-        trg_vocab_size = len(trg.sr_alphabet)
+        # src = [src_length, batch_size]
+        # trg = [trg_length, batch_size]
 
-        outputs = torch.zeros(trg_len, batch_size, trg_vocab_size)
         encoder_states, hidden, cell = self.encoder(src)
+        # encoder_states are all hidden states of the input sequence
+        # hidden and cell are the final forward and backward hidden and cell concatenated
+        # encoder_states = [src_len, batch_size, encoder_hidden_dim * 2]
+        # hidden = [batch_size, encoder_hidden_dim]
+        # cell = [batch_size, encoder_hidden_dim]
 
-        # First input will be <SOS> token
-        x = trg[0]
+        batch_size = trg.shape[1]
+        trg_len = trg.shape[0]
+        trg_vocab_size = len(trg.sr_alphabet)
+        outputs = torch.zeros(trg_len, batch_size, trg_vocab_size)  # tensor to store decoder outputs
 
+        input = trg[0]  # first input to the decoder is the <SOS> token
         for t in range(1, trg_len):
-            # At every time step use encoder_states and update hidden, cell
-            output, hidden, cell, _ = self.decoder(x, encoder_states, hidden, cell)
+            # at every time step, insert input token, encoder_states, and previous hidden and cell
+            # receive output (predictions) and new hidden and cell
+            output, hidden, cell, _ = self.decoder(input, encoder_states, hidden, cell)
+            # output = [batch_size, output_dim]
+            # hidden = [batch_size, decoder_hidden_dim]
+            # cell = [batch_size, decoder_hidden_dim]
 
-            # Store prediction for current time step
+            # store prediction for current time step
             outputs[t] = output
 
-            # Get the best word the Decoder predicted (index in the vocabulary)
+            # get the best word predicted by the decoder
             best_guess = output.argmax(1)
 
-            # With probability of teacher_force_ratio we take the actual next word
-            # otherwise we take the word that the Decoder predicted it to be.
-            # Teacher Forcing is used so that the model gets used to seeing
-            # similar inputs at training and testing time, if teacher forcing is 1
-            # then inputs at test time might be completely different than what the
-            # network is used to. This was a long comment.
-            x = trg[t] if random.random() < teacher_forcing_ratio else best_guess
+            # with probability of teacher_force_ratio we take the actual next word
+            # otherwise we take the word that the decoder predicted it to be
+            # Teacher Forcing is used so that the model gets used to seeing similar inputs at training and testing time
+            input = trg[t] if random.random() < teacher_forcing_ratio else best_guess
+            # input = [batch_size]
 
         return outputs

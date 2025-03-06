@@ -99,7 +99,7 @@ def get_collate_fn(pad_idx):
 
 
 def get_dataloader(dataset, batch_size=hp.batch_size, shuffle=True):
-    pad_idx = dataset.specials.index(hp.pad_token)
+    pad_idx = hp.special_tokens.index(hp.pad_token)
 
     collate_fn = get_collate_fn(pad_idx)
 
@@ -131,5 +131,5 @@ if __name__ == "__main__":
     text_dataloader = get_dataloader(text_dataset)
     dataiter = iter(text_dataloader)
     source, target = next(dataiter)
-    print("Sample source:", source,
-          "\nSample target:", target)
+    print("Sample source:", source.shape,
+          "\nSample target:", target.shape)
