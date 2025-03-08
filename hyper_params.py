@@ -10,7 +10,6 @@ sample_rate = 22050
 n_samples = 22050
 
 # Model hyperparameters
-load_model = False
 encoder_embedding_dim = 300  # original=300
 decoder_embedding_dim = 300  # original=300
 hidden_dim = 256  # original=256

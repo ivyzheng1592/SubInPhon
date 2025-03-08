@@ -35,22 +35,22 @@ class Encoder(nn.Module):
         # hidden = [n_layers=1 * n_direction=2, batch_size, hidden_dim]
         # cell = [n_layers=1 * n_direction=2, batch_size, hidden_dim]
 
-        # hidden [-2, :, : ] is the last of the forwards RNN
-        # hidden [-1, :, : ] is the last of the backwards RNN
+        # hidden[-2, :, : ] is the last of the forwards RNN
+        # hidden[-1, :, : ] is the last of the backwards RNN
         hidden = self.fc_hidden(torch.cat((hidden[-2, :, :], hidden[-1, :, :]), dim=1))
-        hidden = self.fc_hidden(torch.cat((hidden[-2, :, :], hidden[-1, :, :]), dim=1))
+        cell = self.fc_cell(torch.cat((cell[-2, :, :], cell[-1, :, :]), dim=1))
         # hidden = [batch_size, hidden_dim]
         # cell = [batch_size, hidden_dim]
-        # ignoring hidden = torch.tanh(hidden) in Ben Trevett tutorial
+        # ignoring hidden = torch.tanh(hidden) in Ben Trevett tutorial because we are using LSTM
 
         return encoder_states, hidden, cell
 
 
-class BahdanauAttention():
+class BahdanauAttention(nn.Module):
     def __init__(self, hidden_dim):
-        super().__init__()
-        self.fc_energy = nn.Linear(hidden_dim * 3, hidden_dim)  # select the better from forward and backward encoder states and decoder hidden
-        self.fc_score = nn.Linear(hidden_dim, 1)  # output one score for each alignment
+        super(BahdanauAttention, self).__init__()
+        self.fc_align = nn.Linear(hidden_dim * 3, hidden_dim)  # update weight of forward and backward encoder states and decoder hidden
+        self.fc_score = nn.Linear(hidden_dim, 1)  # output a score for each alignment
         # ignoring bias=False in Ben Trevett tutorial
 
     def forward(self, hidden, encoder_states):
@@ -67,14 +67,14 @@ class BahdanauAttention():
         # construct a soft alignment between target decoder hidden (query) and encoder hidden of each input token (key)
         # calculate a score for each input token
         # calculate the weight of each input token by running the score through softmax
-        energy = torch.tanh(self.fc_energy(torch.cat((hidden, encoder_states), dim=2)))
-        # energy = [batch_size, input_len, hidden_dim]
-        score = self.fc_score(energy).squeeze(2)
-        # energy = [batch_size, input_len]
-        attention = torch.softmax(score, dim=1)
-        # attention = [batch_size, input_len]
+        align = torch.tanh(self.fc_align(torch.cat((hidden, encoder_states), dim=2)))
+        # align = [batch_size, input_len, hidden_dim]
+        score = self.fc_score(align).squeeze(2)
+        # score = [batch_size, input_len]
+        weight = torch.softmax(score, dim=1)
+        # weight = [batch_size, input_len]
 
-        return attention
+        return weight
 
 
 class Decoder(nn.Module):
@@ -99,44 +99,44 @@ class Decoder(nn.Module):
     def forward(self, input, encoder_states, hidden, cell):
         # input = [batch_size]
         # encoder_states = [input_len, batch_size, hidden_dim * 2]
-        # hidden = [1, batch_size, hidden_dim]
-        # cell = [1, batch_size, hidden_dim]
+        # hidden = [batch_size, hidden_dim]
+        # cell = [batch_size, hidden_dim]
 
         input = input.unsqueeze(0)
         # input = [input_len=1, batch_size]
 
         embedding = self.dropout(self.embedding(input))
-        # embedding = [1, batch_size, embedding_size]
+        # embedding = [1, batch_size, embedding_dim]
 
         # calculate the attention weight with target decoder hidden (query) and all encoder hidden (key)
         # compute the context vector by multiplying the attention weight to each target embedding (value)
         # concatenate the target embedding and the context vector as the rnn input
-        attention = self.attention(hidden, encoder_states).unsqueeze(1)
-        # attention = [batch_size, input_len] -> attention = [batch_size, 1, input_len]
-        encoder_states = encoder_states.permute(1, 0, 2)
+        weight = self.attention(hidden, encoder_states)
+        # weight = [batch_size, input_len]
+        context_vector = torch.bmm(weight.unsqueeze(1), encoder_states.permute(1, 0, 2)).permute(1, 0, 2)
+        # weight = [batch_size, 1, input_len]
         # encoder_states = [batch_size, input_len, hidden_dim * 2]
-        context_vector = torch.bmm(attention, encoder_states).permute(1, 0, 2)
         # context_vector = [batch_size, 1, hidden_dim *2] -> context_vector = [1, batch_size, hidden_dim * 2]
         rnn_input = torch.cat((embedding, context_vector), dim=2)
         # rnn_input = [1, batch_size, hidden_dim * 2 + embedding_dim]
 
-        decoder_state, (hidden, cell) = self.rnn(rnn_input, (hidden, cell))
+        decoder_state, (hidden, cell) = self.rnn(rnn_input, (hidden.unsqueeze(0), cell.unsqueeze(0)))
         # decoder_state = [1, batch_size, hidden_dim]
         # hidden = [1, batch_size, hidden_dim]
         # cell = [1, batch_size, hidden_dim]
         assert (decoder_state == hidden).all()
 
         embedding = embedding.squeeze(0)
+        decoder_state = decoder_state.squeeze(0)
         hidden = hidden.squeeze(0)
         cell = cell.squeeze(0)
         context_vector = context_vector.squeeze(0)
-        attention = attention.squeeze(0)
 
         # the original manuscript uses all of embedding, decoder state, and context vector for the predictions
         predictions = self.fc_out(torch.cat((embedding, decoder_state, context_vector), dim=1))
         # predictions = [batch_size, output_dim]
 
-        return predictions, hidden, cell, attention
+        return predictions, hidden, cell, weight
 
 
 class Seq2Seq(nn.Module):
@@ -146,15 +146,15 @@ class Seq2Seq(nn.Module):
         self.decoder = decoder
 
         assert (
-            encoder.hidden_dim == decoder.hidden_dim
+            self.encoder.hidden_dim == self.decoder.hidden_dim
         ), "Hidden dimensions of encoder and decoder must be equal!"
         assert (
-            encoder.n_layers == decoder.n_layers
+            self.encoder.n_layers == self.decoder.n_layers
         ), "Encoder and decoder must have equal number of layers!"
 
     def forward(self, src, trg, teacher_forcing_ratio=0.5):
-        # src = [src_length, batch_size]
-        # trg = [trg_length, batch_size]
+        # src = [src_len, batch_size]
+        # trg = [trg_len, batch_size]
 
         encoder_states, hidden, cell = self.encoder(src)
         # encoder_states are all hidden states of the input sequence
@@ -165,8 +165,8 @@ class Seq2Seq(nn.Module):
 
         batch_size = trg.shape[1]
         trg_len = trg.shape[0]
-        trg_vocab_size = len(trg.sr_alphabet)
-        outputs = torch.zeros(trg_len, batch_size, trg_vocab_size)  # tensor to store decoder outputs
+        output_dim = self.decoder.output_dim
+        outputs = torch.zeros(trg_len, batch_size, output_dim)  # tensor to store decoder outputs
 
         input = trg[0]  # first input to the decoder is the <SOS> token
         for t in range(1, trg_len):

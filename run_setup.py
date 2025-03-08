@@ -1,6 +1,6 @@
 import torch
 from torch.nn.utils import clip_grad_norm_
-from torch.nn.init import uniform_
+from torch.nn.init import normal_, constant_
 
 
 # training loop within one epoch
@@ -65,9 +65,24 @@ def evaluate_fn(model, data_loader, criterion, device):
 
         return average_loss
 
+"""
+def ur2sr(src, model, src_vocab, trg_vocab, device):
+    model.eval()  # disable dropout in evaluation
+    with torch.no_grad():  # disable gradient tracking
+        src = src.to(device)
+        # src = [src_len]
+
+        encoder_states, hidden, cell = model.encoder(src)
+
+        for i in range(len(src)):
+"""
+
 
 # weight initialization
 def init_weights(model):
     for name, param in model.named_parameters():
-        uniform_(param.data, -0.08, 0.08)
+        if "weight" in name:
+            normal_(param.data, mean=0, std=0.01)
+        else:
+            constant_(param.data, 0)
 

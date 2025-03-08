@@ -17,13 +17,14 @@ if __name__ == "__main__":
     annotations_file = "Dataset/English_txt_harmony.csv"
     text_dataset = TextDataset(annotations_file, hp.special_tokens)
     print(f"The dataset contains {len(text_dataset)} UR-SR pairs")
-    print(f"The UR vocabulary size is {len(text_dataset.ur_alphabet)}")
-    print(f"The SR vocabulary size is {len(text_dataset.sr_alphabet)}")
 
+    ur_vocab_size = len(text_dataset.ur_alphabet)
+    sr_vocab_size = len(text_dataset.sr_alphabet)
+    print(f"The UR vocabulary size is {ur_vocab_size}")
+    print(f"The SR vocabulary size is {sr_vocab_size}")
+
+    print(" - Splitting dataset:")
     train_data, valid_data, test_data = random_split(text_dataset, [0.8, 0.1, 0.1])
-    print(f"The training data contains {len(train_data)} UR-SR pairs")
-    print(f"The validation data contains {len(valid_data)} UR-SR pairs")
-    print(f"The testing data contains {len(test_data)} UR-SR pairs")
 
     print(" - Creating dataloader:")
     train_dataloader = get_dataloader(train_data)
@@ -32,9 +33,9 @@ if __name__ == "__main__":
 
     print(" - Initializing model:")
     # model hyperparameters
-    encoder_input_dim = len(text_dataset.ur_alphabet)
-    decoder_input_dim = len(text_dataset.sr_alphabet)
-    output_dim = len(text_dataset.sr_alphabet)
+    encoder_input_dim = ur_vocab_size
+    decoder_input_dim = sr_vocab_size
+    output_dim = sr_vocab_size
 
     # device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -73,7 +74,7 @@ if __name__ == "__main__":
         print(f"\tTrain Loss: {train_loss:7.3f} | Train PPL: {np.exp(train_loss):7.3f}")
         print(f"\tValid Loss: {valid_loss:7.3f} | Valid PPL: {np.exp(valid_loss):7.3f}")
 
-        # if the model has achieved the best validation loss so far
+        # if the validation loss in this epoch is the best so far
         # update the best validation loss and save the model
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
