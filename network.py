@@ -140,10 +140,11 @@ class Decoder(nn.Module):
 
 
 class Seq2Seq(nn.Module):
-    def __init__(self, encoder, decoder):
+    def __init__(self, encoder, decoder, device):
         super(Seq2Seq, self).__init__()
         self.encoder = encoder
         self.decoder = decoder
+        self.device = device
 
         assert (
             self.encoder.hidden_dim == self.decoder.hidden_dim
@@ -166,8 +167,8 @@ class Seq2Seq(nn.Module):
         trg_len = trg.shape[0]
         batch_size = trg.shape[1]
         output_dim = self.decoder.output_dim
-        decoder_outputs = torch.zeros(trg_len, batch_size, output_dim)
-        predictions = torch.zeros(trg_len, batch_size)
+        decoder_outputs = torch.zeros(trg_len, batch_size, output_dim).to(self.device)
+        predictions = torch.zeros(trg_len, batch_size).to(self.device)
         # decoder_outputs store the probability of all output vocabulary for each input token
         # predictions store the predicted output token for each input token
         # decoder_outputs = [trg_len, batch_size, output_dim]

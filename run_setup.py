@@ -36,16 +36,16 @@ def record_acc(acc_file, datatype, condition, run, epoch, train_loss, train_acc,
         # open csv file in append mode
         with open(acc_file, mode='a', newline='') as file:
             writer = csv.writer(file)
+            data = [datatype, condition, run, epoch, train_loss, train_acc, valid_loss, valid_acc]
+            writer.writerow(data)
     else:
         # open csv file in write mode and add header
         with open(acc_file, mode='w', newline='') as file:
             writer = csv.writer(file)
             header = ['datatype', 'condition', 'run', 'epoch', 'train_loss', 'train_acc', 'valid_loss', 'valid_acc']
             writer.writerow(header)
-
-    # append acc data
-    data = [datatype, condition, run, epoch, train_loss, train_acc, valid_loss, valid_acc]
-    writer.writerow(data)
+            data = [datatype, condition, run, epoch, train_loss, train_acc, valid_loss, valid_acc]
+            writer.writerow(data)
 
 
 # learning curve plotting
@@ -92,8 +92,10 @@ def train_one_epoch(model, data_loader, optimizer, criterion, clip, teacher_forc
         # output = [trg_length, batch_size, output_dim]
         # pred = [trg_len, batch_size]
 
-        batch_acc = (pred == trg).sum()  # calculate batch accuracy
-        epoch_acc += batch_acc.item()  # add to epoch accuracy
+        batch_size = trg.shape[1]
+        batch_correct = torch.all(torch.eq(pred, trg), dim=0).sum()  # calculate total number of correct predictions in a batch
+        batch_acc = batch_correct.item() / batch_size # calculate batch accuracy rate
+        epoch_acc += batch_acc  # add to epoch accuracy rate
 
         # remove the <SOS> token from output and target and reshape for loss calculation
         output_dim = output.shape[2]
@@ -133,8 +135,10 @@ def evaluate_one_epoch(model, data_loader, criterion, device):
             # output = [trg_length, batch_size, output_dim]
             # pred = [trg_len, batch_size]
 
-            batch_acc = (pred == trg).sum()  # calculate batch accuracy
-            epoch_acc += batch_acc.item()  # add to epoch accuracy
+            batch_size = trg.shape[1]
+            batch_correct = torch.all(torch.eq(pred, trg), dim=0).sum()  # calculate total number of correct predictions in a batch
+            batch_acc = batch_correct.item() / batch_size  # calculate batch accuracy rate
+            epoch_acc += batch_acc  # add to epoch accuracy rate
 
             # remove the <SOS> token from output and target and reshape for loss calculation
             output_dim = output.shape[2]
@@ -203,7 +207,7 @@ def run_once(trial_num, run, datatype, condition):
                           hp.n_layers, hp.encoder_dropout).to(device)
     decoder_net = Decoder(decoder_input_dim, hp.decoder_embedding_dim, hp.hidden_dim, output_dim,
                           hp.n_layers, hp.decoder_dropout, attention).to(device)
-    seq2seq = Seq2Seq(encoder_net, decoder_net).to(device)
+    seq2seq = Seq2Seq(encoder_net, decoder_net, device).to(device)
 
     # weight initialization
     seq2seq.apply(init_weights)
@@ -222,20 +226,20 @@ def run_once(trial_num, run, datatype, condition):
                                                 hp.teacher_forcing_ratio, device)
         valid_loss, valid_acc = evaluate_one_epoch(seq2seq, valid_dataloader, criterion, device)
         print(f"\tTrain Loss: {train_loss:7.3f} | Train PPL: {np.exp(train_loss):7.3f} | Train Acc: {train_acc:7.3f}")
-        print(f"\tValid Loss: {valid_loss:7.3f} | Valid PPL: {np.exp(valid_loss):7.3f} | Train Acc: {valid_acc:7.3f}")
+        print(f"\tValid Loss: {valid_loss:7.3f} | Valid PPL: {np.exp(valid_loss):7.3f} | Valid Acc: {valid_acc:7.3f}")
 
         # save and the accuracy value
         acc_file = "Results/" + trial_num + "/acc.csv"
-        record_acc(acc_file, datatype, condition, run, epoch, train_acc, valid_acc)
+        record_acc(acc_file, datatype, condition, run, epoch, train_loss, train_acc, valid_loss, valid_acc)
         print(f"Accuracy data saved at {acc_file}")
 
         # save the model
-        model_file = "Results/" + trial_num + "/English_" + datatype + "_" + condition + "_run" + run + "_seq2seq.pth"
+        model_file = "Results/" + trial_num + "/English_" + datatype + "_" + condition + "_run" + str(run) + "_seq2seq.pth"
         torch.save(seq2seq.state_dict(), model_file)
         print(f"Model trained and stored at {model_file}")
 
     # plot the accuracy value
-    plot_acc(acc_file)
+    plot_acc(trial_num, acc_file)
 
     print(" - Evaluating model:")
     # load the model

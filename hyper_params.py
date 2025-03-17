@@ -19,7 +19,7 @@ decoder_dropout = 0.1  # 0.0 is equivalent to Identity function
 teacher_forcing_ratio = 0.5
 
 # Training hyperparameters
-n_epochs = 50  # original=50. Note: must be >1 !!!
+n_epochs = 10  # original=50. Note: must be >1 !!!
 learning_rate = 3e-4
 batch_size = 32  # original=32
 clip = 1.0
