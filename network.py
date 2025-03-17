@@ -132,11 +132,11 @@ class Decoder(nn.Module):
         cell = cell.squeeze(0)
         context_vector = context_vector.squeeze(0)
 
-        # the original manuscript uses all of embedding, decoder state, and context vector for the predictions
-        predictions = self.fc_out(torch.cat((embedding, decoder_state, context_vector), dim=1))
-        # predictions = [batch_size, output_dim]
+        # the original manuscript uses all of embedding, decoder state, and context vector for the prediction
+        output = self.fc_out(torch.cat((embedding, decoder_state, context_vector), dim=1))
+        # output = [batch_size, output_dim]
 
-        return predictions, hidden, cell, weight
+        return output, hidden, cell, weight
 
 
 class Seq2Seq(nn.Module):
@@ -163,25 +163,31 @@ class Seq2Seq(nn.Module):
         # hidden = [batch_size, encoder_hidden_dim]
         # cell = [batch_size, encoder_hidden_dim]
 
-        batch_size = trg.shape[1]
         trg_len = trg.shape[0]
+        batch_size = trg.shape[1]
         output_dim = self.decoder.output_dim
-        outputs = torch.zeros(trg_len, batch_size, output_dim)  # tensor to store decoder outputs
+        decoder_outputs = torch.zeros(trg_len, batch_size, output_dim)
+        predictions = torch.zeros(trg_len, batch_size)
+        # decoder_outputs store the probability of all output vocabulary for each input token
+        # predictions store the predicted output token for each input token
+        # decoder_outputs = [trg_len, batch_size, output_dim]
+        # predictions = [trg_len, batch_size]
 
         input = trg[0]  # first input to the decoder is the <SOS> token
         for t in range(1, trg_len):
             # at every time step, insert input token, encoder_states, and previous hidden and cell
-            # receive output (predictions) and new hidden and cell
+            # receive output and new hidden and cell
+            # and get the best word predicted by the decoder
             output, hidden, cell, _ = self.decoder(input, encoder_states, hidden, cell)
             # output = [batch_size, output_dim]
             # hidden = [batch_size, decoder_hidden_dim]
             # cell = [batch_size, decoder_hidden_dim]
-
-            # store prediction for current time step
-            outputs[t] = output
-
-            # get the best word predicted by the decoder
             best_guess = output.argmax(1)
+            # best_guess = [batch_size]
+
+            # store output and best guess for current time step
+            decoder_outputs[t] = output
+            predictions[t] = best_guess
 
             # with probability of teacher_force_ratio we take the actual next word
             # otherwise we take the word that the decoder predicted it to be
@@ -189,4 +195,4 @@ class Seq2Seq(nn.Module):
             input = trg[t] if random.random() < teacher_forcing_ratio else best_guess
             # input = [batch_size]
 
-        return outputs
+        return decoder_outputs, predictions
