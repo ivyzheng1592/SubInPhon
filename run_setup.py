@@ -49,7 +49,7 @@ def record_acc(acc_file, datatype, condition, run, epoch, train_loss, train_acc,
 
 
 # learning curve plotting
-def plot_acc(trial_num, acc_file):
+def plot_acc(acc_file, plot_file):
     acc_data = pd.read_csv(acc_file)
     epoch = acc_data["epoch"]
     train_loss = acc_data["train_loss"]
@@ -57,14 +57,12 @@ def plot_acc(trial_num, acc_file):
     valid_loss = acc_data["valid_loss"]
     valid_acc = acc_data["valid_acc"]
 
-    plt.figure()
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)  # create a 2 * 2 plot
     ax1.plot(epoch, train_loss, label="Train Loss")
     ax2.plot(epoch, train_acc, label="Train Acc")
     ax3.plot(epoch, valid_loss, label="Valid Loss")
     ax4.plot(epoch, valid_acc, label="Valid Acc")
 
-    plot_file = "Results/" + trial_num + "/accuracy_plot.png"
     plt.savefig(plot_file)
     plt.show()
 
@@ -219,6 +217,10 @@ def run_once(trial_num, run, datatype, condition):
     criterion = nn.CrossEntropyLoss(ignore_index=hp.special_tokens.index(hp.pad_token))
 
     print(" - Training model:")
+    acc_file = "Results/" + trial_num + "/English_" + datatype + "_" + condition + "_run" + str(run) + "_acc.csv"
+    model_file = "Results/" + trial_num + "/English_" + datatype + "_" + condition + "_run" + str(run) + "_seq2seq.pth"
+    plot_file = "Results/" + trial_num + "/English_" + datatype + "_" + condition + "_run" + str(run) + "_acc_plot.png"
+
     # at each epoch, display progress bar
     for epoch in tqdm.tqdm(range(hp.n_epochs)):
         # update loss for each batch
@@ -229,17 +231,16 @@ def run_once(trial_num, run, datatype, condition):
         print(f"\tValid Loss: {valid_loss:7.3f} | Valid PPL: {np.exp(valid_loss):7.3f} | Valid Acc: {valid_acc:7.3f}")
 
         # save and the accuracy value
-        acc_file = "Results/" + trial_num + "/acc.csv"
         record_acc(acc_file, datatype, condition, run, epoch, train_loss, train_acc, valid_loss, valid_acc)
         print(f"Accuracy data saved at {acc_file}")
 
         # save the model
-        model_file = "Results/" + trial_num + "/English_" + datatype + "_" + condition + "_run" + str(run) + "_seq2seq.pth"
         torch.save(seq2seq.state_dict(), model_file)
         print(f"Model trained and stored at {model_file}")
 
     # plot the accuracy value
-    plot_acc(trial_num, acc_file)
+    plot_acc(acc_file, plot_file)
+    print(f"Accuracy plot save at {plot_file}")
 
     print(" - Evaluating model:")
     # load the model
