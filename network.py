@@ -5,6 +5,8 @@
 import torch
 import torch.nn as nn
 import random
+import hyper_params as hp
+import torchinfo
 
 
 class Encoder(nn.Module):
@@ -153,7 +155,7 @@ class Seq2Seq(nn.Module):
             self.encoder.n_layers == self.decoder.n_layers
         ), "Encoder and decoder must have equal number of layers!"
 
-    def forward(self, src, trg, teacher_forcing_ratio):
+    def forward(self, src, trg, teacher_forcing_ratio=0.5):
         # src = [src_len, batch_size]
         # trg = [trg_len, batch_size]
 
@@ -197,3 +199,22 @@ class Seq2Seq(nn.Module):
             # input = [batch_size]
 
         return decoder_outputs, predictions
+
+
+if __name__ == "__main__":
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using {device} device")
+
+    print(" - Initializing model:")
+    encoder_input_dim = 30
+    decoder_input_dim = 30
+    output_dim = 30
+
+    attention = BahdanauAttention(hp.hidden_dim)
+    encoder_net = Encoder(encoder_input_dim, hp.encoder_embedding_dim, hp.hidden_dim,
+                          hp.n_layers, hp.encoder_dropout).to(device)
+    decoder_net = Decoder(decoder_input_dim, hp.decoder_embedding_dim, hp.hidden_dim, output_dim,
+                          hp.n_layers, hp.decoder_dropout, attention).to(device)
+    seq2seq = Seq2Seq(encoder_net, decoder_net, device).to(device)
+
+    torchinfo.summary(seq2seq, input_size = [(7, 32), (7, 32)], dtypes=[torch.long, torch.long], device=device)
