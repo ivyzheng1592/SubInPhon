@@ -10,13 +10,13 @@ sample_rate = 22050
 n_samples = 22050
 
 # Model hyperparameters
-encoder_embedding_dim = 300  # original=300
-decoder_embedding_dim = 300  # original=300
-hidden_dim = 256  # original=256
+encoder_embedding_dim = 30  # original=300
+decoder_embedding_dim = 30  # original=300
+hidden_dim = 16  # original=256
 n_layers = 1
 encoder_dropout = 0.1  # 0.0 is equivalent to Identity function
 decoder_dropout = 0.1  # 0.0 is equivalent to Identity function
-teacher_forcing_ratio = 0.5
+teacher_forcing_ratio = 0.2  #original=0.5
 
 # Training hyperparameters
 n_epochs = 10  # original=50. Note: must be >1 !!!
