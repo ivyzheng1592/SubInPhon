@@ -2,25 +2,27 @@
 # A temporary script to check audio length
 
 import os
-import random
 import torchaudio
+import pandas as pd
 
 # get a list of all WAV files
-dir = "audio/English"
-wav_files = [file for file in os.listdir(dir) if file.endswith('.wav')]
+aud_dir = "audio/English"
+wav_files = [file for file in os.listdir(aud_dir) if file.endswith('.wav')]
 
-# randomly select 10% of the WAV files
-selected_files = random.sample(wav_files, int(0.1 * len(wav_files)))
+# dictionary for audio length
+num_frame_dict = {header: [] for header in ['file', 'num_frames']}
 
-# placeholder for the maximum audio length
-max_num_frames = 0
-
-# iterate over the selected files
-for file in selected_files:
-    file_path = os.path.join(dir, file)
+# iterate over all WAV files
+for index, file in enumerate(wav_files):
+    file_path = os.path.join(aud_dir, file)
     num_frames = torchaudio.info(file_path).num_frames
-    print(num_frames)
-    if num_frames > max_num_frames:
-        max_num_frames = num_frames
+    num_frame_dict['file'].append(file)
+    num_frame_dict['num_frames'].append(num_frames)
+    if index % 1762 == 0:
+        print(f"Went through {index / 1762}% of the files!")
 
-print(max_num_frames)
+# write dataframe to csv file
+num_frame_df = pd.DataFrame(num_frame_dict)
+df_path = "audio_length.xlsx"
+num_frame_df.to_excel(df_path, index=False)
+print(f"All done!")
