@@ -6,7 +6,6 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
-import hyper_params as hp
 
 
 class Alphabet:
@@ -56,6 +55,7 @@ class TextDataset(Dataset):
 
         # define special characters
         self.specials = special_tokens
+        self.pad_idx = special_tokens.index("<PAD>")
 
         # build ur alphabet
         self.ur_name = re.split('[/_.]', annotations_file)[2] + "_ur"
@@ -83,36 +83,32 @@ class TextDataset(Dataset):
 
         return source_tensor, target_tensor
 
+    # a closure of customized collate_fn
+    def get_collate_fn(self):
+        def collate_fn(batch):
+            sources = [item[0] for item in batch]
+            sources = pad_sequence(sources, batch_first=False, padding_value=self.pad_idx)
 
-# a closure of customized collate_fn
-def get_collate_fn(pad_idx):
-    def collate_fn(batch):
-        sources = [item[0] for item in batch]
-        sources = pad_sequence(sources, batch_first=False, padding_value=pad_idx)
+            targets = [item[1] for item in batch]
+            targets = pad_sequence(targets, batch_first=False, padding_value=self.pad_idx)
+            return sources, targets
+        return collate_fn
 
-        targets = [item[1] for item in batch]
-        targets = pad_sequence(targets, batch_first=False, padding_value=pad_idx)
+    def get_dataloader(self, batch_size, shuffle=True):
+        collate_fn = self.get_collate_fn()
 
-        return sources, targets
-
-    return collate_fn
-
-
-def get_dataloader(dataset, batch_size=hp.batch_size, shuffle=True):
-    pad_idx = hp.special_tokens.index(hp.pad_token)
-
-    collate_fn = get_collate_fn(pad_idx)
-
-    data_loader = DataLoader(
-        dataset=dataset,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        collate_fn=collate_fn
-    )
-    return data_loader
+        data_loader = DataLoader(
+            dataset=self,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            collate_fn=collate_fn
+        )
+        return data_loader
 
 
 if __name__ == "__main__":
+    import hyper_params as hp
+
     print(" - Loading dataset:")
     annotations_file = "Dataset/English_txt_harmony.csv"
     annotations = pd.read_csv(annotations_file)
@@ -128,8 +124,8 @@ if __name__ == "__main__":
           "\nSample target:", trg)
 
     print(" - Creating dataloader:")
-    text_dataloader = get_dataloader(text_dataset)
+    text_dataloader = text_dataset.get_dataloader(batch_size=hp.batch_size)
     dataiter = iter(text_dataloader)
     source, target = next(dataiter)
-    print("Sample source:", source.shape,
-          "\nSample target:", target.shape)
+    print("Sample source:", source,
+          "\nSample target:", target)

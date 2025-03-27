@@ -6,21 +6,38 @@ import pandas as pd
 import random
 import torch
 import torchaudio
+import torchaudio.transforms as T
 from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
-import hyper_params as hp
 
 
-def plot_waveform(waveform, sample_rate):
-    pass
+def plot_waveform(waveform, sample_rate, title="Waveform"):
+    waveform = waveform.numpy()  # [n_channels, n_samples]
+    time_axis = torch.arange(0, waveform.shape[1]) / sample_rate
 
+    fig, axs = plt.subplots(1, 1)
+    axs.set_xlabel("time")
+    axs.set_ylabel("amplitude")
+    axs.plot(time_axis, waveform[0], linewidth=1)
+    axs.grid(visible=True)
+    fig.suptitle(title)
+    plt.show()
 
-def plot_spectrogram(waveform, sample_rate):
-    pass
+def plot_spectrogram(spectrogram, title="Spectrogram"):
+    spectrogram = spectrogram[0]  # [1, n_freq, n_samples]
+
+    fig, axs = plt.subplots(1, 1)
+    axs.set_xlabel("frame")
+    axs.set_ylabel("mel freq")
+    im = axs.imshow(spectrogram, origin='lower', aspect='auto')
+    fig.colorbar(im, ax=axs)
+    fig.suptitle(title)
+    plt.show()
 
 
 class AudioDataset(Dataset):
-    def __init__(self, annotations_file, audio_dir, sample_rate, n_samples, device, wav2mel=True, power2db=True, normalize=True):
+    def __init__(self, annotations_file, audio_dir, sample_rate, n_samples, n_fft, hop_length, n_mels,
+                 wav2mel=True, power2db=True, normalize=True, device='cuda'):
         # get the list of ur and sr words
         self.annotations = pd.read_csv(annotations_file)
         self.ur = self.annotations["ur"]
@@ -32,6 +49,9 @@ class AudioDataset(Dataset):
         # audio attributes
         self.sample_rate = sample_rate
         self.n_samples = n_samples
+        self.n_fft = n_fft
+        self.hop_length = hop_length
+        self.n_mels = n_mels
 
         # audio transformation
         self.wav2mel = wav2mel
@@ -63,17 +83,32 @@ class AudioDataset(Dataset):
         if self.wav2mel:
             source_audio = self._wav_to_mel(source_audio)
             target_audio = self._wav_to_mel(target_audio)
+        if self.power2db:
+            source_audio = self._power_to_db(source_audio)
+            target_audio = self._power_to_db(target_audio)
 
         return source_audio, target_audio
 
     def _resampling(self, signal, sr):
+
+        # in this project, we expect all sr == self.sample_rate
+        assert (
+            sr == self.sample_rate
+        ), f"All audio data should have {self.sample_rate} sample rate!"
+
         if sr != self.sample_rate:
-            resampler = torchaudio.transforms.Resample(sr, self.sample_rate)
+            resampler = T.Resample(orig_freq=sr, new_freq=self.sample_rate).to(device)
             signal = resampler(signal)
         return signal
 
     def _padding(self, signal):
         length_signal = signal.shape[1]
+
+        # in this project, we are padding to a maximum length
+        # so we expect all length_signal < self.n_samples
+        assert (
+            length_signal < self.n_samples
+        ), f"All audio data should have less than {self.n_samples} samples!"
 
         # if the signal have more samples than we expect, cut the signal with slicing
         if length_signal > self.n_samples:
@@ -93,31 +128,37 @@ class AudioDataset(Dataset):
         return signal
 
     def _wav_to_mel(self, signal):
-        mel_spectrogram = torchaudio.transforms.MelSpectrogram(
-            sample_rate=24000,  # sampling rate, i.e. 24000 samples in 1s
-            n_fft=1024,  # length of the FFT window
+        mel_spectrogram = T.MelSpectrogram(
+            sample_rate=self.sample_rate,  # sampling rate, i.e. 24000 samples in 1s
+            n_fft=self.n_fft,  # length of the FFT window
             # vowel length normally 50-100ms
-            # we select 40ms for each window --> 960 points --> round up to 1024 points as it is power of 2
+            # we select 40ms for each window --> 960 samples --> round up to 1024 samples as it is power of 2
             # the higher n_fft is, the better frequency resolution it gets
-            hop_length=256,  # number of samples overlapping between successive frames
+            hop_length=self.hop_length,  # number of samples overlapping between successive frames
             # we select 1024/4 = 256
             # the shorter hop_length, the higher temporal resolution it gets
-            n_mels=128,  # number of Mel bands to generate, normally 128
+            n_mels=self.n_mels,  # number of Mel bands to generate, normally 128
         ).to(self.device)
         signal = mel_spectrogram(signal)
         return signal
 
+    def _power_to_db(self, signal):
+        db_spectrogram = T.AmplitudeToDB(stype="power").to(self.device)
+        signal = db_spectrogram(signal)
+        return signal
 
-def get_dataloader(dataset, batch_size=hp.batch_size, shuffle=True):
-    data_loader = DataLoader(
-        dataset=dataset,
-        batch_size=batch_size,
-        shuffle=shuffle
-    )
-    return data_loader
+    def get_dataloader(self, batch_size, shuffle=True):
+        data_loader = DataLoader(
+            dataset=self,
+            batch_size=batch_size,
+            shuffle=shuffle
+        )
+        return data_loader
 
 
 if __name__ == "__main__":
+    import hyper_params as hp
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using {device} device")
 
@@ -129,13 +170,18 @@ if __name__ == "__main__":
           "\nSample data token:", annotations.iloc[0])
 
     print(" - Audio preprocessing:")
-    audio_dataset = AudioDataset(annotations_file, audio_dir, hp.sample_rate, hp.n_samples, device)
+    audio_dataset = AudioDataset(annotations_file, audio_dir, hp.sample_rate, hp.n_samples,
+                                 hp.n_fft, hp.hop_length, hp.n_mels,
+                                 wav2mel=True, power2db=True, device='cpu')
     src, trg = audio_dataset[0]
     print("Sample source:", src,
           "\nSample target:", trg)
 
+    plot_spectrogram(src)
+    plot_spectrogram(trg)
+
     print(" - Creating dataloader:")
-    audio_dataloader = get_dataloader(audio_dataset)
+    audio_dataloader = audio_dataset.get_dataloader(batch_size=hp.batch_size)
     dataiter = iter(audio_dataloader)
     source, target = next(dataiter)
     print("Sample source:", source,

@@ -1,3 +1,16 @@
+"""
+data structure:
+- "Dataset"
+    - "audio"
+        - {language_name}
+- "Results"
+    - "trial_"{trial_num}
+        - {datatype} + "_" + {condition} + "_" + "run_"{run_num} + "_seq2seq.pth"
+        - {datatype} + "_" + {condition} + "_" + "run_"{run_num} + "_acc.csv"
+        - {datatype} + "_" + {condition} + "_" + "run_"{run_num} + "_acc_plot.png"
+        - {datatype} + "_" + {condition} + "_" + "run_"{run_num} + "_att_plot.png"
+"""
+
 # Alphabet
 sos_token = "<SOS>"
 eos_token = "<EOS>"
@@ -5,9 +18,15 @@ unk_token = "<UNK>"
 pad_token = "<PAD>"
 special_tokens = [sos_token, eos_token, unk_token, pad_token]
 
-# Audio
-sample_rate = 22050
-n_samples = 22050
+# Audio preprocessing hyperparameters
+sample_rate = 24000
+n_samples = 24000
+n_fft = 1024
+hop_length = 256
+n_mels = 128
+
+# Dataset hyperparameters
+data_split_ratio = [0.8, 0.1, 0.1]
 
 # Model hyperparameters
 encoder_embedding_dim = 30  # original=300
@@ -16,7 +35,7 @@ hidden_dim = 32  # original=256
 n_layers = 1
 encoder_dropout = 0.1  # 0.0 is equivalent to Identity function
 decoder_dropout = 0.1  # 0.0 is equivalent to Identity function
-teacher_forcing_ratio = 0.5  #original=0.5
+teacher_forcing_ratio = 0.5  # original=0.5
 
 # Training hyperparameters
 n_epochs = 10  # original=50. Note: must be >1 !!!

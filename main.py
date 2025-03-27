@@ -1,12 +1,130 @@
-from run_setup import run_once
+import os
+import tqdm
+import numpy as np
+from torch.utils.data import random_split
+
+from audio_dataset_loader import AudioDataset
+from text_dataset_loader import TextDataset, get_dataloader
+from network import Encoder, Decoder, BahdanauAttention, Seq2Seq
+import hyper_params as hp
+from run_setup import *
+
+# a function that completes one run of training and evaluation of one model
+def run_once(seq2seq: Seq2Seq, train_dataloader, valid_dataloader, test_dataloader,
+             acc_file, model_file, acc_plot, att_plot):
+
+    # model weight initialization
+    seq2seq.apply(init_weights)
+    model_parameters = sum(p.numel() for p in seq2seq.parameters() if p.requires_grad)
+    print(f"The model has {model_parameters} trainable parameters")
+
+    # optimizer and loss function
+    optimizer = torch.optim.Adam(seq2seq.parameters(), lr=hp.learning_rate)
+    criterion = nn.CrossEntropyLoss(ignore_index=hp.special_tokens.index(hp.pad_token))
+
+    # at each epoch, display progress bar
+    for epoch in tqdm.tqdm(range(hp.n_epochs)):
+        # update loss for each batch
+        train_loss, train_acc = train_one_epoch(seq2seq, train_dataloader, optimizer, criterion, hp.clip,
+                                                hp.teacher_forcing_ratio, device)
+        valid_loss, valid_acc = evaluate_one_epoch(seq2seq, valid_dataloader, criterion, device)
+        print(f"\tTrain Loss: {train_loss:7.3f} | Train PPL: {np.exp(train_loss):7.3f} | Train Acc: {train_acc:7.3f}")
+        print(f"\tValid Loss: {valid_loss:7.3f} | Valid PPL: {np.exp(valid_loss):7.3f} | Valid Acc: {valid_acc:7.3f}")
+
+        # save and the accuracy value
+        record_acc(acc_file, datatype, condition, run, epoch, train_loss, train_acc, valid_loss, valid_acc)
+        print(f"Accuracy data saved at {acc_file}")
+
+        # save the model
+        torch.save(seq2seq.state_dict(), model_file)
+        print(f"Model trained and stored at {model_file}")
+
+    # plot the accuracy value
+    plot_acc(acc_file, acc_plot)
+    print(f"Accuracy plot save at {acc_plot}")
+
+    print(" - Evaluating model:")
+    # load the model
+    seq2seq.load_state_dict(torch.load(model_file))
+
+    # check loss for the test dataset
+    test_loss, test_acc = evaluate_one_epoch(seq2seq, test_dataloader, criterion, device)
+
+
+def run_one_condition(trial_num, language, datatype, condition):
+
+    print(" - Loading dataset and building vocabulary:")
+    annotations_file = os.path.join("Dataset", language + "_" + datatype + "_" + condition + ".csv")
+    audio_dir = os.path.join("Dataset", "audio", language)
+
+    if datatype == "txt":
+        dataset = TextDataset(annotations_file, hp.special_tokens)
+        print(f"The dataset contains {len(dataset)} UR-SR pairs")
+
+        ur_vocab_size = len(dataset.ur_alphabet)
+        sr_vocab_size = len(dataset.sr_alphabet)
+        print(f"The UR vocabulary size is {ur_vocab_size}")
+        print(f"The SR vocabulary size is {sr_vocab_size}")
+    elif datatype == "aud":
+        dataset = AudioDataset(annotations_file, audio_dir, hp.sample_rate, hp.n_samples, device=device,
+                               wav2mel=True, power2db=True, normalize=True)
+        print(f"The dataset contains {len(dataset)} UR-SR pairs")
+
+        ur, sr = dataset[0]
+        ur_shape = ur.shape
+        sr_shape = sr.shape
+        print(f"The UR input shape is {ur_shape}")
+        print(f"The SR input shape is {sr_shape}")
+    else:
+        raise ValueError("Invalid datatype input")
+
+    print(" - Splitting dataset:")
+    train_data, valid_data, test_data = random_split(dataset, hp.data_split_ratio)
+
+    print(" - Creating dataloader:")
+    train_dataloader = get_dataloader(train_data)
+    valid_dataloader = get_dataloader(valid_data)
+    test_dataloader = get_dataloader(test_data)
+
+    print(" - Initializing model:")
+    # model hyperparameters
+    if datatype == "txt":
+        encoder_input_dim = ur_vocab_size
+        decoder_input_dim = sr_vocab_size
+        output_dim = sr_vocab_size
+    elif datatype == "aud":
+        encoder_input_dim = ur.shape[1] * ur_shape[2]  # audio_freq * audio_dur
+        decoder_input_dim = sr.shape[1] * sr_shape[2]
+        output_dim = sr.shape[1] * sr_shape[2]
+    else:
+        raise ValueError("Invalid datatype input")
+
+    # model initialization
+    attention = BahdanauAttention(hp.hidden_dim)
+    encoder_net = Encoder(encoder_input_dim, hp.encoder_embedding_dim, hp.hidden_dim,
+                          hp.n_layers, hp.encoder_dropout).to(device)
+    decoder_net = Decoder(decoder_input_dim, hp.decoder_embedding_dim, hp.hidden_dim, output_dim,
+                          hp.n_layers, hp.decoder_dropout, attention).to(device)
+    seq2seq = Seq2Seq(encoder_net, decoder_net, device).to(device)
+
+    acc_file = "Results/" + trial_num + "/English_" + datatype + "_" + condition + "_run" + str(run) + "_acc.csv"
+    model_file = "Results/" + trial_num + "/English_" + datatype + "_" + condition + "_run" + str(run) + "_seq2seq.pth"
+    plot_file = "Results/" + trial_num + "/English_" + datatype + "_" + condition + "_run" + str(run) + "_acc_plot.png"
+    print(" - Training model:")
 
 if __name__ == "__main__":
+
     # defining the current trial of running
-    trial_num = "250320"
+    trial_num = "250327"
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using {device} device")
 
     # running each condition for x times
-    for run in range(2,3):
-        run_once(trial_num, run, "txt", "harmony")
-        run_once(trial_num, run, "txt", "disharmony")
-        #run_once(trial_num, run, "aud", "harmony")
-        #run_once(trial_num, run, "aud", "disharmony")
+    languages = ["English"]
+    datatypes = ["txt", "aud"]
+    conditions = ["harmony", "disharmony"]
+    for language in languages:
+        for datatype in datatypes:
+            for condition in conditions:
+                run_one_condition(trial_num, language, datatype, condition)
