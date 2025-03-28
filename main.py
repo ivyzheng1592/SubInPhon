@@ -1,17 +1,26 @@
 import os
 import tqdm
 import numpy as np
-from torch.utils.data import random_split
 
+from text_dataset_loader import TextDataset
 from audio_dataset_loader import AudioDataset
-from text_dataset_loader import TextDataset, get_dataloader
-from network import Encoder, Decoder, BahdanauAttention, Seq2Seq
+from network import *
 import hyper_params as hp
 from run_setup import *
 
 # a function that completes one run of training and evaluation of one model
-def run_once(seq2seq: Seq2Seq, train_dataloader, valid_dataloader, test_dataloader,
-             acc_file, model_file, acc_plot, att_plot):
+def run_once(seq2seq, train_dataloader, valid_dataloader, test_dataloader,
+             trial_num, language, datatype, condition, run):
+
+    # results files
+    acc_file = os.path.join("Results", trial_num,
+                            language + "_" + datatype + "_" + condition + "_run" + str(run) + "_acc.csv")
+    model_file = os.path.join("Results", trial_num,
+                              language + "_" + datatype + "_" + condition + "_run" + str(run) + "_seq2seq.pth")
+    acc_plot = os.path.join("Results", trial_num,
+                            language + "_" + datatype + "_" + condition + "_run" + str(run) + "_acc_plot.png")
+    att_plot = os.path.join("Results", trial_num,
+                            language + "_" + datatype + "_" + condition + "_run" + str(run) + "_att_plot.png")
 
     # model weight initialization
     seq2seq.apply(init_weights)
@@ -25,14 +34,15 @@ def run_once(seq2seq: Seq2Seq, train_dataloader, valid_dataloader, test_dataload
     # at each epoch, display progress bar
     for epoch in tqdm.tqdm(range(hp.n_epochs)):
         # update loss for each batch
-        train_loss, train_acc = train_one_epoch(seq2seq, train_dataloader, optimizer, criterion, hp.clip,
-                                                hp.teacher_forcing_ratio, device)
-        valid_loss, valid_acc = evaluate_one_epoch(seq2seq, valid_dataloader, criterion, device)
+        train_loss, train_acc = train_one_epoch(seq2seq, train_dataloader, optimizer, criterion,
+                                                hp.clip, hp.teacher_forcing_ratio)
+        valid_loss, valid_acc = evaluate_one_epoch(seq2seq, valid_dataloader, criterion)
         print(f"\tTrain Loss: {train_loss:7.3f} | Train PPL: {np.exp(train_loss):7.3f} | Train Acc: {train_acc:7.3f}")
         print(f"\tValid Loss: {valid_loss:7.3f} | Valid PPL: {np.exp(valid_loss):7.3f} | Valid Acc: {valid_acc:7.3f}")
 
-        # save and the accuracy value
-        record_acc(acc_file, datatype, condition, run, epoch, train_loss, train_acc, valid_loss, valid_acc)
+        # save the accuracy value
+        record_acc(acc_file, language, datatype, condition, run, epoch,
+                   train_loss, train_acc, valid_loss, valid_acc)
         print(f"Accuracy data saved at {acc_file}")
 
         # save the model
@@ -48,17 +58,19 @@ def run_once(seq2seq: Seq2Seq, train_dataloader, valid_dataloader, test_dataload
     seq2seq.load_state_dict(torch.load(model_file))
 
     # check loss for the test dataset
-    test_loss, test_acc = evaluate_one_epoch(seq2seq, test_dataloader, criterion, device)
+    test_loss, test_acc = evaluate_one_epoch(seq2seq, test_dataloader, criterion)
 
 
-def run_one_condition(trial_num, language, datatype, condition):
+# a function that loads dataset and initializes model
+# and completes multiple runs of training and evaluation of one model
+def run_one_condition(trial_num, language, datatype, condition, n_runs, device):
 
     print(" - Loading dataset and building vocabulary:")
     annotations_file = os.path.join("Dataset", language + "_" + datatype + "_" + condition + ".csv")
     audio_dir = os.path.join("Dataset", "audio", language)
 
     if datatype == "txt":
-        dataset = TextDataset(annotations_file, hp.special_tokens)
+        dataset = TextDataset(annotations_file, hp.special_tokens, device=device)
         print(f"The dataset contains {len(dataset)} UR-SR pairs")
 
         ur_vocab_size = len(dataset.ur_alphabet)
@@ -66,8 +78,9 @@ def run_one_condition(trial_num, language, datatype, condition):
         print(f"The UR vocabulary size is {ur_vocab_size}")
         print(f"The SR vocabulary size is {sr_vocab_size}")
     elif datatype == "aud":
-        dataset = AudioDataset(annotations_file, audio_dir, hp.sample_rate, hp.n_samples, device=device,
-                               wav2mel=True, power2db=True, normalize=True)
+        dataset = AudioDataset(annotations_file, audio_dir, hp.sample_rate, hp.n_samples,
+                               hp.n_fft, hp.hop_length, hp.n_mels,
+                               wav2mel=True, power2db=True, device=device)
         print(f"The dataset contains {len(dataset)} UR-SR pairs")
 
         ur, sr = dataset[0]
@@ -79,12 +92,12 @@ def run_one_condition(trial_num, language, datatype, condition):
         raise ValueError("Invalid datatype input")
 
     print(" - Splitting dataset:")
-    train_data, valid_data, test_data = random_split(dataset, hp.data_split_ratio)
+    train_data, valid_data, test_data = dataset.split_dataset(hp.data_split_ratio)
 
     print(" - Creating dataloader:")
-    train_dataloader = get_dataloader(train_data)
-    valid_dataloader = get_dataloader(valid_data)
-    test_dataloader = get_dataloader(test_data)
+    train_dataloader = train_data.dataset.get_dataloader(hp.batch_size)
+    valid_dataloader = valid_data.dataset.get_dataloader(hp.batch_size)
+    test_dataloader = test_data.dataset.get_dataloader(hp.batch_size)
 
     print(" - Initializing model:")
     # model hyperparameters
@@ -93,9 +106,9 @@ def run_one_condition(trial_num, language, datatype, condition):
         decoder_input_dim = sr_vocab_size
         output_dim = sr_vocab_size
     elif datatype == "aud":
-        encoder_input_dim = ur.shape[1] * ur_shape[2]  # audio_freq * audio_dur
-        decoder_input_dim = sr.shape[1] * sr_shape[2]
-        output_dim = sr.shape[1] * sr_shape[2]
+        encoder_input_dim = ur.shape[1] * ur.shape[2]  # audio_freq * audio_dur
+        decoder_input_dim = sr.shape[1] * sr.shape[2]
+        output_dim = sr.shape[1] * sr.shape[2]
     else:
         raise ValueError("Invalid datatype input")
 
@@ -107,10 +120,11 @@ def run_one_condition(trial_num, language, datatype, condition):
                           hp.n_layers, hp.decoder_dropout, attention).to(device)
     seq2seq = Seq2Seq(encoder_net, decoder_net, device).to(device)
 
-    acc_file = "Results/" + trial_num + "/English_" + datatype + "_" + condition + "_run" + str(run) + "_acc.csv"
-    model_file = "Results/" + trial_num + "/English_" + datatype + "_" + condition + "_run" + str(run) + "_seq2seq.pth"
-    plot_file = "Results/" + trial_num + "/English_" + datatype + "_" + condition + "_run" + str(run) + "_acc_plot.png"
     print(" - Training model:")
+    for run in range(n_runs):
+        run_once(seq2seq, train_dataloader, valid_dataloader, test_dataloader,
+                 trial_num, language, datatype, condition, run)
+
 
 if __name__ == "__main__":
 
@@ -124,7 +138,8 @@ if __name__ == "__main__":
     languages = ["English"]
     datatypes = ["txt", "aud"]
     conditions = ["harmony", "disharmony"]
+    n_runs = 1
     for language in languages:
         for datatype in datatypes:
             for condition in conditions:
-                run_one_condition(trial_num, language, datatype, condition)
+                run_one_condition(trial_num, language, datatype, condition, n_runs, device)

@@ -7,7 +7,7 @@ import random
 import torch
 import torchaudio
 import torchaudio.transforms as T
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, random_split, Subset
 import matplotlib.pyplot as plt
 
 
@@ -147,20 +147,21 @@ class AudioDataset(Dataset):
         signal = db_spectrogram(signal)
         return signal
 
+    def split_dataset(self, data_split_ratio):
+        return random_split(self, data_split_ratio)
+
     def get_dataloader(self, batch_size, shuffle=True):
         data_loader = DataLoader(
             dataset=self,
             batch_size=batch_size,
-            shuffle=shuffle
+            shuffle=shuffle,
+            pin_memory=True
         )
         return data_loader
 
 
 if __name__ == "__main__":
     import hyper_params as hp
-
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using {device} device")
 
     print(" - Loading dataset:")
     audio_dir = "Dataset/audio/English"
@@ -181,7 +182,7 @@ if __name__ == "__main__":
     plot_spectrogram(trg)
 
     print(" - Creating dataloader:")
-    audio_dataloader = audio_dataset.get_dataloader(batch_size=hp.batch_size)
+    audio_dataloader = audio_dataset.get_dataloader(hp.batch_size)
     dataiter = iter(audio_dataloader)
     source, target = next(dataiter)
     print("Sample source:", source,

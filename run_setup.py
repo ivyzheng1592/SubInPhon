@@ -20,20 +20,24 @@ def init_weights(model):
 
 
 # accuracy recoding
-def record_acc(acc_file, datatype, condition, run, epoch, train_loss, train_acc, valid_loss, valid_acc):
+def record_acc(acc_file, language, datatype, condition, run, epoch,
+               train_loss, train_acc, valid_loss, valid_acc):
     if os.path.exists(acc_file):
         # open csv file in append mode
         with open(acc_file, mode='a', newline='') as file:
             writer = csv.writer(file)
-            data = [datatype, condition, run, epoch, train_loss, train_acc, valid_loss, valid_acc]
+            data = [language, datatype, condition, run, epoch,
+                    train_loss, train_acc, valid_loss, valid_acc]
             writer.writerow(data)
     else:
         # open csv file in write mode and add header
         with open(acc_file, mode='w', newline='') as file:
             writer = csv.writer(file)
-            header = ['datatype', 'condition', 'run', 'epoch', 'train_loss', 'train_acc', 'valid_loss', 'valid_acc']
+            header = ['language', 'datatype', 'condition', 'run', 'epoch',
+                      'train_loss', 'train_acc', 'valid_loss', 'valid_acc']
             writer.writerow(header)
-            data = [datatype, condition, run, epoch, train_loss, train_acc, valid_loss, valid_acc]
+            data = [language, datatype, condition, run, epoch,
+                    train_loss, train_acc, valid_loss, valid_acc]
             writer.writerow(data)
 
 
@@ -46,11 +50,15 @@ def plot_acc(acc_file, plot_file):
     valid_loss = acc_data["valid_loss"]
     valid_acc = acc_data["valid_acc"]
 
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)  # create a 2 * 2 plot
-    ax1.plot(epoch, train_loss, label="Train Loss")
-    ax2.plot(epoch, train_acc, label="Train Acc")
-    ax3.plot(epoch, valid_loss, label="Valid Loss")
-    ax4.plot(epoch, valid_acc, label="Valid Acc")
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, sharex='all', sharey='row')  # create a 2 * 2 plot
+    ax1.plot(epoch, train_loss)
+    ax1.set_title("Train loss")
+    ax2.plot(epoch, train_acc)
+    ax2.set_title("Train acc")
+    ax3.plot(epoch, valid_loss)
+    ax2.set_title("Valid loss")
+    ax4.plot(epoch, valid_acc)
+    ax4.set_title("Valid acc")
 
     plt.savefig(plot_file)
     plt.show()
@@ -62,15 +70,15 @@ def plot_attention():
 
 
 # a function that manages training at one epoch
-def train_one_epoch(model, data_loader, optimizer, criterion, clip, teacher_forcing_ratio, device):
+def train_one_epoch(model, data_loader, optimizer, criterion, clip, teacher_forcing_ratio):
     model.train()  # enable dropout in training
     epoch_loss = 0
     epoch_acc = 0
 
     # training in one batch
     for i, (src, trg) in enumerate(data_loader):
-        src = src.to(device)
-        trg = trg.to(device)
+        #src = src.to(device)
+        #trg = trg.to(device)
         # src = [src_len, batch_size]
         # trg = [trg_len, batch_size]
 
@@ -105,7 +113,7 @@ def train_one_epoch(model, data_loader, optimizer, criterion, clip, teacher_forc
 
 
 # a function that manages evaluation at one epoch
-def evaluate_one_epoch(model, data_loader, criterion, device):
+def evaluate_one_epoch(model, data_loader, criterion):
     model.eval()  # disable dropout in evaluation
     epoch_loss = 0
     epoch_acc = 0
@@ -113,8 +121,8 @@ def evaluate_one_epoch(model, data_loader, criterion, device):
     # evaluation in one batch
     with torch.no_grad():  # disable gradient tracking
         for i, (src, trg) in enumerate(data_loader):
-            src = src.to(device)
-            trg = trg.to(device)
+            #src = src.to(device)
+            #trg = trg.to(device)
             # src = [src_len, batch_size]
             # trg = [trg_len, batch_size]
 

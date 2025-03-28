@@ -4,7 +4,7 @@
 import re
 import pandas as pd
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, random_split
 from torch.nn.utils.rnn import pad_sequence
 
 
@@ -47,7 +47,9 @@ class Alphabet:
 
 
 class TextDataset(Dataset):
-    def __init__(self, annotations_file, special_tokens):
+    def __init__(self, annotations_file, special_tokens, device='cuda'):
+        self.device = device
+
         # get the list of ur and sr words
         self.annotations = pd.read_csv(annotations_file)
         self.ur = self.annotations["ur"]
@@ -74,14 +76,17 @@ class TextDataset(Dataset):
         # get source word
         source = self.ur[index]
         source_vector = self.ur_alphabet.word2vec(source)
-        source_tensor = torch.tensor(source_vector)
+        source_tensor = torch.tensor(source_vector).to(self.device)
 
         # get target word
         target = self.sr[index]
         target_vector = self.sr_alphabet.word2vec(target)
-        target_tensor = torch.tensor(target_vector)
+        target_tensor = torch.tensor(target_vector).to(self.device)
 
         return source_tensor, target_tensor
+
+    def split_dataset(self, data_split_ratio):
+        return random_split(self, data_split_ratio)
 
     # a closure of customized collate_fn
     def get_collate_fn(self):
@@ -101,7 +106,8 @@ class TextDataset(Dataset):
             dataset=self,
             batch_size=batch_size,
             shuffle=shuffle,
-            collate_fn=collate_fn
+            collate_fn=collate_fn,
+            pin_memory=True
         )
         return data_loader
 
@@ -116,7 +122,7 @@ if __name__ == "__main__":
           "\nSample data token:", annotations.iloc[0])
 
     print(" - Building vocabulary:")
-    text_dataset = TextDataset(annotations_file, hp.special_tokens)
+    text_dataset = TextDataset(annotations_file, hp.special_tokens, device='cpu')
     src, trg = text_dataset[0]
     print("UR vocab size:", len(text_dataset.ur_alphabet),
           "\nSR vocab size:", len(text_dataset.ur_alphabet),
@@ -124,7 +130,7 @@ if __name__ == "__main__":
           "\nSample target:", trg)
 
     print(" - Creating dataloader:")
-    text_dataloader = text_dataset.get_dataloader(batch_size=hp.batch_size)
+    text_dataloader = text_dataset.get_dataloader(hp.batch_size)
     dataiter = iter(text_dataloader)
     source, target = next(dataiter)
     print("Sample source:", source,
