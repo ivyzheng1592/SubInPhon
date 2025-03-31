@@ -45,15 +45,15 @@ def plot_acc(acc_file, plot_file):
     train_data = acc_data[acc_data["test_type"] == "train"]
     valid_data = acc_data[acc_data["test_type"] == "valid"]
 
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, sharex='all', sharey='row')  # create a 2 * 2 plot
-    ax1.plot(train_data["epoch"], train_data["loss"])
-    ax1.set_title("Train loss")
-    ax2.plot(train_data["epoch"], train_data["acc"])
-    ax2.set_title("Train acc")
-    ax3.plot(valid_data["epoch"], valid_data["loss"])
-    ax3.set_title("Valid loss")
-    ax4.plot(valid_data["epoch"], valid_data["acc"])
-    ax4.set_title("Valid acc")
+    fig, (ax1, ax2) = plt.subplots(2, 1, sharex='all')  # create a 2 * 1 plot
+    ax1.plot(train_data["epoch"], train_data["loss"], label="train")
+    ax1.plot(valid_data["epoch"], valid_data["loss"], label="valid")
+    ax1.legend()
+    ax1.set_title("Loss")
+    ax2.plot(train_data["epoch"], train_data["acc"], label="train")
+    ax2.plot(valid_data["epoch"], valid_data["acc"], label="valid")
+    ax2.legend()
+    ax2.set_title("Acc")
 
     plt.savefig(plot_file)
     plt.show()
@@ -97,7 +97,7 @@ def train_one_epoch(model, data_loader, optimizer, criterion, clip, teacher_forc
         batch_loss = criterion(output, trg)  # calculate batch loss
         epoch_loss += batch_loss.item()  # add to epoch loss
         batch_loss.backward()  # backpropagate loss
-        nn.utils.clip_grad_norm_(model.parameters(), clip) # clip the gradients to prevent exploding
+        #nn.utils.clip_grad_norm_(model.parameters(), clip) # clip the gradients to prevent exploding
         optimizer.step()  # update the weights
 
     # average loss and accuracy over all batches

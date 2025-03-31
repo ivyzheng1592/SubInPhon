@@ -39,6 +39,7 @@ def run_once(seq2seq, train_dataloader, valid_dataloader, test_dataloader,
         print(f"\tValid Loss: {valid_loss:7.3f} | Valid PPL: {np.exp(valid_loss):7.3f} | Valid Acc: {valid_acc:7.3f}")
 
         # save the accuracy value
+        
         record_acc(acc_file, language, datatype, condition, run, epoch,
                    "train", train_loss, train_acc)
         record_acc(acc_file, language, datatype, condition, run, epoch,
@@ -58,9 +59,9 @@ def run_once(seq2seq, train_dataloader, valid_dataloader, test_dataloader,
 
     # check loss for the test dataset
     test_loss, test_acc = evaluate_one_epoch(seq2seq, test_dataloader, criterion)
-    print(f"\tValid Loss: {test_loss:7.3f} | Valid PPL: {np.exp(test_loss):7.3f} | Valid Acc: {test_acc:7.3f}")
+    print(f"\tTest Loss: {test_loss:7.3f} | Test PPL: {np.exp(test_loss):7.3f} | Test Acc: {test_acc:7.3f}")
     # save the accuracy value
-    record_acc(acc_file, language, datatype, condition, run, hp.n_epochs+1,
+    record_acc(acc_file, language, datatype, condition, run, hp.n_epochs,
                "test", test_loss, test_acc)
     print(f"Accuracy data saved at {acc_file}")
 
@@ -125,7 +126,7 @@ def run_one_condition(trial_num, language, datatype, condition, n_runs, device):
     seq2seq = Seq2Seq(encoder_net, decoder_net, device).to(device)
 
     print(" - Training and evaluating model:")
-    for run in range(n_runs):
+    for run in n_runs:
         run_once(seq2seq, train_dataloader, valid_dataloader, test_dataloader,
                  trial_num, language, datatype, condition, run)
 
@@ -146,7 +147,7 @@ if __name__ == "__main__":
     languages = ["English"]
     datatypes = ["txt"]
     conditions = ["harmony", "disharmony"]
-    n_runs = 1
+    n_runs = range(6, 7)
     for language in languages:
         for datatype in datatypes:
             for condition in conditions:
