@@ -154,8 +154,7 @@ class AudioDataset(Dataset):
         data_loader = DataLoader(
             dataset=self,
             batch_size=batch_size,
-            shuffle=shuffle,
-            pin_memory=True
+            shuffle=shuffle
         )
         return data_loader
 
@@ -175,8 +174,8 @@ if __name__ == "__main__":
                                  hp.n_fft, hp.hop_length, hp.n_mels,
                                  wav2mel=True, power2db=True, device='cpu')
     src, trg = audio_dataset[0]
-    print("Sample source:", src,
-          "\nSample target:", trg)
+    print("Sample source:", src.shape,
+          "\nSample target:", trg.shape)
 
     plot_spectrogram(src)
     plot_spectrogram(trg)
@@ -185,5 +184,5 @@ if __name__ == "__main__":
     audio_dataloader = audio_dataset.get_dataloader(hp.batch_size)
     dataiter = iter(audio_dataloader)
     source, target = next(dataiter)
-    print("Sample source:", source,
-          "\nSample target:", target)
+    print("Sample source:", source.shape,
+          "\nSample target:", target.shape)

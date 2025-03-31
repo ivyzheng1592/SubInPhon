@@ -106,8 +106,7 @@ class TextDataset(Dataset):
             dataset=self,
             batch_size=batch_size,
             shuffle=shuffle,
-            collate_fn=collate_fn,
-            pin_memory=True
+            collate_fn=collate_fn
         )
         return data_loader
 
@@ -126,12 +125,12 @@ if __name__ == "__main__":
     src, trg = text_dataset[0]
     print("UR vocab size:", len(text_dataset.ur_alphabet),
           "\nSR vocab size:", len(text_dataset.ur_alphabet),
-          "\nSample source:", src,
-          "\nSample target:", trg)
+          "\nSample source:", src.shape,
+          "\nSample target:", trg.shape)
 
     print(" - Creating dataloader:")
     text_dataloader = text_dataset.get_dataloader(hp.batch_size)
     dataiter = iter(text_dataloader)
     source, target = next(dataiter)
-    print("Sample source:", source,
-          "\nSample target:", target)
+    print("Sample source:", source.shape,
+          "\nSample target:", target.shape)

@@ -5,8 +5,8 @@ import numpy as np
 from text_dataset_loader import TextDataset
 from audio_dataset_loader import AudioDataset
 from network import *
-import hyper_params as hp
 from run_setup import *
+import hyper_params as hp
 
 # a function that completes one run of training and evaluation of one model
 def run_once(seq2seq, train_dataloader, valid_dataloader, test_dataloader,
@@ -19,8 +19,6 @@ def run_once(seq2seq, train_dataloader, valid_dataloader, test_dataloader,
                               language + "_" + datatype + "_" + condition + "_run" + str(run) + "_seq2seq.pth")
     acc_plot = os.path.join("Results", trial_num,
                             language + "_" + datatype + "_" + condition + "_run" + str(run) + "_acc_plot.png")
-    att_plot = os.path.join("Results", trial_num,
-                            language + "_" + datatype + "_" + condition + "_run" + str(run) + "_att_plot.png")
 
     # model weight initialization
     seq2seq.apply(init_weights)
@@ -42,7 +40,9 @@ def run_once(seq2seq, train_dataloader, valid_dataloader, test_dataloader,
 
         # save the accuracy value
         record_acc(acc_file, language, datatype, condition, run, epoch,
-                   train_loss, train_acc, valid_loss, valid_acc)
+                   "train", train_loss, train_acc)
+        record_acc(acc_file, language, datatype, condition, run, epoch,
+                   "valid", valid_loss, valid_acc)
         print(f"Accuracy data saved at {acc_file}")
 
         # save the model
@@ -53,12 +53,16 @@ def run_once(seq2seq, train_dataloader, valid_dataloader, test_dataloader,
     plot_acc(acc_file, acc_plot)
     print(f"Accuracy plot save at {acc_plot}")
 
-    print(" - Evaluating model:")
     # load the model
     seq2seq.load_state_dict(torch.load(model_file))
 
     # check loss for the test dataset
     test_loss, test_acc = evaluate_one_epoch(seq2seq, test_dataloader, criterion)
+    print(f"\tValid Loss: {test_loss:7.3f} | Valid PPL: {np.exp(test_loss):7.3f} | Valid Acc: {test_acc:7.3f}")
+    # save the accuracy value
+    record_acc(acc_file, language, datatype, condition, run, hp.n_epochs+1,
+               "test", test_loss, test_acc)
+    print(f"Accuracy data saved at {acc_file}")
 
 
 # a function that loads dataset and initializes model
@@ -120,10 +124,14 @@ def run_one_condition(trial_num, language, datatype, condition, n_runs, device):
                           hp.n_layers, hp.decoder_dropout, attention).to(device)
     seq2seq = Seq2Seq(encoder_net, decoder_net, device).to(device)
 
-    print(" - Training model:")
+    print(" - Training and evaluating model:")
     for run in range(n_runs):
         run_once(seq2seq, train_dataloader, valid_dataloader, test_dataloader,
                  trial_num, language, datatype, condition, run)
+
+
+def inspect_one_condition(trial_num, language, datatype, condition, run):
+    pass
 
 
 if __name__ == "__main__":

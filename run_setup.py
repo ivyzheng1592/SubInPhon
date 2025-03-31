@@ -21,23 +21,21 @@ def init_weights(model):
 
 # accuracy recoding
 def record_acc(acc_file, language, datatype, condition, run, epoch,
-               train_loss, train_acc, valid_loss, valid_acc):
+               test_type, loss, acc):
     if os.path.exists(acc_file):
         # open csv file in append mode
         with open(acc_file, mode='a', newline='') as file:
             writer = csv.writer(file)
-            data = [language, datatype, condition, run, epoch,
-                    train_loss, train_acc, valid_loss, valid_acc]
+            data = [language, datatype, condition, run, epoch, test_type, loss, acc]
             writer.writerow(data)
     else:
         # open csv file in write mode and add header
         with open(acc_file, mode='w', newline='') as file:
             writer = csv.writer(file)
             header = ['language', 'datatype', 'condition', 'run', 'epoch',
-                      'train_loss', 'train_acc', 'valid_loss', 'valid_acc']
+                      'test_type', 'loss', 'acc']
             writer.writerow(header)
-            data = [language, datatype, condition, run, epoch,
-                    train_loss, train_acc, valid_loss, valid_acc]
+            data = [language, datatype, condition, run, epoch, test_type, loss, acc]
             writer.writerow(data)
 
 
@@ -65,7 +63,7 @@ def plot_acc(acc_file, plot_file):
 
 
 # attention plotting
-def plot_attention():
+def plot_att():
     pass
 
 
