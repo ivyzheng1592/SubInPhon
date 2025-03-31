@@ -20,11 +20,11 @@ class Alphabet:
 
     # convert each word to a vector
     def word2vec(self, word):
-        word_vector = [self.char2idx[hp.sos_token]]
+        word_vector = [self.char2idx["<SOS>"]]
         word_vector.extend([self.char2idx[char] if char in self.char2idx
-                            else self.char2idx[hp.unk_token]
+                            else self.char2idx["<UNK>"]
                             for char in word])
-        word_vector.append(self.char2idx[hp.eos_token])
+        word_vector.append(self.char2idx["<EOS>"])
         return word_vector
 
     # build vocabulary with a list of words and special characters

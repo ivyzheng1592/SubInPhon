@@ -137,14 +137,14 @@ def inspect_one_condition(trial_num, language, datatype, condition, run):
 if __name__ == "__main__":
 
     # defining the current trial of running
-    trial_num = "250327"
+    trial_num = "250331"
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using {device} device")
 
     # running each condition for x times
     languages = ["English"]
-    datatypes = ["txt", "aud"]
+    datatypes = ["txt"]
     conditions = ["harmony", "disharmony"]
     n_runs = 1
     for language in languages:

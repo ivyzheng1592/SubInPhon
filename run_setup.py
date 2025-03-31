@@ -42,20 +42,17 @@ def record_acc(acc_file, language, datatype, condition, run, epoch,
 # learning curve plotting
 def plot_acc(acc_file, plot_file):
     acc_data = pd.read_csv(acc_file)
-    epoch = acc_data["epoch"]
-    train_loss = acc_data["train_loss"]
-    train_acc = acc_data["train_acc"]
-    valid_loss = acc_data["valid_loss"]
-    valid_acc = acc_data["valid_acc"]
+    train_data = acc_data[acc_data["test_type"] == "train"]
+    valid_data = acc_data[acc_data["test_type"] == "valid"]
 
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, sharex='all', sharey='row')  # create a 2 * 2 plot
-    ax1.plot(epoch, train_loss)
+    ax1.plot(train_data["epoch"], train_data["loss"])
     ax1.set_title("Train loss")
-    ax2.plot(epoch, train_acc)
+    ax2.plot(train_data["epoch"], train_data["acc"])
     ax2.set_title("Train acc")
-    ax3.plot(epoch, valid_loss)
-    ax2.set_title("Valid loss")
-    ax4.plot(epoch, valid_acc)
+    ax3.plot(valid_data["epoch"], valid_data["loss"])
+    ax3.set_title("Valid loss")
+    ax4.plot(valid_data["epoch"], valid_data["acc"])
     ax4.set_title("Valid acc")
 
     plt.savefig(plot_file)
