@@ -47,9 +47,9 @@ def text_condition(trial_num, language, datatype, condition, n_reps, device):
     print(" - Training and evaluating model:")
     for rep in n_reps:
         run = TextRun(seq2seq, trial_num, language, datatype, condition, rep)
-        run.train(train_dataloader, valid_dataloader)
-        run.test(test_dataloader)
-        run.evaluate_one_batch(test_dataloader)
+        #run.train(train_dataloader, valid_dataloader)
+        #run.test(test_dataloader)
+        run.evaluate_one_batch(test_dataloader, dataset)
 
 """
 # a function that loads audio dataset, initializes audio model
@@ -100,7 +100,7 @@ def audio_condition(trial_num, language, datatype, condition, n_reps, device):
 if __name__ == "__main__":
 
     # defining the current trial of running
-    trial_num = "250331"
+    trial_num = "250401"
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using {device} device")
@@ -109,7 +109,7 @@ if __name__ == "__main__":
     languages = ["English"]
     #datatypes = ["txt", "aud"]
     conditions = ["harmony", "disharmony"]
-    n_reps = range(6, 7)
+    n_reps = range(1)
     for language in languages:
         for condition in conditions:
             text_condition(trial_num, language, "txt", condition, n_reps, device)

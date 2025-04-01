@@ -27,6 +27,11 @@ class Alphabet:
         word_vector.append(self.char2idx["<EOS>"])
         return word_vector
 
+    # convert each vector to a word
+    def vec2word(self, vector):
+        word = [self.idx2char[idx] for idx in vector]
+        return word
+
     # build vocabulary with a list of words and special characters
     def build_alphabet(self, words, specials):
         # add special characters to vocabulary

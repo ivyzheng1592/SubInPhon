@@ -51,6 +51,7 @@ class TextRun():
 
     # a function that completes one repetition of training
     def train(self, train_dataloader, valid_dataloader):
+
         # at each epoch, display progress bar
         for epoch in tqdm.tqdm(range(hp.n_epochs)):
             # update loss for each batch
@@ -88,7 +89,7 @@ class TextRun():
         print(f"Accuracy data saved at {self.acc_file}")
 
     # a function that manages evaluation of one random batch
-    def evaluate_one_batch(self, test_dataloader):
+    def evaluate_one_batch(self, test_dataloader, dataset):
         # get one random batch of test data
         dataiter = iter(test_dataloader)
         src, trg = next(dataiter)
@@ -105,13 +106,20 @@ class TextRun():
             # pred = [trg_len, batch_size]
             # att = [trg_len, batch_size, src_len]
 
+            src = src.split(hp.batch_size, dim=1)
+            trg = trg.split(hp.batch_size, dim=1)
+            pred = pred.split(hp.batch_size, dim=1)
+            # src = batch_size tuple of [src_len]
+            # src = batch_size tuple of [src_len]
+
             # compare the actual and predicted target surface form
-            print(f"UR: {src}")
-            print(f"Actual SR: {trg}")
-            print(f"Predicted SR: {pred}")
+            for ur, sr in zip(src, trg):
+                print(f"UR: {src}")
+                print(f"Actual SR: {trg}")
+                print(f"Predicted SR: {pred}")
 
             # plot attention
-            self.plot_att(src, trg, att[: len(trg) - 1])
+            self.plot_att(src, trg, att)
 
     # a function that manages training at one epoch
     def train_one_epoch(self, data_loader, teacher_forcing_ratio):
@@ -214,8 +222,8 @@ class TextRun():
 
     def plot_acc(self):
         acc_data = pd.read_csv(self.acc_file)
-        train_data = acc_data[acc_data["test_type"] == "train"]
-        valid_data = acc_data[acc_data["test_type"] == "valid"]
+        train_data = acc_data[acc_data["record_type"] == "train"]
+        valid_data = acc_data[acc_data["record_type"] == "valid"]
 
         fig, (ax1, ax2) = plt.subplots(2, 1, sharex='all')  # create a 2 * 1 plot
         ax1.plot(train_data["epoch"], train_data["loss"], label="train")
@@ -232,7 +240,7 @@ class TextRun():
 
     def plot_att(self, src, trg, attention):
         fig, ax = plt.subplots(figsize=(10, 10))
-        attention = attention.squeeze(1).numpy()
+        attention = attention.squeeze(1).cpu().numpy()
         cax = ax.matshow(attention, cmap="bone")
         ax.set_xticks(ticks=np.arange(len(src)), labels=src, rotation=90, size=15)
         translation = trg[1:]
