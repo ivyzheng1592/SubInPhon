@@ -1,14 +1,16 @@
-# created 2025/03/03 structure based on Ben Trevett tutorial
-# updated 2025/03/07 including model specific implementations
-# updated 2025/03/17 including accuracy recording and visualization
-# A script that defines training and evaluation at each epoch of each run
+# created 2025/04/01 incorporating audio input
+# A script that defines training and evaluation at each epoch of each repetition
 
 import os
 import csv
+import tqdm
 import pandas as pd
+import numpy as np
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
+import hyper_params as hp
+
 
 # weight initialization
 def init_weights(model):
@@ -65,15 +67,13 @@ def plot_att():
 
 
 # a function that manages training at one epoch
-def train_one_epoch(model, data_loader, optimizer, criterion, clip, teacher_forcing_ratio):
+def train_one_epoch(model, data_loader, optimizer, criterion, teacher_forcing_ratio):
     model.train()  # enable dropout in training
     epoch_loss = 0
     epoch_acc = 0
 
     # training in one batch
     for i, (src, trg) in enumerate(data_loader):
-        #src = src.to(device)
-        #trg = trg.to(device)
         # src = [src_len, batch_size]
         # trg = [trg_len, batch_size]
 
@@ -145,3 +145,61 @@ def evaluate_one_epoch(model, data_loader, criterion):
     average_acc = epoch_acc / len(data_loader)
 
     return average_loss, average_acc
+
+
+# a function that completes one repetition of training and evaluation of one model
+def audio_run(seq2seq, train_dataloader, valid_dataloader, test_dataloader,
+              trial_num, language, datatype, condition, rep_num):
+    # results files
+    acc_file = os.path.join("Results", trial_num,
+                            language + "_" + datatype + "_" + condition + "_run" + str(rep_num) + "_acc.csv")
+    model_file = os.path.join("Results", trial_num,
+                              language + "_" + datatype + "_" + condition + "_run" + str(rep_num) + "_seq2seq.pth")
+    acc_plot = os.path.join("Results", trial_num,
+                            language + "_" + datatype + "_" + condition + "_run" + str(rep_num) + "_acc_plot.png")
+
+    # model weight initialization
+    seq2seq.apply(init_weights)
+    model_parameters = sum(p.numel() for p in seq2seq.parameters() if p.requires_grad)
+    print(f"The model has {model_parameters} trainable parameters")
+
+    # optimizer and loss function
+    optimizer = torch.optim.Adam(seq2seq.parameters(), lr=hp.learning_rate)
+    criterion = nn.CrossEntropyLoss(ignore_index=hp.special_tokens.index(hp.pad_token))
+
+    # at each epoch, display progress bar
+    for epoch in tqdm.tqdm(range(hp.n_epochs)):
+        # update loss for each batch
+        train_loss, train_acc = train_one_epoch(seq2seq, train_dataloader, optimizer, criterion,
+                                                hp.teacher_forcing_ratio)
+        valid_loss, valid_acc = evaluate_one_epoch(seq2seq, valid_dataloader, criterion)
+        print(f"\tTrain Loss: {train_loss:7.3f} | Train PPL: {np.exp(train_loss):7.3f} | Train Acc: {train_acc:7.3f}")
+        print(f"\tValid Loss: {valid_loss:7.3f} | Valid PPL: {np.exp(valid_loss):7.3f} | Valid Acc: {valid_acc:7.3f}")
+
+        # save the accuracy value
+        record_acc(acc_file, language, datatype, condition, rep_num, epoch,
+                   "train", train_loss, train_acc)
+        record_acc(acc_file, language, datatype, condition, rep_num, epoch,
+                   "valid", valid_loss, valid_acc)
+        print(f"Accuracy data saved at {acc_file}")
+
+        # save the model
+        torch.save(seq2seq.state_dict(), model_file)
+        print(f"Model trained and stored at {model_file}")
+
+    # plot loss and accuracy for training and validation dataset
+    plot_acc(acc_file, acc_plot)
+    print(f"Accuracy plot save at {acc_plot}")
+
+    # load the model
+    seq2seq.load_state_dict(torch.load(model_file))
+
+    # check loss for the test dataset
+    test_loss, test_acc = evaluate_one_epoch(seq2seq, test_dataloader, criterion)
+    print(f"\tTest Loss: {test_loss:7.3f} | Test PPL: {np.exp(test_loss):7.3f} | Test Acc: {test_acc:7.3f}")
+    # save the accuracy value
+    record_acc(acc_file, language, datatype, condition, rep_num, hp.n_epochs,
+               "test", test_loss, test_acc)
+    print(f"Accuracy data saved at {acc_file}")
+
+    # randomly select 10 datapoints for

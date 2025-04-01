@@ -57,7 +57,7 @@ class TextDataset(Dataset):
 
         # define special characters
         self.specials = special_tokens
-        self.pad_idx = special_tokens.index("<PAD>")
+        self.pad_idx = self.specials.index("<PAD>")
 
         # build ur alphabet
         self.ur_name = re.split('[/_.]', annotations_file)[2] + "_ur"
@@ -74,16 +74,16 @@ class TextDataset(Dataset):
 
     def __getitem__(self, index):
         # get source word
-        source = self.ur[index]
-        source_vector = self.ur_alphabet.word2vec(source)
-        source_tensor = torch.tensor(source_vector).to(self.device)
+        src = self.ur[index]
+        src_vector = self.ur_alphabet.word2vec(src)
+        src_tensor = torch.tensor(src_vector).to(self.device)
 
         # get target word
-        target = self.sr[index]
-        target_vector = self.sr_alphabet.word2vec(target)
-        target_tensor = torch.tensor(target_vector).to(self.device)
+        trg = self.sr[index]
+        trg_vector = self.sr_alphabet.word2vec(trg)
+        trg_tensor = torch.tensor(trg_vector).to(self.device)
 
-        return source_tensor, target_tensor
+        return src_tensor, trg_tensor
 
     def split_dataset(self, data_split_ratio):
         return random_split(self, data_split_ratio)
@@ -91,12 +91,12 @@ class TextDataset(Dataset):
     # a closure of customized collate_fn
     def get_collate_fn(self):
         def collate_fn(batch):
-            sources = [item[0] for item in batch]
-            sources = pad_sequence(sources, batch_first=False, padding_value=self.pad_idx)
+            srcs = [item[0] for item in batch]
+            srcs = pad_sequence(srcs, batch_first=False, padding_value=self.pad_idx)
 
-            targets = [item[1] for item in batch]
-            targets = pad_sequence(targets, batch_first=False, padding_value=self.pad_idx)
-            return sources, targets
+            trgs = [item[1] for item in batch]
+            trgs = pad_sequence(trgs, batch_first=False, padding_value=self.pad_idx)
+            return srcs, trgs
         return collate_fn
 
     def get_dataloader(self, batch_size, shuffle=True):

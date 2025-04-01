@@ -2,13 +2,16 @@
 # A script to load custom dataset with self-defined class inherited from torch Dataset
 
 import os
+import re
 import pandas as pd
 import random
 import torch
 import torchaudio
 import torchaudio.transforms as T
 from torch.utils.data import Dataset, DataLoader, random_split
+from torch.nn.utils.rnn import pad_sequence
 import matplotlib.pyplot as plt
+from text_dataset_loader import Alphabet
 
 
 def plot_waveform(waveform, sample_rate, title="Waveform"):
@@ -36,15 +39,29 @@ def plot_spectrogram(spectrogram, title="Spectrogram"):
 
 
 class AudioDataset(Dataset):
-    def __init__(self, annotations_file, audio_dir, sample_rate, n_samples, n_fft, hop_length, n_mels,
+    def __init__(self, annotations_file, audio_dir, special_tokens,
+                 sample_rate, n_samples, n_fft, hop_length, n_mels,
                  wav2mel=True, power2db=True, normalize=True, device='cuda'):
         # get the list of ur and sr words
+        self.device = device
+        self.audio_dir = audio_dir
         self.annotations = pd.read_csv(annotations_file)
         self.ur = self.annotations["ur"]
         self.sr = self.annotations["sr"]
 
-        self.audio_dir = audio_dir
-        self.device = device
+        # define special characters
+        self.specials = special_tokens
+        self.pad_idx = self.specials.index("<PAD>")
+
+        # build ur alphabet
+        self.ur_name = re.split('[/_.]', annotations_file)[2] + "_ur"
+        self.ur_alphabet = Alphabet(self.ur_name)
+        self.ur_alphabet.build_alphabet(self.ur, self.specials)
+
+        # build sr alphabet
+        self.sr_name = re.split('[/_.]', annotations_file)[2] + "_sr"
+        self.sr_alphabet = Alphabet(self.sr_name)
+        self.sr_alphabet.build_alphabet(self.sr, self.specials)
 
         # audio attributes
         self.sample_rate = sample_rate
@@ -62,32 +79,43 @@ class AudioDataset(Dataset):
         return len(self.annotations)
 
     def __getitem__(self, index):
-        # audio: torch.Tensor [n_channels, n_samples]
+        # audio: [n_channels, n_samples]
         # retrieve and pre-process source audio
-        source_label = self.ur[index]
-        source_path = os.path.join(self.audio_dir, (source_label + ".wav"))
-        source_audio, source_sr = torchaudio.load(source_path, format="wav")
-        source_audio = source_audio.to(self.device)
-        source_audio = self._resampling(source_audio, source_sr)
-        source_audio = self._padding(source_audio)
+        src_label = self.ur[index]
+        src_path = os.path.join(self.audio_dir, (src_label + ".wav"))
+        src_audio, src_sr = torchaudio.load(src_path, format="wav")
+        src_audio = src_audio.to(self.device)
+        src_audio = self._resampling(src_audio, src_sr)
+        src_audio = self._padding(src_audio)
 
         # retrieve and pre-process target audio
-        target_label = self.sr[index]
-        target_path = os.path.join(self.audio_dir, (target_label + ".wav"))
-        target_audio, target_sr = torchaudio.load(target_path, format="wav")
-        target_audio = target_audio.to(self.device)
-        target_audio = self._resampling(target_audio, target_sr)
-        target_audio = self._padding(target_audio)
+        trg_label = self.sr[index]
+        trg_path = os.path.join(self.audio_dir, (trg_label + ".wav"))
+        trg_audio, trg_sr = torchaudio.load(trg_path, format="wav")
+        trg_audio = trg_audio.to(self.device)
+        trg_audio = self._resampling(trg_audio, trg_sr)
+        trg_audio = self._padding(trg_audio)
 
         # transform source and target audio
         if self.wav2mel:
-            source_audio = self._wav_to_mel(source_audio)
-            target_audio = self._wav_to_mel(target_audio)
+            src_audio = self._wav_to_mel(src_audio)
+            trg_audio = self._wav_to_mel(trg_audio)
+            # [n_channels, freq, dur]
         if self.power2db:
-            source_audio = self._power_to_db(source_audio)
-            target_audio = self._power_to_db(target_audio)
+            src_audio = self._power_to_db(src_audio)
+            trg_audio = self._power_to_db(trg_audio)
 
-        return source_audio, target_audio
+        # get source text
+        src = self.ur[index]
+        src_vector = self.ur_alphabet.word2vec(src)
+        src_tensor = torch.tensor(src_vector).to(self.device)
+
+        # get target text
+        trg = self.sr[index]
+        trg_vector = self.sr_alphabet.word2vec(trg)
+        trg_tensor = torch.tensor(trg_vector).to(self.device)
+
+        return src_tensor, src_audio, trg_tensor, trg_audio
 
     def _resampling(self, signal, sr):
 
@@ -97,7 +125,7 @@ class AudioDataset(Dataset):
         ), f"All audio data should have {self.sample_rate} sample rate!"
 
         if sr != self.sample_rate:
-            resampler = T.Resample(orig_freq=sr, new_freq=self.sample_rate).to(device)
+            resampler = T.Resample(orig_freq=sr, new_freq=self.sample_rate).to(self.device)
             signal = resampler(signal)
         return signal
 
@@ -127,6 +155,7 @@ class AudioDataset(Dataset):
 
         return signal
 
+    # converting waveform to mel spectrogram
     def _wav_to_mel(self, signal):
         mel_spectrogram = T.MelSpectrogram(
             sample_rate=self.sample_rate,  # sampling rate, i.e. 24000 samples in 1s
@@ -140,8 +169,11 @@ class AudioDataset(Dataset):
             n_mels=self.n_mels,  # number of Mel bands to generate, normally 128
         ).to(self.device)
         signal = mel_spectrogram(signal)
+        # [n_channels, n_mels, n_samples//hop_length+1]
         return signal
 
+    # converting power scale to decibel scale in spectrogram
+    # only for readability of the spectrogram figure
     def _power_to_db(self, signal):
         db_spectrogram = T.AmplitudeToDB(stype="power").to(self.device)
         signal = db_spectrogram(signal)
@@ -150,11 +182,27 @@ class AudioDataset(Dataset):
     def split_dataset(self, data_split_ratio):
         return random_split(self, data_split_ratio)
 
+    # a closure of customized collate_fn
+    def get_collate_fn(self):
+        def collate_fn(batch):
+            src_labels = [item[0] for item in batch]
+            src_labels = pad_sequence(src_labels, batch_first=False, padding_value=self.pad_idx)
+            src_audios = [item[1] for item in batch]
+
+            trg_labels = [item[2] for item in batch]
+            trg_labels = pad_sequence(trg_labels, batch_first=False, padding_value=self.pad_idx)
+            trg_audios = [item[3] for item in batch]
+            return src_labels, src_audios, trg_labels, trg_audios
+        return collate_fn
+
     def get_dataloader(self, batch_size, shuffle=True):
+        collate_fn = self.get_collate_fn()
+
         data_loader = DataLoader(
             dataset=self,
             batch_size=batch_size,
-            shuffle=shuffle
+            shuffle=shuffle,
+            collate_fn=collate_fn
         )
         return data_loader
 
@@ -170,15 +218,17 @@ if __name__ == "__main__":
           "\nSample data token:", annotations.iloc[0])
 
     print(" - Audio preprocessing:")
-    audio_dataset = AudioDataset(annotations_file, audio_dir, hp.sample_rate, hp.n_samples,
-                                 hp.n_fft, hp.hop_length, hp.n_mels,
+    audio_dataset = AudioDataset(annotations_file, audio_dir, hp.special_tokens,
+                                 hp.sample_rate, hp.n_samples, hp.n_fft, hp.hop_length, hp.n_mels,
                                  wav2mel=True, power2db=True, device='cpu')
-    src, trg = audio_dataset[0]
-    print("Sample source:", src.shape,
-          "\nSample target:", trg.shape)
+    src_txt, src_aud, trg_txt, trg_aud = audio_dataset[0]
+    print("Sample source text:", src_txt.shape,
+          "\nSample source audio:", src_aud.shape,
+          "\nSample target text:", trg_txt.shape,
+          "\nSample target audio:", trg_aud.shape)
 
-    plot_spectrogram(src)
-    plot_spectrogram(trg)
+    plot_spectrogram(src_aud)
+    plot_spectrogram(trg_aud)
 
     print(" - Creating dataloader:")
     audio_dataloader = audio_dataset.get_dataloader(hp.batch_size)

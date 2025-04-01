@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 import random
 import hyper_params as hp
-import torchinfo
 
 
 class Encoder(nn.Module):
@@ -24,7 +23,7 @@ class Encoder(nn.Module):
         self.fc_cell = nn.Linear(hidden_dim * 2, hidden_dim)  # select the better cell from forward and backward
         self.dropout = nn.Dropout(dropout)  # dropout probability, see https://arxiv.org/abs/1207.0580
 
-    def forward(self, input: torch.Tensor):
+    def forward(self, input):
         # input = [input_len, batch_size]
 
         embedding = self.dropout(self.embedding(input))
@@ -51,30 +50,29 @@ class Encoder(nn.Module):
 class BahdanauAttention(nn.Module):
     def __init__(self, hidden_dim):
         super(BahdanauAttention, self).__init__()
-        self.fc_align = nn.Linear(hidden_dim * 3, hidden_dim)  # update weight of forward and backward encoder states and decoder hidden
-        self.fc_score = nn.Linear(hidden_dim, 1)  # output a score for each alignment
+        self.fc_W1 = nn.Linear(hidden_dim * 2, hidden_dim)  # update weight of forward and backward encoder states
+        self.fc_W2 = nn.Linear(hidden_dim, hidden_dim)  # update weight of decoder hidden
+        self.fc_V = nn.Linear(hidden_dim, 1)  # output a score for each alignment
         # ignoring bias=False in Ben Trevett tutorial
 
-    def forward(self, hidden, encoder_states):
+    def forward(self, encoder_states, hidden):
+        # encoder_states = [src_len, batch_size, hidden_dim * 2]
         # hidden = [batch_size, hidden_dim]
         # cell = [batch_size, hidden_dim]
-        # encoder_states = [input_len, batch_size, hidden_dim * 2]
 
-        input_len = encoder_states.shape[0]
-        hidden = hidden.unsqueeze(1).repeat(1, input_len, 1)
-        # hidden = [batch_size, input_len, hidden_dim]
         encoder_states = encoder_states.permute(1, 0, 2)
-        # encoder_states = [batch_size, input_len, hidden_dim * 2]
+        # encoder_states = [batch_size, src_len, hidden_dim * 2]
+        src_len = encoder_states.shape[1]
+        hidden = hidden.unsqueeze(1).repeat(1, src_len, 1)
+        # hidden = [batch_size, src_len, hidden_dim]
 
         # construct a soft alignment between target decoder hidden (query) and encoder hidden of each input token (key)
-        # calculate a score for each input token
-        # calculate the weight of each input token by running the score through softmax
-        align = torch.tanh(self.fc_align(torch.cat((hidden, encoder_states), dim=2)))
-        # align = [batch_size, input_len, hidden_dim]
-        score = self.fc_score(align).squeeze(2)
-        # score = [batch_size, input_len]
-        weight = torch.softmax(score, dim=1)
-        # weight = [batch_size, input_len]
+        # calculate the score of each src input token
+        # run the score through softmax to get the weight of each src input token
+        score = self.fc_V(torch.tanh(self.fc_W1(encoder_states) + self.fc_W2(hidden)))
+        # score = [batch_size, src_len, hidden_dim] -> score = [batch_size, src_len, 1]
+        weight = torch.softmax(score.squeeze(2), dim=1)
+        # weight = [batch_size, src_len]
 
         return weight
 
@@ -100,7 +98,7 @@ class Decoder(nn.Module):
 
     def forward(self, input, encoder_states, hidden, cell):
         # input = [batch_size]
-        # encoder_states = [input_len, batch_size, hidden_dim * 2]
+        # encoder_states = [src_len, batch_size, hidden_dim * 2]
         # hidden = [batch_size, hidden_dim]
         # cell = [batch_size, hidden_dim]
 
@@ -113,11 +111,11 @@ class Decoder(nn.Module):
         # calculate the attention weight with target decoder hidden (query) and all encoder hidden (key)
         # compute the context vector by multiplying the attention weight to each target embedding (value)
         # concatenate the target embedding and the context vector as the rnn input
-        weight = self.attention(hidden, encoder_states)
-        # weight = [batch_size, input_len]
+        weight = self.attention(encoder_states, hidden)
+        # weight = [batch_size, src_len]
         context_vector = torch.bmm(weight.unsqueeze(1), encoder_states.permute(1, 0, 2)).permute(1, 0, 2)
-        # weight = [batch_size, 1, input_len]
-        # encoder_states = [batch_size, input_len, hidden_dim * 2]
+        # weight = [batch_size, 1, src_len]
+        # encoder_states = [batch_size, src_len, hidden_dim * 2]
         # context_vector = [batch_size, 1, hidden_dim *2] -> context_vector = [1, batch_size, hidden_dim * 2]
         rnn_input = torch.cat((embedding, context_vector), dim=2)
         # rnn_input = [1, batch_size, hidden_dim * 2 + embedding_dim]
@@ -141,26 +139,35 @@ class Decoder(nn.Module):
         return output, hidden, cell, weight
 
 
-class Seq2Seq(nn.Module):
-    def __init__(self, encoder, decoder, device):
-        super(Seq2Seq, self).__init__()
-        self.encoder = encoder
-        self.decoder = decoder
-        self.device = device
+class TextSeq2Seq(nn.Module):
+    def __init__(self, encoder_input_dim, decoder_input_dim, encoder_embedding_dim, decoder_embedding_dim,
+                 n_layers, hidden_dim, output_dim, encoder_dropout, decoder_dropout, device='cuda'):
+        super(TextSeq2Seq, self).__init__()
 
-        assert (
-            self.encoder.hidden_dim == self.decoder.hidden_dim
-        ), "Hidden dimensions of encoder and decoder must be equal!"
-        assert (
-            self.encoder.n_layers == self.decoder.n_layers
-        ), "Encoder and decoder must have equal number of layers!"
+        self.device = device
+        self.encoder_input_dim = encoder_input_dim
+        self.decoder_input_dim = decoder_input_dim
+        self.encoder_embedding_dim = encoder_embedding_dim
+        self.decoder_embedding_dim = decoder_embedding_dim
+        self.n_layers = n_layers
+        self.hidden_dim = hidden_dim
+        self.output_dim = output_dim
+        self.encoder_dropout = encoder_dropout
+        self.decoder_dropout = decoder_dropout
+
+        # model components
+        self.attention = BahdanauAttention(hidden_dim)
+        self.encoder = Encoder(encoder_input_dim, encoder_embedding_dim, hidden_dim,
+                               n_layers, encoder_dropout).to(self.device)
+        self.decoder = Decoder(decoder_input_dim, decoder_embedding_dim, hidden_dim, output_dim,
+                               n_layers, decoder_dropout, self.attention).to(self.device)
 
     def forward(self, src, trg, teacher_forcing_ratio=0.5):
         # src = [src_len, batch_size]
         # trg = [trg_len, batch_size]
 
         encoder_states, hidden, cell = self.encoder(src)
-        # encoder_states are all hidden states of the input sequence
+        # encoder_states are all hidden states of the src input sequence
         # hidden and cell are the final forward and backward hidden and cell concatenated
         # encoder_states = [src_len, batch_size, encoder_hidden_dim * 2]
         # hidden = [batch_size, encoder_hidden_dim]
@@ -168,29 +175,34 @@ class Seq2Seq(nn.Module):
 
         trg_len = trg.shape[0]
         batch_size = trg.shape[1]
-        output_dim = self.decoder.output_dim
-        decoder_outputs = torch.zeros(trg_len, batch_size, output_dim).to(self.device)
+        src_len = src.shape[0]
+        decoder_outputs = torch.zeros(trg_len, batch_size, self.output_dim).to(self.device)
         predictions = torch.zeros(trg_len, batch_size).to(self.device)
-        # decoder_outputs store the probability of all output vocabulary for each input token
-        # predictions store the predicted output token for each input token
+        attentions = torch.zeros(trg_len, batch_size, src_len).to(self.device)
+        # decoder_outputs store the probability of all output vocabulary for each trg input token
+        # predictions store the predicted output token for each trg input token
+        # attentions store the attention weights for each trg input token
         # decoder_outputs = [trg_len, batch_size, output_dim]
         # predictions = [trg_len, batch_size]
+        # attentions = [trg_len, batch_size, src_len]
 
-        input = trg[0]  # first input to the decoder is the <SOS> token
+        input = trg[0, :]  # first input to the decoder is the <SOS> token
         for t in range(1, trg_len):
-            # at every time step, insert input token, encoder_states, and previous hidden and cell
+            # at every time step, insert trg input token, encoder_states, and previous hidden and cell
             # receive output and new hidden and cell
             # and get the best word predicted by the decoder
-            output, hidden, cell, _ = self.decoder(input, encoder_states, hidden, cell)
+            output, hidden, cell, weight = self.decoder(input, encoder_states, hidden, cell)
             # output = [batch_size, output_dim]
             # hidden = [batch_size, decoder_hidden_dim]
             # cell = [batch_size, decoder_hidden_dim]
+            # weight = [batch_size, src_len]
             best_guess = output.argmax(1)
             # best_guess = [batch_size]
 
             # store output and best guess for current time step
             decoder_outputs[t] = output
             predictions[t] = best_guess
+            attentions[t] = weight
 
             # with probability of teacher_force_ratio we take the actual next word
             # otherwise we take the word that the decoder predicted it to be
@@ -198,23 +210,18 @@ class Seq2Seq(nn.Module):
             input = trg[t] if random.random() < teacher_forcing_ratio else best_guess
             # input = [batch_size]
 
-        return decoder_outputs, predictions
+        return decoder_outputs, predictions, attentions
 
 
 if __name__ == "__main__":
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using {device} device")
+    import torchinfo
 
     print(" - Initializing model:")
     encoder_input_dim = 30
     decoder_input_dim = 30
     output_dim = 30
 
-    attention = BahdanauAttention(hp.hidden_dim)
-    encoder_net = Encoder(encoder_input_dim, hp.encoder_embedding_dim, hp.hidden_dim,
-                          hp.n_layers, hp.encoder_dropout).to(device)
-    decoder_net = Decoder(decoder_input_dim, hp.decoder_embedding_dim, hp.hidden_dim, output_dim,
-                          hp.n_layers, hp.decoder_dropout, attention).to(device)
-    seq2seq = Seq2Seq(encoder_net, decoder_net, device).to(device)
+    seq2seq = TextSeq2Seq(encoder_input_dim, decoder_input_dim, hp.encoder_embedding_dim, hp.decoder_embedding_dim,
+                          hp.n_layers, hp.hidden_dim, output_dim, hp.encoder_dropout, hp.decoder_dropout, device='cpu').to('cpu')
 
-    torchinfo.summary(seq2seq, input_size = [(7, 32), (7, 32)], dtypes=[torch.long, torch.long], device=device)
+    torchinfo.summary(seq2seq, input_size = [(7, 32), (7, 32)], dtypes=[torch.long, torch.long], device='cpu')
