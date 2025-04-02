@@ -8,7 +8,8 @@ data structure:
         - {datatype} + "_" + {condition} + "_" + "run_"{run_num} + "_seq2seq.pth"
         - {datatype} + "_" + {condition} + "_" + "run_"{run_num} + "_acc.csv"
         - {datatype} + "_" + {condition} + "_" + "run_"{run_num} + "_acc_plot.png"
-        - {datatype} + "_" + {condition} + "_" + "run_"{run_num} + "_att_plot.png"
+        - {datatype} + "_" + {condition} + "_" + "run_"{run_num} + "_att_plot"
+            - {src}_{trg}.png
 """
 
 # Alphabet

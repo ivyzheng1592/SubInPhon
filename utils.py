@@ -1,14 +1,14 @@
 import torch
 import numpy as np
 import pandas as pd
-import matplotlib as plt
+import matplotlib.pyplot as plt
 
 
 def plot_waveform(waveform, sample_rate, title="Waveform"):
-    waveform = waveform.numpy()  # [n_channels, n_samples]
+    waveform = waveform.cpu().numpy()  # [n_channels, n_samples]
     time_axis = torch.arange(0, waveform.shape[1]) / sample_rate
 
-    fig, axs = plt.subplots(1, 1)
+    fig, axs = plt.subplots()
     axs.set_xlabel("time")
     axs.set_ylabel("amplitude")
     axs.plot(time_axis, waveform[0], linewidth=1)
@@ -47,7 +47,7 @@ def plot_acc(acc_file, acc_plot):
 
 def plot_att(ur, sr, attention, att_plot):
     fig, ax = plt.subplots(1, 1)
-    attention = attention.numpy()
+    attention = attention.cpu().numpy()
     ax.matshow(attention, cmap="bone")
     ax.set_xticks(ticks=np.arange(len(ur)), labels=ur)
     ax.set_yticks(ticks=np.arange(len(sr)), labels=sr)

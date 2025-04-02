@@ -31,13 +31,13 @@ class AudioDataset(Dataset):
 
         # build ur alphabet
         self.ur_name = re.split('[/_.]', annotations_file)[2] + "_ur"
-        self.ur_alphabet = Alphabet(self.ur_name)
-        self.ur_alphabet.build_alphabet(self.ur, self.specials)
+        self.ur_alphabet = Alphabet(self.ur_name, self.specials)
+        self.ur_alphabet.build_alphabet(self.ur)
 
         # build sr alphabet
         self.sr_name = re.split('[/_.]', annotations_file)[2] + "_sr"
-        self.sr_alphabet = Alphabet(self.sr_name)
-        self.sr_alphabet.build_alphabet(self.sr, self.specials)
+        self.sr_alphabet = Alphabet(self.sr_name, self.specials)
+        self.sr_alphabet.build_alphabet(self.sr)
 
         # audio attributes
         self.sample_rate = sample_rate

@@ -9,11 +9,12 @@ from torch.nn.utils.rnn import pad_sequence
 
 
 class Alphabet:
-    def __init__(self, name):
+    def __init__(self, name, special_tokens):
         self.name = name
         self.idx2char = {} # {index: char}
         self.char2idx = {}  # {char: index}
         self.char2count = {}  # {char: number of occurrences}
+        self.specials = special_tokens
 
     def __len__(self):
         return len(self.idx2char)
@@ -29,15 +30,19 @@ class Alphabet:
 
     # convert each vector to a word
     def vec2word(self, vector):
-        word = [self.idx2char[idx] for idx in vector]
-        return word
+        word_list = [self.idx2char[idx] for idx in vector]
+        word_string = ""
+        for char in word_list:
+            if char not in self.specials:
+                word_string += char
+        return word_list, word_string
 
     # build vocabulary with a list of words and special characters
-    def build_alphabet(self, words, specials):
+    def build_alphabet(self, words):
         # add special characters to vocabulary
-        self.idx2char.update({idx: char for idx, char in enumerate(specials)})
-        self.char2idx.update({char: idx for idx, char in enumerate(specials)})
-        idx = len(specials)
+        self.idx2char.update({idx: char for idx, char in enumerate(self.specials)})
+        self.char2idx.update({char: idx for idx, char in enumerate(self.specials)})
+        idx = len(self.specials)
 
         # add real characters to vocabulary
         for word in words:
@@ -66,13 +71,13 @@ class TextDataset(Dataset):
 
         # build ur alphabet
         self.ur_name = re.split('[/_.]', annotations_file)[2] + "_ur"
-        self.ur_alphabet = Alphabet(self.ur_name)
-        self.ur_alphabet.build_alphabet(self.ur, self.specials)
+        self.ur_alphabet = Alphabet(self.ur_name, self.specials)
+        self.ur_alphabet.build_alphabet(self.ur)
 
         # build sr alphabet
         self.sr_name = re.split('[/_.]', annotations_file)[2] + "_sr"
-        self.sr_alphabet = Alphabet(self.sr_name)
-        self.sr_alphabet.build_alphabet(self.sr, self.specials)
+        self.sr_alphabet = Alphabet(self.sr_name, self.specials)
+        self.sr_alphabet.build_alphabet(self.sr)
 
     def __len__(self):
         return len(self.annotations)

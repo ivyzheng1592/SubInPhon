@@ -104,39 +104,33 @@ class TextRun:
             # pred = [trg_len, batch_size]
             # att = [trg_len, batch_size, src_len]
 
-            # split batch into individual items
-            src = src.split(hp.batch_size, dim=1)
-            trg = trg.split(hp.batch_size, dim=1)
-            pred = pred.split(hp.batch_size, dim=1)
-            att = att.split(hp.batch_size, dim=1)
-            # src = batch_size tuple of [src_len]
-            # trg = batch_size tuple of [trg_len]
-            # pred = batch_size tuple of [pred_len]
-            # att = batch_size tuple of [trg_len, 1, src_len]
-
             # for individual items
-            for ur, sr, pred_sr, attention in zip(src, trg, pred):
+            for i in range(hp.batch_size):
+                ur_tensor = src[:, i]
+                sr_tensor = trg[:, i]
+                pred_sr_tensor = pred[:, i]
+                att_tensor = att[:, i, :]
+                # attention = [trg_len, src_len]
+
                 # convert tensor to vector
-                ur_vector = [int(x) for x in ur.tolist()]
-                sr_vector = [int(x) for x in sr.tolist()]
-                pred_sr_vector = [int(x) for x in pred_sr.tolist()]
+                ur_vector = [int(x) for x in ur_tensor.tolist()]
+                sr_vector = [int(x) for x in sr_tensor.tolist()]
+                pred_sr_vector = [int(x) for x in pred_sr_tensor.tolist()]
 
                 # convert vector to word
-                ur_word = dataset.ur_alphabet.vec2word(ur_vector)
-                sr_word = dataset.sr_alphabet.vec2word(sr_vector)
-                pred_sr_word = dataset.sr_alphabet.vec2word(pred_sr_vector)
+                ur_word, ur_string = dataset.ur_alphabet.vec2word(ur_vector)
+                sr_word, sr_string = dataset.sr_alphabet.vec2word(sr_vector)
+                pred_sr_word, pred_sr_string = dataset.sr_alphabet.vec2word(pred_sr_vector)
 
                 # compare the actual and predicted target surface form
-                print(f"UR: {ur_word}")
-                print(f"Actual SR: {sr_word}")
-                print(f"Predicted SR: {pred_sr_word}")
+                print(f"UR: {ur_string}")
+                print(f"Actual SR: {sr_string}")
+                print(f"Predicted SR: {pred_sr_string}")
 
                 # plot attention
-                attention = attention.squeeze(1)
-                # attention = [trg_len, src_len]
                 att_plot = os.path.join(self.att_plot_dir,
-                                        ur + "_" + sr + ".png")
-                utils.plot_att(ur_word, sr_word, attention, att_plot)
+                                        ur_string + "_" + pred_sr_string + ".png")
+                utils.plot_att(ur_word, pred_sr_word, att_tensor, att_plot)
 
     # a function that manages training at one epoch
     def train_one_epoch(self, data_loader, teacher_forcing_ratio):

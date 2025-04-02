@@ -41,12 +41,13 @@ def text_condition(trial_num, language, datatype, condition, n_run, n_check, dev
     print(" - Training and evaluating model:")
     reps = []
     for run in n_run:
-        reps[run] = TextRun(seq2seq, trial_num, language, datatype, condition, run)
+        reps.insert(run, TextRun(seq2seq, trial_num, language, datatype, condition, run))
         reps[run].train(train_dataloader, valid_dataloader)
         reps[run].test(test_dataloader)
 
     print(" - Inspecting model outputs:")
     for check in n_check:
+        reps.insert(check, TextRun(seq2seq, trial_num, language, datatype, condition, check))
         reps[check].evaluate_one_batch(test_dataloader, dataset)
 
 
@@ -88,15 +89,15 @@ def audio_condition(trial_num, language, datatype, condition, n_run, n_check, de
         reps[run].train(train_dataloader, valid_dataloader)
         reps[run].test(test_dataloader)
 
-    print(" - Inspecting model outputs:")
-    for check in n_check:
-        reps[check].evaluate_one_batch(test_dataloader, dataset)
+    #print(" - Inspecting model outputs:")
+    #for check in n_check:
+        #reps[check].evaluate_one_batch(test_dataloader, dataset)
 
 
 if __name__ == "__main__":
 
     # defining the current trial of running
-    trial_num = "250401"
+    trial_num = "250402"
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using {device} device")
@@ -105,9 +106,9 @@ if __name__ == "__main__":
     languages = ["English"]
     #datatypes = ["txt", "aud"]
     conditions = ["harmony", "disharmony"]
-    n_run = range(1)  # which run to complete
+    n_run = range(0)  # which run to complete
     n_check = range(1)  # which run to inspect
     for language in languages:
         for condition in conditions:
             text_condition(trial_num, language, "txt", condition, n_run, n_check, device)
-            #audio_condition(trial_num, language, "aud", condition, n_run, device)
+            #audio_condition(trial_num, language, "aud", condition, n_run, n_check, device)
