@@ -162,7 +162,7 @@ class TextSeq2Seq(nn.Module):
         self.decoder = Decoder(decoder_input_dim, decoder_embedding_dim, hidden_dim, output_dim,
                                n_layers, decoder_dropout, self.attention).to(self.device)
 
-    def forward(self, src, trg, teacher_forcing_ratio=0.5):
+    def forward(self, src, trg, teacher_forcing_ratio):
         # src = [src_len, batch_size]
         # trg = [trg_len, batch_size]
 
@@ -186,7 +186,7 @@ class TextSeq2Seq(nn.Module):
         # predictions = [trg_len, batch_size]
         # attentions = [trg_len, batch_size, src_len]
 
-        input = trg[0, :]  # first input to the decoder is the <SOS> token
+        input = trg[0]  # first input to the decoder is the <SOS> token
         for t in range(1, trg_len):
             # at every time step, insert trg input token, encoder_states, and previous hidden and cell
             # receive output and new hidden and cell
@@ -199,7 +199,7 @@ class TextSeq2Seq(nn.Module):
             best_guess = output.argmax(1)
             # best_guess = [batch_size]
 
-            # store output and best guess for current time step
+            # store output, best guess, and attention weight for current time step
             decoder_outputs[t] = output
             predictions[t] = best_guess
             attentions[t] = weight

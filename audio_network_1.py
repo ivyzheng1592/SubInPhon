@@ -67,19 +67,19 @@ class Decoder(nn.Module):
         self.rnn = nn.LSTM(hidden_dim * 2 + embedding_dim, hidden_dim, n_layers)  # input forward and backward encoder hidden states and embedding
         self.fc_out = nn.Linear(hidden_dim * 3 + embedding_dim, output_dim)  # take into account context vector, decoder hidden, and embedding for the prediction
         self.dropout = nn.Dropout(dropout)
+        self.relu = nn.ReLU()
         self.attention = attention
 
     def forward(self, input, encoder_states, hidden, cell):
-        # input = [batch_size, n_channels]
-        # input = [batch_size, n_channels=1, n_freq, input_len]
+        # input = [batch_size, n_channels=1, n_freq]
         # encoder_states = [input_len, batch_size, hidden_dim * 2]
         # hidden = [batch_size, hidden_dim]
         # cell = [batch_size, hidden_dim]
 
-        input = input.unsqueeze(0)
-        # input = [input_len=1, batch_size]
+        input = input.squeeze(1).unsqueeze(0)
+        # input = [input_len=1, batch_size, n_freq]
 
-        embedding = self.dropout(self.embedding(input))
+        embedding = self.dropout(self.relu(self.embedding(input)))
         # embedding = [1, batch_size, embedding_dim]
 
         # calculate the attention weight with target decoder hidden (query) and all encoder hidden (key)
@@ -109,13 +109,15 @@ class Decoder(nn.Module):
         # the original manuscript uses all of embedding, decoder state, and context vector for the prediction
         output = self.fc_out(torch.cat((embedding, decoder_state, context_vector), dim=1))
         # output = [batch_size, output_dim]
+        output = output.unsqueeze(1)  # add n_channels to match mel spectrogram shape
+        # output = [batch_size, n_channel=1, output_dim]
 
         return output, hidden, cell, weight
 
 
 class AudioSeq2Seq(nn.Module):
     def __init__(self, encoder_input_dim, decoder_input_dim, encoder_embedding_dim, decoder_embedding_dim,
-                 n_layers, hidden_dim, output_dim, encoder_dropout, decoder_dropout):
+                 n_layers, hidden_dim, output_dim, encoder_dropout, decoder_dropout, device):
         super(AudioSeq2Seq, self).__init__()
 
         self.device = device
@@ -136,12 +138,12 @@ class AudioSeq2Seq(nn.Module):
         self.decoder = Decoder(decoder_input_dim, decoder_embedding_dim, hidden_dim, output_dim,
                                n_layers, decoder_dropout, self.attention).to(self.device)
 
-    def forward(self, src, trg, teacher_forcing_ratio=0.5):
-        # src = [batch_size, n_channels, freq, src_len]
-        # trg = [batch_size, n_channels, freq, trg_len]
+    def forward(self, src, trg, teacher_forcing_ratio):
+        # src = [batch_size, n_channels, n_freq, src_len]
+        # trg = [batch_size, n_channels, n_freq, trg_len]
 
         encoder_states, hidden, cell = self.encoder(src)
-        # encoder_states are all hidden states of the input sequence
+        # encoder_states are all hidden states of the src input sequence
         # hidden and cell are the final forward and backward hidden and cell concatenated
         # encoder_states = [src_len, batch_size, encoder_hidden_dim * 2]
         # hidden = [batch_size, encoder_hidden_dim]
@@ -150,19 +152,23 @@ class AudioSeq2Seq(nn.Module):
         batch_size = trg.shape[0]
         n_channels = trg.shape[1]
         trg_len = trg.shape[3]
+        src_len = src.shape[3]
         decoder_outputs = torch.zeros(trg_len, batch_size, n_channels, self.output_dim).to(self.device)
-        # decoder_outputs store the output for each frame
+        attentions = torch.zeros(trg_len, batch_size, src_len).to(self.device)
+        # decoder_outputs store the output for each trg input frame
+        # attentions store the attention weights for each trg input frame
         # decoder_outputs = [trg_len, batch_size, n_channels, output_dim]
+        # attentions = [trg_len, batch_size, src_len]
 
         input = torch.zeros(batch_size, n_channels, self.output_dim).to(device)  # first input to the decoder is 0 tensor
         for t in range(1, trg_len):
             # at every time step, insert input frame, encoder_states, and previous hidden and cell
             # receive output and new hidden and cell
-            # and get decoder output
-            output, hidden, cell, _ = self.decoder(input, encoder_states, hidden, cell)
+            output, hidden, cell, weight = self.decoder(input, encoder_states, hidden, cell)
             # output = [batch_size, n_channels, output_dim]
             # hidden = [batch_size, decoder_hidden_dim]
             # cell = [batch_size, decoder_hidden_dim]
+            # weight = [batch_size, src_len]
 
             # store output for current time step
             decoder_outputs[t] = output
@@ -170,8 +176,8 @@ class AudioSeq2Seq(nn.Module):
             # with probability of teacher_force_ratio we take the actual next frame
             # otherwise we take the frame that the decoder predicted it to be
             # Teacher Forcing is used so that the model gets used to seeing similar inputs at training and testing time
-            input = trg[t] if random.random() < teacher_forcing_ratio else output
-            # input = [batch_size]
+            input = trg[:, :, :, t] if random.random() < teacher_forcing_ratio else output
+            # input = [batch_size, n_channels, n_freq]
 
         return decoder_outputs
 

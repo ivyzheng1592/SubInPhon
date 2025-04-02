@@ -1,5 +1,4 @@
-# created 2025/03/07 structure based on Ben Trevett tutorial
-# updated 2025/04/01 upgraded to class
+# created 2025/04/01
 # A script that defines training and evaluation at each epoch of each run
 
 import os
@@ -12,7 +11,7 @@ import hyper_params as hp
 import utils
 
 
-class TextRun:
+class AudioRun:
     def __init__(self, seq2seq, trial_num, language, datatype, condition, run_num):
 
         # condition hyperparameters
@@ -47,7 +46,7 @@ class TextRun:
 
         # optimizer and loss function
         self.optimizer = torch.optim.Adam(self.seq2seq.parameters(), lr=hp.learning_rate)
-        self.criterion = nn.CrossEntropyLoss(ignore_index=hp.special_tokens.index(hp.pad_token))
+        self.criterion = nn.MSELoss(reduction='mean')
 
     # a function that completes one repetition of training
     def train(self, train_dataloader, valid_dataloader):
@@ -87,7 +86,7 @@ class TextRun:
         # save the accuracy value
         self.record_acc(hp.n_epochs, "test", test_loss, test_acc)
         print(f"Accuracy data saved at {self.acc_file}")
-
+    """
     # a function that manages evaluation of one random batch
     def evaluate_one_batch(self, test_dataloader, dataset):
         # get one random batch of test data
@@ -134,40 +133,29 @@ class TextRun:
                 # plot attention
                 attention = attention.squeeze(1)
                 # attention = [trg_len, src_len]
-                att_plot = os.path.join(self.att_plot_dir,
-                                        ur + "_" + sr + ".png")
-                utils.plot_att(ur_word, sr_word, attention, att_plot)
-
+                self.plot_att(ur_word, sr_word, attention)
+    """
     # a function that manages training at one epoch
     def train_one_epoch(self, data_loader, teacher_forcing_ratio):
         self.seq2seq.train()  # enable dropout in training
         epoch_loss = 0
-        epoch_acc = 0
+        epoch_mse = 0
 
         # training in one batch
-        for i, (src, trg) in enumerate(data_loader):
-            # src = [src_len, batch_size]
-            # trg = [trg_len, batch_size]
+        for i, ((src_txt, src_aud), (trg_txt, trg_aud)) in enumerate(data_loader):
+            # src_txt = [src_len, batch_size]
+            # src_aud = [batch_size, n_channels, n_freq, n_samples]
+            # trg_txt = [trg_len, batch_size]
+            # trg_aud = [batch_size, n_channels, n_freq, n_samples]
 
             self.optimizer.zero_grad()  # reset gradient at each iteration to 0
-            output, pred, _ = self.seq2seq(src, trg, teacher_forcing_ratio)
+            output, _ = self.seq2seq(src_aud, trg_aud, teacher_forcing_ratio)
             # output = [trg_len, batch_size, output_dim]
-            # pred = [trg_len, batch_size]
 
-            batch_size = trg.shape[1]
-            # calculate total number of correct predictions in a batch
-            batch_correct = torch.all(torch.eq(pred, trg), dim=0).sum()
-            batch_acc = batch_correct.item() / batch_size  # calculate batch accuracy rate
-            epoch_acc += batch_acc  # add to epoch accuracy rate
+            batch_mse = nn.functional.mse_loss(output, trg_aud, reduction='mean')  # calculate batch mse
+            epoch_mse += batch_mse.item()  # add to epoch mse
 
-            # remove the <SOS> token from output and target and reshape for loss calculation
-            output_dim = output.shape[2]
-            output = output[1:].view(-1, output_dim)
-            # output = [(trg_len - 1) * batch_size, output_dim]
-            trg = trg[1:].view(-1)
-            # trg = [(trg_len - 1) * batch_size]
-
-            batch_loss = self.criterion(output, trg)  # calculate batch loss
+            batch_loss = self.criterion(output, trg_aud)  # calculate batch loss
             epoch_loss += batch_loss.item()  # add to epoch loss
             batch_loss.backward()  # backpropagate loss
             # nn.utils.clip_grad_norm_(model.parameters(), clip)
@@ -176,47 +164,39 @@ class TextRun:
 
         # average loss and accuracy over all batches
         average_loss = epoch_loss / len(data_loader)
-        average_acc = epoch_acc / len(data_loader)
+        average_mse = epoch_mse / len(data_loader)
 
-        return average_loss, average_acc
+        return average_loss, average_mse
 
     # a function that manages evaluation at one epoch
     def evaluate_one_epoch(self, data_loader):
         self.seq2seq.eval()  # disable dropout in evaluation
         epoch_loss = 0
-        epoch_acc = 0
+        epoch_mse = 0
 
         # evaluation in one batch
         with torch.no_grad():  # disable gradient tracking
-            for i, (src, trg) in enumerate(data_loader):
-                # src = [src_len, batch_size]
-                # trg = [trg_len, batch_size]
+            for i, ((src_txt, src_aud), (trg_txt, trg_aud)) in enumerate(data_loader):
+                # src_txt = [src_len, batch_size]
+                # src_aud = [batch_size, n_channels, n_freq, n_samples]
+                # trg_txt = [trg_len, batch_size]
+                # trg_aud = [batch_size, n_channels, n_freq, n_samples]
 
-                output, pred, _ = self.seq2seq(src, trg, 0)  # turn off teacher forcing
+                output, _ = self.seq2seq(src_aud, trg_aud, 0)  # turn off teacher forcing
                 # output = [trg_len, batch_size, output_dim]
-                # pred = [trg_len, batch_size]
 
-                batch_size = trg.shape[1]
-                # calculate total number of correct predictions in a batch
-                batch_correct = torch.all(torch.eq(pred, trg), dim=0).sum()
-                batch_acc = batch_correct.item() / batch_size  # calculate batch accuracy rate
-                epoch_acc += batch_acc  # add to epoch accuracy rate
+                batch_mse = nn.functional.mse_loss(output, trg_aud, reduction='mean')  # calculate batch mse
+                epoch_mse += batch_mse.item()  # add to epoch mse
 
-                # remove the <SOS> token from output and target and reshape for loss calculation
-                output_dim = output.shape[2]
-                output = output[1:].view(-1, output_dim)
-                # output = [(trg_len - 1) * batch_size, output_dim]
-                trg = trg[1:].view(-1)
-                # trg = [(trg_len - 1) * batch_size]
-
-                batch_loss = self.criterion(output, trg)  # calculate batch loss
+                batch_loss = self.criterion(output, trg_aud)  # calculate batch loss
                 epoch_loss += batch_loss.item()  # add to epoch loss
+                self.optimizer.step()  # update the weights
 
         # average loss and accuracy over all batches
         average_loss = epoch_loss / len(data_loader)
-        average_acc = epoch_acc / len(data_loader)
+        average_mse = epoch_mse / len(data_loader)
 
-        return average_loss, average_acc
+        return average_loss, average_mse
 
     def record_acc(self, epoch, record_type, loss, acc):
         if os.path.exists(self.acc_file):

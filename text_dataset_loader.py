@@ -1,4 +1,4 @@
-# 2025/01/15
+# created 2025/01/15
 # A script to load custom text dataset with self-defined class inherited from torch Dataset
 
 import re
@@ -122,20 +122,20 @@ if __name__ == "__main__":
     print(" - Loading dataset:")
     annotations_file = "Dataset/English_txt_harmony.csv"
     annotations = pd.read_csv(annotations_file)
-    print("Dataset size: ", len(annotations),
-          "\nSample data token:", annotations.iloc[0])
+    print(f"Dataset size: {len(annotations)}")
+    print(f"Sample data token: {annotations.iloc[0]}")
 
     print(" - Building vocabulary:")
     text_dataset = TextDataset(annotations_file, hp.special_tokens, device='cpu')
     src, trg = text_dataset[0]
-    print("UR vocab size:", len(text_dataset.ur_alphabet),
-          "\nSR vocab size:", len(text_dataset.ur_alphabet),
-          "\nSample source:", src.shape,
-          "\nSample target:", trg.shape)
+    print(f"UR vocab size: {len(text_dataset.ur_alphabet)}")
+    print(f"UR vocab size: {len(text_dataset.sr_alphabet)}")
+    print(f"Sample source: {src.shape}")
+    print(f"Sample target: {trg.shape}")
 
     print(" - Creating dataloader:")
     text_dataloader = text_dataset.get_dataloader(hp.batch_size)
     dataiter = iter(text_dataloader)
     source, target = next(dataiter)
-    print("Sample source:", source.shape,
-          "\nSample target:", target.shape)
+    print(f"Sample source: {source.shape}")
+    print(f"Sample target: {target.shape}")
