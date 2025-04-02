@@ -16,14 +16,20 @@ def plot_waveform(waveform, sample_rate, title="Waveform"):
     fig.suptitle(title)
     plt.show()
 
-def plot_spectrogram(spectrogram, title="Spectrogram"):
-    spectrogram = spectrogram[0]  # [1, n_freq, n_samples]
+def plot_spectrogram(spectrogram1, spectrogram2, spectrogram1_name, spectrogram2_name,
+                     title="Spectrogram"):
+    spectrogram1 = spectrogram1[0]  # [1, n_freq, n_samples]
+    spectrogram2 = spectrogram2[0]  # [1, n_freq, n_samples]
 
-    fig, axs = plt.subplots(1, 1)
-    axs.set_xlabel("frame")
-    axs.set_ylabel("mel freq")
-    im = axs.imshow(spectrogram, origin='lower', aspect='auto')
-    fig.colorbar(im, ax=axs)
+    fig, (axs1, axs2) = plt.subplots(1, 2, sharey='all')
+    axs1.set_xlabel("frame")
+    axs2.set_xlabel("frame")
+    axs1.set_ylabel("mel freq")
+    axs1.set_title(spectrogram1_name)
+    axs2.set_title(spectrogram2_name)
+    axs1.imshow(spectrogram1, origin='lower', aspect='auto')
+    axs2.imshow(spectrogram2, origin='lower', aspect='auto')
+    #fig.colorbar()
     fig.suptitle(title)
     plt.show()
 

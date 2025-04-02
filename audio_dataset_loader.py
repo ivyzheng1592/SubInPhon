@@ -202,8 +202,7 @@ if __name__ == "__main__":
     print(f"Sample source audio: {src_aud.shape}")
     print(f"Sample target audio: {trg_aud.shape}")
 
-    utils.plot_spectrogram(src_aud)
-    utils.plot_spectrogram(trg_aud)
+    utils.plot_spectrogram(src_aud, trg_aud, "src", "trg")
 
     print(" - Creating dataloader:")
     audio_dataloader = audio_dataset.get_dataloader(hp.batch_size)

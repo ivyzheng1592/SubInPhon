@@ -102,16 +102,14 @@ class AudioRun:
         self.seq2seq.eval()  # disable dropout in evaluation
         with torch.no_grad():  # disable gradient tracking
             pred, att = self.seq2seq(src_aud, trg_aud, 0)  # turn off teacher forcing
-            # pred = [trg_len, batch_size, n_channels, output_dim]
+            # pred = [batch_size, n_channels, output_dim, trg_len]
             # att = [trg_len, batch_size, src_len]
 
             # for individual items
             for i in range(hp.batch_size):
-                ur_tensor = src_aud[i, :, :, :]
-                sr_tensor = trg_aud[i, :, :, :]
+                ur_tensor = src_txt[:, i]
+                sr_tensor = trg_txt[:, i]
                 pred_sr_tensor = pred[:, i]
-                att_tensor = att[:, i, :]
-                # attention = [trg_len, src_len]
 
                 # convert tensor to vector
                 ur_vector = [int(x) for x in ur_tensor.tolist()]
@@ -119,19 +117,23 @@ class AudioRun:
                 pred_sr_vector = [int(x) for x in pred_sr_tensor.tolist()]
 
                 # convert vector to word
-                ur_word, ur_string = dataset.ur_alphabet.vec2word(ur_vector)
-                sr_word, sr_string = dataset.sr_alphabet.vec2word(sr_vector)
-                pred_sr_word, pred_sr_string = dataset.sr_alphabet.vec2word(pred_sr_vector)
+                _, ur_string = dataset.ur_alphabet.vec2word(ur_vector)
+                _, sr_string = dataset.sr_alphabet.vec2word(sr_vector)
+                _, pred_sr_string = dataset.sr_alphabet.vec2word(pred_sr_vector)
+
+                ur_aud = src_aud[i, :, :, :]
+                sr_aud = trg_aud[i, :, :, :]
+                pred_sr_aud = pred[i, :, :, :]
+                att_tensor = att[:, i, :]
+                # attention = [trg_len, src_len]
 
                 # compare the actual and predicted target surface form
-                print(f"UR: {ur_string}")
-                print(f"Actual SR: {sr_string}")
-                print(f"Predicted SR: {pred_sr_string}")
+                utils.plot_spectrogram(sr_aud, pred_sr_aud, ur_string, sr_string)
 
                 # plot attention
                 att_plot = os.path.join(self.att_plot_dir,
                                         ur_string + "_" + pred_sr_string + ".png")
-                utils.plot_att(ur_word, pred_sr_word, att_tensor, att_plot)
+                utils.plot_att(ur_aud, sr_aud, att_tensor, att_plot)
 
     # a function that manages training at one epoch
     def train_one_epoch(self, data_loader, teacher_forcing_ratio):
