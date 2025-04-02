@@ -86,55 +86,53 @@ class AudioRun:
         # save the accuracy value
         self.record_acc(hp.n_epochs, "test", test_loss, test_acc)
         print(f"Accuracy data saved at {self.acc_file}")
-    """
+
     # a function that manages evaluation of one random batch
     def evaluate_one_batch(self, test_dataloader, dataset):
         # get one random batch of test data
         dataiter = iter(test_dataloader)
-        src, trg = next(dataiter)
-        # src = [src_len, batch_size]
-        # trg = [trg_len, batch_size]
+        (src_txt, src_aud), (trg_txt, trg_aud) = next(dataiter)
+        # src_txt = [src_len, batch_size]
+        # src_aud = [batch_size, n_channels, n_freq, n_samples]
+        # trg_txt = [trg_len, batch_size]
+        # trg_aud = [batch_size, n_channels, n_freq, n_samples]
 
         # load the model
         self.seq2seq.load_state_dict(torch.load(self.model_file))
         self.seq2seq.eval()  # disable dropout in evaluation
         with torch.no_grad():  # disable gradient tracking
-            _, pred, att = self.seq2seq(src, trg, 0)  # turn off teacher forcing
-            # pred = [trg_len, batch_size]
+            pred, att = self.seq2seq(src_aud, trg_aud, 0)  # turn off teacher forcing
+            # pred = [trg_len, batch_size, n_channels, output_dim]
             # att = [trg_len, batch_size, src_len]
 
-            # split batch into individual items
-            src = src.split(hp.batch_size, dim=1)
-            trg = trg.split(hp.batch_size, dim=1)
-            pred = pred.split(hp.batch_size, dim=1)
-            att = att.split(hp.batch_size, dim=1)
-            # src = batch_size tuple of [src_len]
-            # trg = batch_size tuple of [trg_len]
-            # pred = batch_size tuple of [pred_len]
-            # att = batch_size tuple of [trg_len, 1, src_len]
-
             # for individual items
-            for ur, sr, pred_sr, attention in zip(src, trg, pred):
+            for i in range(hp.batch_size):
+                ur_tensor = src_aud[i, :, :, :]
+                sr_tensor = trg_aud[i, :, :, :]
+                pred_sr_tensor = pred[:, i]
+                att_tensor = att[:, i, :]
+                # attention = [trg_len, src_len]
+
                 # convert tensor to vector
-                ur_vector = [int(x) for x in ur.tolist()]
-                sr_vector = [int(x) for x in sr.tolist()]
-                pred_sr_vector = [int(x) for x in pred_sr.tolist()]
+                ur_vector = [int(x) for x in ur_tensor.tolist()]
+                sr_vector = [int(x) for x in sr_tensor.tolist()]
+                pred_sr_vector = [int(x) for x in pred_sr_tensor.tolist()]
 
                 # convert vector to word
-                ur_word = dataset.ur_alphabet.vec2word(ur_vector)
-                sr_word = dataset.sr_alphabet.vec2word(sr_vector)
-                pred_sr_word = dataset.sr_alphabet.vec2word(pred_sr_vector)
+                ur_word, ur_string = dataset.ur_alphabet.vec2word(ur_vector)
+                sr_word, sr_string = dataset.sr_alphabet.vec2word(sr_vector)
+                pred_sr_word, pred_sr_string = dataset.sr_alphabet.vec2word(pred_sr_vector)
 
                 # compare the actual and predicted target surface form
-                print(f"UR: {ur_word}")
-                print(f"Actual SR: {sr_word}")
-                print(f"Predicted SR: {pred_sr_word}")
+                print(f"UR: {ur_string}")
+                print(f"Actual SR: {sr_string}")
+                print(f"Predicted SR: {pred_sr_string}")
 
                 # plot attention
-                attention = attention.squeeze(1)
-                # attention = [trg_len, src_len]
-                self.plot_att(ur_word, sr_word, attention)
-    """
+                att_plot = os.path.join(self.att_plot_dir,
+                                        ur_string + "_" + pred_sr_string + ".png")
+                utils.plot_att(ur_word, pred_sr_word, att_tensor, att_plot)
+
     # a function that manages training at one epoch
     def train_one_epoch(self, data_loader, teacher_forcing_ratio):
         self.seq2seq.train()  # enable dropout in training
@@ -144,13 +142,13 @@ class AudioRun:
         # training in one batch
         for i, ((src_txt, src_aud), (trg_txt, trg_aud)) in enumerate(data_loader):
             # src_txt = [src_len, batch_size]
-            # src_aud = [batch_size, n_channels, n_freq, n_samples]
+            # src_aud = [batch_size, n_channels, n_freq, src_len]
             # trg_txt = [trg_len, batch_size]
-            # trg_aud = [batch_size, n_channels, n_freq, n_samples]
+            # trg_aud = [batch_size, n_channels, n_freq, trg_len]
 
             self.optimizer.zero_grad()  # reset gradient at each iteration to 0
             output, _ = self.seq2seq(src_aud, trg_aud, teacher_forcing_ratio)
-            # output = [trg_len, batch_size, output_dim]
+            # output = [batch_size, n_channels, output_dim, trg_len]
 
             batch_mse = nn.functional.mse_loss(output, trg_aud, reduction='mean')  # calculate batch mse
             epoch_mse += batch_mse.item()  # add to epoch mse
@@ -178,12 +176,12 @@ class AudioRun:
         with torch.no_grad():  # disable gradient tracking
             for i, ((src_txt, src_aud), (trg_txt, trg_aud)) in enumerate(data_loader):
                 # src_txt = [src_len, batch_size]
-                # src_aud = [batch_size, n_channels, n_freq, n_samples]
+                # src_aud = [batch_size, n_channels, n_freq, trg_len]
                 # trg_txt = [trg_len, batch_size]
-                # trg_aud = [batch_size, n_channels, n_freq, n_samples]
+                # trg_aud = [batch_size, n_channels, n_freq, trg_len]
 
                 output, _ = self.seq2seq(src_aud, trg_aud, 0)  # turn off teacher forcing
-                # output = [trg_len, batch_size, output_dim]
+                # output = [batch_size, n_channels, output_dim, trg_len]
 
                 batch_mse = nn.functional.mse_loss(output, trg_aud, reduction='mean')  # calculate batch mse
                 epoch_mse += batch_mse.item()  # add to epoch mse

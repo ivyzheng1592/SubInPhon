@@ -106,9 +106,9 @@ if __name__ == "__main__":
     languages = ["English"]
     #datatypes = ["txt", "aud"]
     conditions = ["harmony", "disharmony"]
-    n_run = range(0)  # which run to complete
+    n_run = range(1)  # which run to complete
     n_check = range(1)  # which run to inspect
     for language in languages:
         for condition in conditions:
-            text_condition(trial_num, language, "txt", condition, n_run, n_check, device)
-            #audio_condition(trial_num, language, "aud", condition, n_run, n_check, device)
+            #text_condition(trial_num, language, "txt", condition, n_run, n_check, device)
+            audio_condition(trial_num, language, "aud", condition, n_run, n_check, device)

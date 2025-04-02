@@ -162,7 +162,7 @@ class TextSeq2Seq(nn.Module):
         self.decoder = Decoder(decoder_input_dim, decoder_embedding_dim, hidden_dim, output_dim,
                                n_layers, decoder_dropout, self.attention).to(self.device)
 
-    def forward(self, src, trg, teacher_forcing_ratio):
+    def forward(self, src, trg, teacher_forcing_ratio=0.5):
         # src = [src_len, batch_size]
         # trg = [trg_len, batch_size]
 

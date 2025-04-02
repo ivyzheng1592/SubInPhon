@@ -138,7 +138,7 @@ class AudioSeq2Seq(nn.Module):
         self.decoder = Decoder(decoder_input_dim, decoder_embedding_dim, hidden_dim, output_dim,
                                n_layers, decoder_dropout, self.attention).to(self.device)
 
-    def forward(self, src, trg, teacher_forcing_ratio):
+    def forward(self, src, trg, teacher_forcing_ratio=0.5):
         # src = [batch_size, n_channels, n_freq, src_len]
         # trg = [batch_size, n_channels, n_freq, trg_len]
 
@@ -160,7 +160,7 @@ class AudioSeq2Seq(nn.Module):
         # decoder_outputs = [trg_len, batch_size, n_channels, output_dim]
         # attentions = [trg_len, batch_size, src_len]
 
-        input = torch.zeros(batch_size, n_channels, self.output_dim).to(device)  # first input to the decoder is 0 tensor
+        input = torch.zeros(batch_size, n_channels, self.output_dim).to(self.device)  # first input to the decoder is 0 tensor
         for t in range(1, trg_len):
             # at every time step, insert input frame, encoder_states, and previous hidden and cell
             # receive output and new hidden and cell
@@ -172,6 +172,7 @@ class AudioSeq2Seq(nn.Module):
 
             # store output for current time step
             decoder_outputs[t] = output
+            attentions[t] = weight
 
             # with probability of teacher_force_ratio we take the actual next frame
             # otherwise we take the frame that the decoder predicted it to be
@@ -179,14 +180,14 @@ class AudioSeq2Seq(nn.Module):
             input = trg[:, :, :, t] if random.random() < teacher_forcing_ratio else output
             # input = [batch_size, n_channels, n_freq]
 
-        return decoder_outputs
+        decoder_outputs.permute(1, 2, 3, 0)  # reshape output for loss calculation
+        # decoder_outputs = [batch_size, n_channels, output_dim, trg_len]
+
+        return decoder_outputs, attentions
 
 
 if __name__ == "__main__":
     import torchinfo
-
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using {device} device")
 
     print(" - Initializing model:")
     encoder_input_dim = 94
@@ -194,6 +195,6 @@ if __name__ == "__main__":
     output_dim = 94
 
     seq2seq = AudioSeq2Seq(encoder_input_dim, decoder_input_dim, hp.encoder_embedding_dim, hp.decoder_embedding_dim,
-                           hp.n_layers, hp.hidden_dim, output_dim, hp.encoder_dropout, hp.decoder_dropout, device).to(device)
+                           hp.n_layers, hp.hidden_dim, output_dim, hp.encoder_dropout, hp.decoder_dropout, device='cpu').to('cpu')
 
-    torchinfo.summary(seq2seq, input_size = [(7, 32), (7, 32)], dtypes=[torch.long, torch.long], device=device)
+    torchinfo.summary(seq2seq, input_size = [(1, 128, 94), (1, 128, 94)], dtypes=[torch.long, torch.long], device='cpu')
