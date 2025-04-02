@@ -153,11 +153,11 @@ class AudioSeq2Seq(nn.Module):
         n_channels = trg.shape[1]
         trg_len = trg.shape[3]
         src_len = src.shape[3]
-        decoder_outputs = torch.zeros(trg_len, batch_size, n_channels, self.output_dim).to(self.device)
+        decoder_outputs = torch.zeros(batch_size, n_channels, self.output_dim, trg_len).to(self.device)
         attentions = torch.zeros(trg_len, batch_size, src_len).to(self.device)
         # decoder_outputs store the output for each trg input frame
         # attentions store the attention weights for each trg input frame
-        # decoder_outputs = [trg_len, batch_size, n_channels, output_dim]
+        # decoder_outputs = [batch_size, n_channels, output_dim, trg_len]
         # attentions = [trg_len, batch_size, src_len]
 
         input = torch.zeros(batch_size, n_channels, self.output_dim).to(self.device)  # first input to the decoder is 0 tensor
@@ -171,7 +171,7 @@ class AudioSeq2Seq(nn.Module):
             # weight = [batch_size, src_len]
 
             # store output for current time step
-            decoder_outputs[t] = output
+            decoder_outputs[:, :, :, t] = output
             attentions[t] = weight
 
             # with probability of teacher_force_ratio we take the actual next frame
@@ -180,9 +180,6 @@ class AudioSeq2Seq(nn.Module):
             input = trg[:, :, :, t] if random.random() < teacher_forcing_ratio else output
             # input = [batch_size, n_channels, n_freq]
 
-        decoder_outputs.permute(1, 2, 3, 0)  # reshape output for loss calculation
-        # decoder_outputs = [batch_size, n_channels, output_dim, trg_len]
-
         return decoder_outputs, attentions
 
 
@@ -190,11 +187,11 @@ if __name__ == "__main__":
     import torchinfo
 
     print(" - Initializing model:")
-    encoder_input_dim = 94
-    decoder_input_dim = 94
-    output_dim = 94
+    encoder_input_dim = 128
+    decoder_input_dim = 128
+    output_dim = 128
 
     seq2seq = AudioSeq2Seq(encoder_input_dim, decoder_input_dim, hp.encoder_embedding_dim, hp.decoder_embedding_dim,
                            hp.n_layers, hp.hidden_dim, output_dim, hp.encoder_dropout, hp.decoder_dropout, device='cpu').to('cpu')
 
-    torchinfo.summary(seq2seq, input_size = [(1, 128, 94), (1, 128, 94)], dtypes=[torch.long, torch.long], device='cpu')
+    torchinfo.summary(seq2seq, input_size = [(32, 1, 128, 94), (32, 1, 128, 94)], dtypes=[torch.float, torch.float], device='cpu')

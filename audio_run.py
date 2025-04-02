@@ -88,9 +88,9 @@ class AudioRun:
         print(f"Accuracy data saved at {self.acc_file}")
 
     # a function that manages evaluation of one random batch
-    def evaluate_one_batch(self, test_dataloader, dataset):
+    def evaluate_one_batch(self, data_loader, dataset):
         # get one random batch of test data
-        dataiter = iter(test_dataloader)
+        dataiter = iter(data_loader)
         (src_txt, src_aud), (trg_txt, trg_aud) = next(dataiter)
         # src_txt = [src_len, batch_size]
         # src_aud = [batch_size, n_channels, n_freq, n_samples]

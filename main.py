@@ -39,16 +39,15 @@ def text_condition(trial_num, language, datatype, condition, n_run, n_check, dev
                           hp.encoder_dropout, hp.decoder_dropout, device=device)
 
     print(" - Training and evaluating model:")
-    reps = []
     for run in n_run:
-        reps.insert(run, TextRun(seq2seq, trial_num, language, datatype, condition, run))
-        reps[run].train(train_dataloader, valid_dataloader)
-        reps[run].test(test_dataloader)
+        rep = TextRun(seq2seq, trial_num, language, datatype, condition, run)
+        rep.train(train_dataloader, valid_dataloader)
+        rep.test(test_dataloader)
 
     print(" - Inspecting model outputs:")
     for check in n_check:
-        reps.insert(check, TextRun(seq2seq, trial_num, language, datatype, condition, check))
-        reps[check].evaluate_one_batch(test_dataloader, dataset)
+        rep = TextRun(seq2seq, trial_num, language, datatype, condition, check)
+        rep.evaluate_one_batch(test_dataloader, dataset)
 
 
 # a function that loads audio dataset, initializes audio model
@@ -83,11 +82,10 @@ def audio_condition(trial_num, language, datatype, condition, n_run, n_check, de
                            hp.encoder_dropout, hp.decoder_dropout, device=device)
 
     print(" - Training and evaluating model:")
-    reps = []
     for run in n_run:
-        reps[run] = AudioRun(seq2seq, trial_num, language, datatype, condition, run)
-        reps[run].train(train_dataloader, valid_dataloader)
-        reps[run].test(test_dataloader)
+        rep = AudioRun(seq2seq, trial_num, language, datatype, condition, run)
+        rep.train(train_dataloader, valid_dataloader)
+        rep.test(test_dataloader)
 
     #print(" - Inspecting model outputs:")
     #for check in n_check:
@@ -106,8 +104,8 @@ if __name__ == "__main__":
     languages = ["English"]
     #datatypes = ["txt", "aud"]
     conditions = ["harmony", "disharmony"]
-    n_run = range(1)  # which run to complete
-    n_check = range(1)  # which run to inspect
+    n_run = range(1, 2)  # which run to complete
+    n_check = range(1, 2)  # which run to inspect
     for language in languages:
         for condition in conditions:
             #text_condition(trial_num, language, "txt", condition, n_run, n_check, device)

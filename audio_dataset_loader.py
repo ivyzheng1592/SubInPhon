@@ -109,7 +109,7 @@ class AudioDataset(Dataset):
         # in this project, we are padding to a maximum length
         # so we expect all length_signal < self.n_samples
         length_signal1 = signal1.shape[1]
-        length_signal2 = signal2.shape[2]
+        length_signal2 = signal2.shape[1]
         assert (
             length_signal1 < self.n_samples and length_signal2 < self.n_samples
         ), f"All audio data should have less than {self.n_samples} samples!"
@@ -157,14 +157,16 @@ class AudioDataset(Dataset):
     # a closure of customized collate_fn
     def get_collate_fn(self):
         def collate_fn(batch):
-            src_labels = [item[0] for item in batch]
+            src_labels = [src_txt for (src_txt, _), trg in batch]
             src_labels = pad_sequence(src_labels, batch_first=False, padding_value=self.pad_idx)
-            src_audios = [item[1] for item in batch]
+            src_audios = [src_aud for (_, src_aud), trg in batch]
+            src_audios = pad_sequence(src_audios, batch_first=True, padding_value=self.pad_idx)
 
-            trg_labels = [item[2] for item in batch]
+            trg_labels = [trg_txt for src, (trg_txt, _) in batch]
             trg_labels = pad_sequence(trg_labels, batch_first=False, padding_value=self.pad_idx)
-            trg_audios = [item[3] for item in batch]
-            return src_labels, src_audios, trg_labels, trg_audios
+            trg_audios = [trg_aud for src, (_, trg_aud) in batch]
+            trg_audios = pad_sequence(trg_audios, batch_first=True, padding_value=self.pad_idx)
+            return (src_labels, src_audios), (trg_labels, trg_audios)
         return collate_fn
 
     def get_dataloader(self, batch_size, shuffle=True):
@@ -206,6 +208,8 @@ if __name__ == "__main__":
     print(" - Creating dataloader:")
     audio_dataloader = audio_dataset.get_dataloader(hp.batch_size)
     dataiter = iter(audio_dataloader)
-    source, target = next(dataiter)
-    print(f"Sample source: {source.shape}")
-    print(f"Sample target: {target.shape}")
+    (source_text, source_audio), (target_text, target_audio) = next(dataiter)
+    print(f"Sample source text: {source_text.shape}")
+    print(f"Sample target text: {target_text.shape}")
+    print(f"Sample source audio: {source_audio.shape}")
+    print(f"Sample target audio: {target_audio.shape}")
