@@ -7,7 +7,7 @@ import os
 from mp3_to_wav import convert_mp3_to_wav
 
 # open file and select the first 200 pairs to generate audio files
-fileName = "English_aud_harmony.csv"
+fileName = "EnglishBH_harmony.csv"
 with open(fileName, "r") as file:
     lines = file.readlines()[1:2]
 
@@ -32,9 +32,8 @@ print(words)
 # create audio folder
 print(" - Creating audio folder:")
 folderName = "audio/English"
-cmd = "mkdir " + folderName
-os.system(cmd)
-print(cmd)
+if not os.path.exists(folderName):
+    os.mkdir(folderName)
 
 # generate audio files
 print(" - Generating audio files:")

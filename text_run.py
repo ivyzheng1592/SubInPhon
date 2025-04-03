@@ -13,29 +13,31 @@ import utils
 
 
 class TextRun:
-    def __init__(self, seq2seq, trial_num, language, datatype, condition, run_num):
+    def __init__(self, seq2seq, trial_num, datatype, language, condition, run_num):
 
         # condition hyperparameters
         self.seq2seq = seq2seq
         self.trial_num = trial_num
-        self.language = language
         self.datatype = datatype
+        self.language = language
         self.condition = condition
         self.run_num = run_num
 
         # results files
-        self.acc_file = os.path.join("Results", trial_num,
-                                     language + "_" + datatype + "_" + condition +
+        self.acc_file = os.path.join("Results", trial_num, datatype,
+                                     language + "_" + condition +
                                      "_run" + str(run_num) + "_acc.csv")
-        self.model_file = os.path.join("Results", trial_num,
-                                       language + "_" + datatype + "_" + condition +
+        self.model_file = os.path.join("Results", trial_num, datatype,
+                                       language + "_" + condition +
                                        "_run" + str(run_num) + "_seq2seq.pth")
-        self.acc_plot = os.path.join("Results", trial_num,
-                                     language + "_" + datatype + "_" + condition +
+        self.acc_plot = os.path.join("Results", trial_num, datatype,
+                                     language + "_" + condition +
                                      "_run" + str(run_num) + "_acc_plot.png")
-        self.att_plot_dir = os.path.join("Results", trial_num,
-                                         language + "_" + datatype + "_" + condition +
+        self.att_plot_dir = os.path.join("Results", trial_num, datatype,
+                                         language + "_" + condition +
                                          "_run" + str(run_num) + "_attention_plots")
+        if not os.path.exists(self.att_plot_dir):
+            os.mkdir(self.att_plot_dir)
 
         # model weight initialization
         for name, param in self.seq2seq.named_parameters():
@@ -139,7 +141,7 @@ class TextRun:
         epoch_acc = 0
 
         # training in one batch
-        for i, (src, trg) in enumerate(data_loader):
+        for i, (src, trg) in enumerate(tqdm.tqdm(data_loader)):
             # src = [src_len, batch_size]
             # trg = [trg_len, batch_size]
 
@@ -182,7 +184,7 @@ class TextRun:
 
         # evaluation in one batch
         with torch.no_grad():  # disable gradient tracking
-            for i, (src, trg) in enumerate(data_loader):
+            for i, (src, trg) in enumerate(tqdm.tqdm(data_loader)):
                 # src = [src_len, batch_size]
                 # trg = [trg_len, batch_size]
 

@@ -4,6 +4,8 @@
 # specifying stem, underlying suffixed form, and surface suffixed form
 # updated 2025/02/27
 # removing all tri-syllables and retaining all di-syllables
+# updated 2025/04/03
+# removing text stimuli where each diphthong was represented using one symbol
 
 import csv
 import itertools
@@ -111,9 +113,9 @@ def generate_stimuli(onset, coda, vowel_1, vowel_2, syll_struct, language):
 # Phoneme inventory:
 onset_ae = ['m', 'n', 'p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'v', 'z', 'ʃ', 'ʒ', 'θ', 'ð', 'h']
 coda_ae = ['m', 'n', 'ŋ', 'p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'v', 'z', 'ʃ', 'ʒ', 'θ', 'ð']
-# vowel for text input (control for number of symbols in a phoneme)
-vowel_front_ae_txt = {'ɪ': "closed", 'ɛ': "closed", 'i': "open", 'e': "open"}
-vowel_back_ae_txt = {'ʊ': "closed", 'ɔ': "closed", 'u': "open", 'o': "open"}
+# vowel for text input (control for number of symbols in a phoneme) -> abandoned
+#vowel_front_ae_txt = {'ɪ': "closed", 'ɛ': "closed", 'i': "open", 'e': "open"}
+#vowel_back_ae_txt = {'ʊ': "closed", 'ɔ': "closed", 'u': "open", 'o': "open"}
 # vowel for audio input (actual realization of phoneme)
 vowel_front_ae_aud = {'ɪ': "closed", 'ɛ': "closed", 'i': "open", 'eɪ': "open"}
 vowel_back_ae_aud = {'ʊ': "closed", 'ɔ': "closed", 'u': "open", 'oʊ': "open"}
@@ -125,8 +127,8 @@ syll_struct_ae = ["V-CV", "V-CVC", "CV-CV", "CV-CVC",
                   #"VC.V-CV", "VC.V-CVC", "VC.VC-V", "VC.VC-VC",
                   #"CVC.V-CV", "CVC.V-CVC","CVC.VC-V", "CVC.VC-VC"]
 # Stimuli
-generate_stimuli(onset_ae, coda_ae, vowel_front_ae_txt, vowel_back_ae_txt, syll_struct_ae, "English_txt")
-generate_stimuli(onset_ae, coda_ae, vowel_front_ae_aud, vowel_back_ae_aud, syll_struct_ae, "English_aud")
+#generate_stimuli(onset_ae, coda_ae, vowel_front_ae_txt, vowel_back_ae_txt, syll_struct_ae, "English_txt")
+generate_stimuli(onset_ae, coda_ae, vowel_front_ae_aud, vowel_back_ae_aud, syll_struct_ae, "EnglishBH")
 
 # Language: Cantonese
 # Phoneme inventory:

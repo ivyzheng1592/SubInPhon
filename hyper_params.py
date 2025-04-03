@@ -1,15 +1,19 @@
 """
 data structure:
 - "Dataset"
+    - {language} + "_" + {condition} + ".csv"
     - "audio"
-        - {language_name}
+        - {language}
+            - {src}.mp3
+            - {src}.wav
 - "Results"
     - "trial_"{trial_num}
-        - {datatype} + "_" + {condition} + "_" + "run_"{run_num} + "_seq2seq.pth"
-        - {datatype} + "_" + {condition} + "_" + "run_"{run_num} + "_acc.csv"
-        - {datatype} + "_" + {condition} + "_" + "run_"{run_num} + "_acc_plot.png"
-        - {datatype} + "_" + {condition} + "_" + "run_"{run_num} + "_att_plot"
-            - {src}_{trg}.png
+        - {datatype}
+            - {language} + "_" + {condition} + "_" + "run_"{run_num} + "_seq2seq.pth"
+            - {language} + "_" + {condition} + "_" + "run_"{run_num} + "_acc.csv"
+            - {language} + "_" + {condition} + "_" + "run_"{run_num} + "_acc_plot.png"
+            - {language} + "_" + {condition} + "_" + "run_"{run_num} + "_att_plot"
+                - {src}_{trg}.png
 """
 
 # Alphabet
@@ -32,14 +36,14 @@ data_split_ratio = [0.1, 0.1, 0.8]
 # Model hyperparameters
 encoder_embedding_dim = 30  # original=300
 decoder_embedding_dim = 30  # original=300
-hidden_dim = 16  # original=256
+hidden_dim = 8  # original=256
 n_layers = 1
 encoder_dropout = 0.1  # 0.0 is equivalent to Identity function
 decoder_dropout = 0.1  # 0.0 is equivalent to Identity function
 teacher_forcing_ratio = 0.5  # original=0.5
 
 # Training hyperparameters
-n_epochs = 30  # original=50. Note: must be >1 !!!
+n_epochs = 20  # original=50. Note: must be >1 !!!
 learning_rate = 0.05
-batch_size = 256  # original=32
-clip = 1.0
+batch_size = 32  # original=32
+#clip = 1.0

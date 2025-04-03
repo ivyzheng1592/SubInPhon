@@ -12,10 +12,10 @@ import hyper_params as hp
 
 # a function that loads text dataset, initializes text model
 # and completes multiple runs of training and evaluation of one condition
-def text_condition(trial_num, language, datatype, condition, n_run, n_check, device):
+def text_condition(trial_num, datatype, language, condition, n_run, n_check, device):
 
     print(" - Loading dataset:")
-    annotations_file = os.path.join("Dataset", language + "_" + datatype + "_" + condition + ".csv")
+    annotations_file = os.path.join("Dataset", language + "_" + condition + ".csv")
     dataset = TextDataset(annotations_file, hp.special_tokens, device=device)
 
     print(" - Splitting dataset:")
@@ -40,22 +40,22 @@ def text_condition(trial_num, language, datatype, condition, n_run, n_check, dev
 
     print(" - Training and evaluating model:")
     for run in n_run:
-        rep = TextRun(seq2seq, trial_num, language, datatype, condition, run)
+        rep = TextRun(seq2seq, trial_num, datatype, language, condition, run)
         rep.train(train_dataloader, valid_dataloader)
         rep.test(test_dataloader)
 
     print(" - Inspecting model outputs:")
     for check in n_check:
-        rep = TextRun(seq2seq, trial_num, language, datatype, condition, check)
+        rep = TextRun(seq2seq, trial_num, datatype, language, condition, check)
         rep.evaluate_one_batch(test_dataloader, dataset)
 
 
 # a function that loads audio dataset, initializes audio model
 # and completes multiple runs of training and evaluation of one condition
-def audio_condition(trial_num, language, datatype, condition, n_run, n_check, device):
+def audio_condition(trial_num, datatype, language, condition, n_run, n_check, device):
 
     print(" - Loading dataset:")
-    annotations_file = os.path.join("Dataset", language + "_" + datatype + "_" + condition + ".csv")
+    annotations_file = os.path.join("Dataset", language + "_" + condition + ".csv")
     audio_dir = os.path.join("Dataset", "audio", language)
     dataset = AudioDataset(annotations_file, audio_dir, hp.special_tokens,
                            hp.sample_rate, hp.n_samples, hp.n_fft, hp.hop_length, hp.n_mels,
@@ -83,7 +83,7 @@ def audio_condition(trial_num, language, datatype, condition, n_run, n_check, de
 
     print(" - Training and evaluating model:")
     for run in n_run:
-        rep = AudioRun(seq2seq, trial_num, language, datatype, condition, run)
+        rep = AudioRun(seq2seq, trial_num, datatype, language, condition, run)
         rep.train(train_dataloader, valid_dataloader)
         rep.test(test_dataloader)
 
@@ -95,18 +95,20 @@ def audio_condition(trial_num, language, datatype, condition, n_run, n_check, de
 if __name__ == "__main__":
 
     # defining the current trial of running
-    trial_num = "250402"
+    trial_num = "250403"
+    if not os.path.exists(os.path.join("Results", trial_num)):
+        os.mkdir(os.path.join("Results", trial_num))
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using {device} device")
 
     # running each condition for x times
-    languages = ["English"]
-    #datatypes = ["txt", "aud"]
+    datatypes = ["txt", "aud"]
+    languages = ["EnglishBH"]
     conditions = ["harmony", "disharmony"]
-    n_run = range(1, 2)  # which run to complete
-    n_check = range(1, 2)  # which run to inspect
+    n_run = range(1)  # which run to complete
+    n_check = range(1)  # which run to inspect
     for language in languages:
         for condition in conditions:
-            #text_condition(trial_num, language, "txt", condition, n_run, n_check, device)
-            audio_condition(trial_num, language, "aud", condition, n_run, n_check, device)
+            text_condition(trial_num, "txt", language, condition, n_run, n_check, device)
+            #audio_condition(trial_num, language, "aud", condition, n_run, n_check, device)
