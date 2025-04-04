@@ -1,14 +1,13 @@
 # created 2024/09/15
-# A script to generate stimuli of vowel harmony and vowel disharmony based on a given inventory of phonemes and syllable structures
-# updated 2025/02/24
-# specifying stem, underlying suffixed form, and surface suffixed form
-# updated 2025/02/27
-# removing all tri-syllables and retaining all di-syllables
-# updated 2025/04/03
-# removing text stimuli where each diphthong was represented using one symbol
+# A script to generate stimuli of vowel harmony and vowel disharmony
+# based on given phoneme inventory and syllable structures
+# updated 2025/04/04
+# added function to decompose vowel harmony and vowel disharmony stimuli
+# into structured syllables based on given phoneme inventory and syllable structures
 
 import csv
 import itertools
+from os import remove
 
 
 # Function to generate stimuli for each language with specified phoneme inventory and syllable structure
@@ -109,6 +108,43 @@ def generate_stimuli(onset, coda, vowel_1, vowel_2, syll_struct, language):
     return harmony_list, disharmony_list
 
 
+# Function to decompose stimuli for each language with specified phoneme inventory and syllable structure
+def decompose_stimuli(onset, coda, vowel_1, vowel_2, syll_struct, word):
+    syll1 = [None, None, None]  # C, V, C
+    syll2 = [None, None, None]
+
+    if word[0] in onset:  # if first syllable has onset
+        syll1.insert(0, word[0])
+        word.remove(0)
+    if word[0] == 'e' or word[0] == 'o':  # if first vowel is diphthong
+        syll1.insert(1, word[0]+word[1])
+        word.remove(0)
+        word.remove(0)
+    else:  # if first vowel is monophthong
+        syll1.insert(1, word[0])
+        word.remove(0)
+    if word[0] in coda:  # if first syllable has coda
+        syll1.insert(2, word[0])
+        word.remove(0)
+
+    if word[0] in onset:  # if first syllable has onset
+        syll2.insert(0, word[0])
+        word.remove(0)
+    if word[0] == 'e' or word[0] == 'o':  # if first vowel is diphthong
+        syll2.insert(1, word[0]+word[1])
+        word.remove(0)
+        word.remove(0)
+    else:  # if first vowel is monophthong
+        syll2.insert(1, word[0])
+        word.remove(0)
+    if word[0] in coda:  # if first syllable has coda
+        syll2.insert(2, word[0])
+        word.remove(0)
+
+    sylls = [syll1, syll2]
+    return sylls
+
+
 # Language: English
 # Phoneme inventory:
 onset_ae = ['m', 'n', 'p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'v', 'z', 'ʃ', 'ʒ', 'θ', 'ð', 'h']
@@ -117,8 +153,8 @@ coda_ae = ['m', 'n', 'ŋ', 'p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'v', 'z', 'ʃ
 #vowel_front_ae_txt = {'ɪ': "closed", 'ɛ': "closed", 'i': "open", 'e': "open"}
 #vowel_back_ae_txt = {'ʊ': "closed", 'ɔ': "closed", 'u': "open", 'o': "open"}
 # vowel for audio input (actual realization of phoneme)
-vowel_front_ae_aud = {'ɪ': "closed", 'ɛ': "closed", 'i': "open", 'eɪ': "open"}
-vowel_back_ae_aud = {'ʊ': "closed", 'ɔ': "closed", 'u': "open", 'oʊ': "open"}
+vowel_front_ae = {'ɪ': "closed", 'ɛ': "closed", 'i': "open", 'eɪ': "open"}
+vowel_back_ae = {'ʊ': "closed", 'ɔ': "closed", 'u': "open", 'oʊ': "open"}
 # Syllable structure:
 syll_struct_ae = ["V-CV", "V-CVC", "CV-CV", "CV-CVC",
                   "VC-V", "VC-VC", "CVC-V", "CVC-VC"]
@@ -128,7 +164,7 @@ syll_struct_ae = ["V-CV", "V-CVC", "CV-CV", "CV-CVC",
                   #"CVC.V-CV", "CVC.V-CVC","CVC.VC-V", "CVC.VC-VC"]
 # Stimuli
 #generate_stimuli(onset_ae, coda_ae, vowel_front_ae_txt, vowel_back_ae_txt, syll_struct_ae, "English_txt")
-generate_stimuli(onset_ae, coda_ae, vowel_front_ae_aud, vowel_back_ae_aud, syll_struct_ae, "EnglishBH")
+generate_stimuli(onset_ae, coda_ae, vowel_front_ae, vowel_back_ae, syll_struct_ae, "EnglishBH")
 
 # Language: Cantonese
 # Phoneme inventory:

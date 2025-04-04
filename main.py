@@ -40,7 +40,7 @@ def text_condition(trial_num, datatype, language, condition, n_run, n_check, dev
 
     print(" - Training and evaluating model:")
     for run in n_run:
-        rep = TextRun(seq2seq, trial_num, datatype, language, condition, run)
+        rep = TextRun(seq2seq, dataset, trial_num, datatype, language, condition, run)
         rep.train(train_dataloader, valid_dataloader)
         rep.test(test_dataloader)
 
@@ -49,7 +49,7 @@ def text_condition(trial_num, datatype, language, condition, n_run, n_check, dev
         rep = TextRun(seq2seq, trial_num, datatype, language, condition, check)
         rep.evaluate_one_batch(test_dataloader, dataset)
 
-
+"""
 # a function that loads audio dataset, initializes audio model
 # and completes multiple runs of training and evaluation of one condition
 def audio_condition(trial_num, datatype, language, condition, n_run, n_check, device):
@@ -90,7 +90,7 @@ def audio_condition(trial_num, datatype, language, condition, n_run, n_check, de
     #print(" - Inspecting model outputs:")
     #for check in n_check:
         #reps[check].evaluate_one_batch(test_dataloader, dataset)
-
+"""
 
 if __name__ == "__main__":
 

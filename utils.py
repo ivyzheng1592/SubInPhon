@@ -4,6 +4,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
+def save_to_file(data_store, save_file):
+    # convert dictionary to pandas dataframe
+    data_df = pd.DataFrame(data_store)
+
+    # write to csv file
+    data_df.to_csv(save_file, index=False)
+
 def plot_waveform(waveform, sample_rate, title="Waveform"):
     waveform = waveform.cpu().numpy()  # [n_channels, n_samples]
     time_axis = torch.arange(0, waveform.shape[1]) / sample_rate
