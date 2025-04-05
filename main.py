@@ -46,8 +46,8 @@ def text_condition(trial_num, datatype, language, condition, n_run, n_check, dev
 
     print(" - Inspecting model outputs:")
     for check in n_check:
-        rep = TextRun(seq2seq, trial_num, datatype, language, condition, check)
-        rep.evaluate_one_batch(test_dataloader, dataset)
+        rep = TextRun(seq2seq, dataset, trial_num, datatype, language, condition, check)
+        rep.evaluate_one_batch(test_dataloader)
 
 """
 # a function that loads audio dataset, initializes audio model
@@ -94,20 +94,20 @@ def audio_condition(trial_num, datatype, language, condition, n_run, n_check, de
 
 if __name__ == "__main__":
 
-    # defining the current trial of running
-    trial_num = "250403"
-    if not os.path.exists(os.path.join("Results", trial_num)):
-        os.mkdir(os.path.join("Results", trial_num))
-
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using {device} device")
 
+    # defining the current trial of running
+    trial_num = "250405"
+    datatype = "txt"
+    if not os.path.exists(os.path.join("Results", trial_num + "_" + datatype)):
+        os.mkdir(os.path.join("Results", trial_num + "_" + datatype))
+
     # running each condition for x times
-    datatypes = ["txt", "aud"]
     languages = ["EnglishBH"]
     conditions = ["harmony", "disharmony"]
-    n_run = range(1)  # which run to complete
-    n_check = range(1)  # which run to inspect
+    n_run = range(5)  # which run to complete
+    n_check = range(5)  # which run to inspect
     for language in languages:
         for condition in conditions:
             text_condition(trial_num, "txt", language, condition, n_run, n_check, device)

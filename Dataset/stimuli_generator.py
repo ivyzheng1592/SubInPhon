@@ -108,38 +108,106 @@ def generate_stimuli(onset, coda, vowel_1, vowel_2, syll_struct, language):
     return harmony_list, disharmony_list
 
 
-# Function to decompose stimuli for each language with specified phoneme inventory and syllable structure
-def decompose_stimuli(onset, coda, vowel_1, vowel_2, syll_struct, word):
+# Function to decompose stimuli for each language with specified phoneme inventory
+def decompose_stimuli(onset, coda, vowel_1, vowel_2, word):
+
     syll1 = [None, None, None]  # C, V, C
     syll2 = [None, None, None]
 
-    if word[0] in onset:  # if first syllable has onset
-        syll1.insert(0, word[0])
-        word.remove(0)
-    if word[0] == 'e' or word[0] == 'o':  # if first vowel is diphthong
-        syll1.insert(1, word[0]+word[1])
-        word.remove(0)
-        word.remove(0)
-    else:  # if first vowel is monophthong
-        syll1.insert(1, word[0])
-        word.remove(0)
-    if word[0] in coda:  # if first syllable has coda
-        syll1.insert(2, word[0])
-        word.remove(0)
+    vowel_close_1 = [key for key, value in vowel_1.items() if value == "closed"]
+    vowel_close_2 = [key for key, value in vowel_2.items() if value == "closed"]
 
-    if word[0] in onset:  # if first syllable has onset
-        syll2.insert(0, word[0])
-        word.remove(0)
-    if word[0] == 'e' or word[0] == 'o':  # if first vowel is diphthong
-        syll2.insert(1, word[0]+word[1])
-        word.remove(0)
-        word.remove(0)
-    else:  # if first vowel is monophthong
-        syll2.insert(1, word[0])
-        word.remove(0)
-    if word[0] in coda:  # if first syllable has coda
-        syll2.insert(2, word[0])
-        word.remove(0)
+    if word and word[0] == "<SOS>":
+    # remove start of sentence token
+        word.pop(0)
+    if word and (word[0] in onset):
+    # if first syllable has onset
+        syll1[0] = word[0]
+        word.pop(0)
+    while (len(word) >= 2 and
+           (word[0] not in vowel_1) and (word[0] not in vowel_2) and
+           (word[0]+word[1] != 'eɪ') and (word[0]+word[1] != 'oʊ')):
+    # if first phone is coda or next phone(s) are onset/coda
+    # get rid of the phone until we meet a vowel
+        syll1[0] = False
+        word.pop(0)
+
+    if len(word) >= 2 and (word[0]+word[1] == 'eɪ' or word[0]+word[1] == 'oʊ'):
+    # if first vowel is a diphthong in an open syllable
+        syll1[1] = word[0]+word[1]
+        word.pop(0)
+        word.pop(0)
+        while word and (word[0] not in onset):
+        # the syllable needs to be immediately followed by an onset
+            syll1[2] = False
+            word.pop(0)
+    elif word and (word[0] == 'i' or word[0] == 'u'):
+    # if first vowel is a monophthong in an open syllable
+        syll1[1] = word[0]
+        word.pop(0)
+        while word and (word[0] not in onset):
+        # the syllable needs to be immediately followed by an onset
+            syll1[2] = False
+            word.pop(0)
+    elif word and (word[0] in vowel_close_1 or word[0] in vowel_close_2):
+    # if the first vowel is in a closed syllable
+        syll1[1] = word[0]
+        word.pop(0)
+        if word and (word[0] in coda):
+        # the syllable needs a coda
+            syll1[2] = word[0]
+            word.pop(0)
+        while (len(word) >= 2 and
+               (word[0] not in vowel_1) and (word[0] not in vowel_2) and
+               (word[0] + word[1] != 'eɪ') and (word[0] + word[1] != 'oʊ')):
+            # the next syllable cannot have an onset
+            # get rid of the phone until we meet a vowel
+                syll2[0] = False
+                word.pop(0)
+        else:
+            syll1[2] = False
+    else:
+    # if the first vowel looks weird
+        syll1[1] = False
+        while word and (word[0] not in onset):
+            # get rid of the phone until we meet the next syllable onset
+            word.pop(0)
+
+    if word and (word[0] in onset):
+    # if second syllable has onset
+        syll2[0] = word[0]
+        word.pop(0)
+    while word and (word[0] not in vowel_1) and (word[0] not in vowel_2):
+    # if the next phone(s) are onset/coda
+    # get rid of the phone until we meet a vowel
+        syll2[0] = False
+        word.pop(0)
+
+    if len(word) >= 2 and (word[0]+word[1] == 'eɪ' or word[0]+word[1] == 'oʊ'):
+    # if second vowel is a diphthong in an open syllable
+        syll2[1] = word[0]+word[1]
+        word.pop(0)
+        word.pop(0)
+    elif word and (word[0] == 'i' or word[0] == 'u'):
+    # if second vowel is a monophthong in an open syllable
+        syll2[1] = word[0]
+        word.pop(0)
+    elif word and (word[0] in vowel_close_1 or word[0] in vowel_close_2):
+    # if the second vowel is in a closed syllable
+        syll2[1] = word[0]
+        word.pop(0)
+        if word and (word[0] in coda):
+        # the syllable needs a coda
+            syll2[2] = word[0]
+            word.pop(0)
+        else:
+            syll2[2] = False
+    else:
+    # if the second vowel looks weird
+        syll2[1] = False
+
+    if word and word[0] != "<EOS>":  # there should be no more phones
+        syll2[2] = False
 
     sylls = [syll1, syll2]
     return sylls
@@ -164,7 +232,7 @@ syll_struct_ae = ["V-CV", "V-CVC", "CV-CV", "CV-CVC",
                   #"CVC.V-CV", "CVC.V-CVC","CVC.VC-V", "CVC.VC-VC"]
 # Stimuli
 #generate_stimuli(onset_ae, coda_ae, vowel_front_ae_txt, vowel_back_ae_txt, syll_struct_ae, "English_txt")
-generate_stimuli(onset_ae, coda_ae, vowel_front_ae, vowel_back_ae, syll_struct_ae, "EnglishBH")
+#generate_stimuli(onset_ae, coda_ae, vowel_front_ae, vowel_back_ae, syll_struct_ae, "EnglishBH")
 
 # Language: Cantonese
 # Phoneme inventory:

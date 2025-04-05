@@ -125,7 +125,7 @@ if __name__ == "__main__":
     import hyper_params as hp
 
     print(" - Loading dataset:")
-    annotations_file = "Dataset/English_txt_harmony.csv"
+    annotations_file = "Dataset/EnglishBH_harmony.csv"
     annotations = pd.read_csv(annotations_file)
     print(f"Dataset size: {len(annotations)}")
     print(f"Sample data token: {annotations.iloc[0]}")

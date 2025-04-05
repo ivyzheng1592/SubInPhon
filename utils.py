@@ -65,5 +65,5 @@ def plot_att(ur, sr, attention, att_plot):
     ax.set_xticks(ticks=np.arange(len(ur)), labels=ur)
     ax.set_yticks(ticks=np.arange(len(sr)), labels=sr)
     plt.savefig(att_plot)
-    plt.show()
-    plt.close()
+    #plt.show()
+    #plt.close()

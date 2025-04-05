@@ -224,4 +224,4 @@ if __name__ == "__main__":
     seq2seq = TextSeq2Seq(encoder_input_dim, decoder_input_dim, hp.encoder_embedding_dim, hp.decoder_embedding_dim,
                           hp.n_layers, hp.hidden_dim, output_dim, hp.encoder_dropout, hp.decoder_dropout, device='cpu').to('cpu')
 
-    torchinfo.summary(seq2seq, input_size = [(7, 32), (7, 32)], dtypes=[torch.long, torch.long], device='cpu')
+    torchinfo.summary(seq2seq, input_size = [(8, 32), (8, 32)], dtypes=[torch.long, torch.long], device='cpu')
