@@ -56,7 +56,7 @@ def plot_acc(acc_file, acc_plot):
     ax2.set_title("Acc")
 
     plt.savefig(acc_plot)
-    plt.show()
+    #plt.show()
 
 def plot_att(ur, sr, attention, att_plot):
     fig, ax = plt.subplots(1, 1)

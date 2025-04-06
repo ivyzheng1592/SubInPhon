@@ -52,7 +52,7 @@ class TextRun:
                                      "_run" + str(run_num) + "_acc_plot.png")
         self.att_plot_dir = os.path.join("Results", trial_num + "_" + datatype,
                                          language + "_" + condition +
-                                         "_run" + str(run_num) + "_attention_plots")
+                                         "_run" + str(run_num) + "_att_plots")
         if not os.path.exists(self.att_plot_dir):
             os.mkdir(self.att_plot_dir)
 
@@ -94,7 +94,7 @@ class TextRun:
         utils.save_to_file(self.acc_store, self.acc_file)
         utils.save_to_file(self.pred_store, self.pred_file)
         utils.plot_acc(self.acc_file, self.acc_plot)
-        print(f"Loss, accuracy, and predicted results are saved")
+        print(f"Training loss, accuracy, and predicted results are saved")
 
     # a function that completes one repetition of evaluation at the end of training
     def test(self, test_dataloader):
@@ -112,7 +112,7 @@ class TextRun:
         # save loss, accuracy, and predicted results
         utils.save_to_file(self.acc_store, self.acc_file)
         utils.save_to_file(self.pred_store, self.pred_file)
-        print(f"Loss, accuracy, and predicted results are saved")
+        print(f"Testing loss, accuracy, and predicted results are saved")
 
     # a function that manages training at one epoch
     def train_one_epoch(self, epoch, record_type, data_loader, teacher_forcing_ratio):
@@ -214,10 +214,11 @@ class TextRun:
         self.seq2seq.load_state_dict(torch.load(self.model_file))
         self.seq2seq.eval()  # disable dropout in evaluation
         with torch.no_grad():  # disable gradient tracking
+
+            # get attention weights
             _, pred, att = self.seq2seq(src, trg, 0)  # turn off teacher forcing
             # pred = [trg_len, batch_size]
             # att = [trg_len, batch_size, src_len]
-            batch_preds = self.one_pred_line(src, trg, pred)
 
             # for individual items in a batch
             for i in range(hp.batch_size):
@@ -241,6 +242,8 @@ class TextRun:
                 att_plot = os.path.join(self.att_plot_dir,
                                         ur_string + "_" + sr_string + ".png")
                 utils.plot_att(ur_list, pred_sr_list, att_tensor, att_plot)
+                print(f"{hp.batch_size} attention plots are saved for investigation")
+
 
     def one_pred_line(self, src, trg, pred_trg):
         # src = [src_len, batch_size]
