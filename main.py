@@ -98,7 +98,7 @@ if __name__ == "__main__":
     print(f"Using {device} device")
 
     # defining the current trial of running
-    trial_num = "250405"
+    trial_num = "250406"
     datatype = "txt"
     if not os.path.exists(os.path.join("Results", trial_num + "_" + datatype)):
         os.mkdir(os.path.join("Results", trial_num + "_" + datatype))
@@ -106,8 +106,8 @@ if __name__ == "__main__":
     # running each condition for x times
     languages = ["EnglishBH"]
     conditions = ["harmony", "disharmony"]
-    n_run = range(5)  # which run to complete
-    n_check = range(5)  # which run to inspect
+    n_run = range(10)  # which run to complete
+    n_check = range(10)  # which run to inspect
     for language in languages:
         for condition in conditions:
             text_condition(trial_num, "txt", language, condition, n_run, n_check, device)

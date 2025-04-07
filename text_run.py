@@ -33,7 +33,7 @@ class TextRun:
         self.pred_store = {
             'trial_num': [], 'datatype': [], 'language': [], 'condition': [], 'run_num': [],
             'epoch': [], 'record_type': [], 'ur': [], 'sr': [], 'pred_sr': [],
-            'syll_error': [], 'c_error': [], 'v1_error': [], 'v2_error': [],
+            'c_error': [], 'v1_error': [], 'v2_error': [],
             'ur_v1': [], 'ur_v2': [], 'sr_v1': [], 'sr_v2': [], 'pred_sr_v1': [], 'pred_sr_v2': []
         }
 
@@ -77,9 +77,9 @@ class TextRun:
             train_loss, train_acc = self.train_one_epoch(epoch, "train",
                                                          train_dataloader, hp.teacher_forcing_ratio)
             valid_loss, valid_acc = self.evaluate_one_epoch(epoch, "valid", valid_dataloader)
-            print(f"\tTrain Loss: {train_loss:7.3f} | Train PPL: {np.exp(train_loss):7.3f} "
+            print(f"Epoch {epoch} Train Loss: {train_loss:7.3f} | Train PPL: {np.exp(train_loss):7.3f} "
                   f"| Train Acc: {train_acc:7.3f}")
-            print(f"\tValid Loss: {valid_loss:7.3f} | Valid PPL: {np.exp(valid_loss):7.3f} "
+            print(f"Epoch {epoch} Valid Loss: {valid_loss:7.3f} | Valid PPL: {np.exp(valid_loss):7.3f} "
                   f"| Valid Acc: {valid_acc:7.3f}")
 
             # record the accuracy value
@@ -88,13 +88,13 @@ class TextRun:
 
             # save the model
             torch.save(self.seq2seq.state_dict(), self.model_file)
-            print(f"Model trained and stored at {self.model_file}")
+            print(f"Epoch {epoch} model trained and stored at {self.model_file}")
 
         # save loss, accuracy, and predicted results
         utils.save_to_file(self.acc_store, self.acc_file)
         utils.save_to_file(self.pred_store, self.pred_file)
         utils.plot_acc(self.acc_file, self.acc_plot)
-        print(f"Training loss, accuracy, and predicted results are saved")
+        print(f"Run {self.run_num} training loss, accuracy, and predicted results are saved")
 
     # a function that completes one repetition of evaluation at the end of training
     def test(self, test_dataloader):
@@ -103,7 +103,7 @@ class TextRun:
 
         # check loss for the test dataset
         test_loss, test_acc = self.evaluate_one_epoch(hp.n_epochs, "test", test_dataloader)
-        print(f"\tTest Loss: {test_loss:7.3f} | Test PPL: {np.exp(test_loss):7.3f} "
+        print(f"Run {self.run_num} Test Loss: {test_loss:7.3f} | Test PPL: {np.exp(test_loss):7.3f} "
               f"| Test Acc: {test_acc:7.3f}")
 
         # record the accuracy value
@@ -112,7 +112,7 @@ class TextRun:
         # save loss, accuracy, and predicted results
         utils.save_to_file(self.acc_store, self.acc_file)
         utils.save_to_file(self.pred_store, self.pred_file)
-        print(f"Testing loss, accuracy, and predicted results are saved")
+        print(f"Run {self.run_num} testing loss, accuracy, and predicted results are saved")
 
     # a function that manages training at one epoch
     def train_one_epoch(self, epoch, record_type, data_loader, teacher_forcing_ratio):
@@ -131,11 +131,11 @@ class TextRun:
             # pred = [trg_len, batch_size]
 
             # record predictions in dictionary format
-            batch_preds = self.one_pred_line(src, trg, pred)
+            trg_strings, pred_strings, batch_preds = self.transform_one_batch(src, trg, pred)
             self.record_pred(epoch, record_type, batch_preds)
 
             # calculate total number of correct predictions in a batch
-            batch_correct = [1 if batch_preds['sr'][i] == batch_preds['pred_sr'][i] else 0
+            batch_correct = [1 if trg_strings[i] == pred_strings[i] else 0
                              for i in range(hp.batch_size)]
             batch_acc = sum(batch_correct) / len(batch_correct)  # calculate batch accuracy rate
             epoch_acc += batch_acc  # add to epoch accuracy rate
@@ -177,11 +177,11 @@ class TextRun:
                 # pred = [trg_len, batch_size]
 
                 # record predictions in dictionary format
-                batch_preds = self.one_pred_line(src, trg, pred)
+                trg_strings, pred_strings, batch_preds = self.transform_one_batch(src, trg, pred)
                 self.record_pred(epoch, record_type, batch_preds)
 
                 # calculate total number of correct predictions in a batch
-                batch_correct = [1 if batch_preds['sr'][i] == batch_preds['pred_sr'][i] else 0
+                batch_correct = [1 if trg_strings[i] == pred_strings[i] else 0
                                  for i in range(hp.batch_size)]
                 batch_acc = sum(batch_correct) / len(batch_correct)  # calculate batch accuracy rate
                 epoch_acc += batch_acc  # add to epoch accuracy rate
@@ -214,61 +214,75 @@ class TextRun:
         self.seq2seq.load_state_dict(torch.load(self.model_file))
         self.seq2seq.eval()  # disable dropout in evaluation
         with torch.no_grad():  # disable gradient tracking
-
             # get attention weights
             _, pred, att = self.seq2seq(src, trg, 0)  # turn off teacher forcing
             # pred = [trg_len, batch_size]
             # att = [trg_len, batch_size, src_len]
 
-            # for individual items in a batch
+            # for individual pairs in a batch
             for i in range(hp.batch_size):
-                ur_tensor = src[:, i]
-                sr_tensor = trg[:, i]
-                pred_sr_tensor = pred[:, i]
+                ur = src[:, i]
+                sr = trg[:, i]
+                pred_sr = pred[:, i]
                 att_tensor = att[:, i, :]
                 # att_tensor = [trg_len, src_len]
 
-                # convert tensor to vector
-                ur_vector = [int(x) for x in ur_tensor.tolist()]
-                sr_vector = [int(x) for x in sr_tensor.tolist()]
-                pred_sr_vector = [int(x) for x in pred_sr_tensor.tolist()]
-
-                # convert vector to word list and string
-                ur_list, ur_string = self.dataset.ur_alphabet.vec2word(ur_vector)
-                sr_list, sr_string = self.dataset.sr_alphabet.vec2word(sr_vector)
-                pred_sr_list, pred_sr_string = self.dataset.sr_alphabet.vec2word(pred_sr_vector)
+                # transform the pair
+                (ur_list, ur_string,
+                 sr_list, sr_string,
+                 pred_sr_list, pred_sr_string) = self.transform_one_pair(ur, sr, pred_sr)
 
                 # plot attention
                 att_plot = os.path.join(self.att_plot_dir,
                                         ur_string + "_" + sr_string + ".png")
                 utils.plot_att(ur_list, pred_sr_list, att_tensor, att_plot)
-                print(f"{hp.batch_size} attention plots are saved for investigation")
 
+        print(f"{hp.batch_size} attention plots are saved for investigation")
 
-    def one_pred_line(self, src, trg, pred_trg):
+    # a function that transforms one pair of ur, sr, and pred_sr tensor to list and string
+    def transform_one_pair(self, ur, sr, pred_sr):
+        # convert tensor to vector
+        ur_vector = [int(x) for x in ur.tolist()]
+        sr_vector = [int(x) for x in sr.tolist()]
+        pred_sr_vector = [int(x) for x in pred_sr.tolist()]
+
+        # convert vector to word list and string
+        ur_list, ur_string = self.dataset.ur_alphabet.vec2word(ur_vector)
+        sr_list, sr_string = self.dataset.sr_alphabet.vec2word(sr_vector)
+        pred_sr_list, pred_sr_string = self.dataset.sr_alphabet.vec2word(pred_sr_vector)
+
+        return ur_list, ur_string, sr_list, sr_string, pred_sr_list, pred_sr_string
+
+    # a function that transforms one batch of src, trg, and pred_trg to list and string
+    # and one line that contains all prediction information we want to record
+    def transform_one_batch(self, src, trg, pred_trg):
         # src = [src_len, batch_size]
         # trg = [trg_len, batch_size]
 
         pred_lines = {
-            'ur': [], 'sr': [], 'pred_sr': [], 'syll_error': [], 'c_error': [], 'v1_error': [], 'v2_error': [],
+            'ur': [], 'sr': [], 'pred_sr': [], 'c_error': [], 'v1_error': [], 'v2_error': [],
             'ur_v1': [], 'ur_v2': [], 'sr_v1': [], 'sr_v2': [], 'pred_sr_v1': [], 'pred_sr_v2': []
         }
+        trg_strings = []
+        pred_strings = []
 
-        # for individual items in a batch
+        # for individual pairs in a batch
         for i in range(hp.batch_size):
-            ur_tensor = src[:, i]
-            sr_tensor = trg[:, i]
-            pred_sr_tensor = pred_trg[:, i]
+            ur = src[:, i]
+            sr = trg[:, i]
+            pred_sr = pred_trg[:, i]
 
-            # convert tensor to vector
-            ur_vector = [int(x) for x in ur_tensor.tolist()]
-            sr_vector = [int(x) for x in sr_tensor.tolist()]
-            pred_sr_vector = [int(x) for x in pred_sr_tensor.tolist()]
+            # transform the pair
+            (ur_list, ur_string,
+             sr_list, sr_string,
+             pred_sr_list, pred_sr_string) = self.transform_one_pair(ur, sr, pred_sr)
 
-            # convert vector to word list and string
-            ur_list, ur_string = self.dataset.ur_alphabet.vec2word(ur_vector)
-            sr_list, sr_string = self.dataset.sr_alphabet.vec2word(sr_vector)
-            pred_sr_list, pred_sr_string = self.dataset.sr_alphabet.vec2word(pred_sr_vector)
+            trg_strings.insert(i, sr_string)
+            pred_strings.insert(i, pred_sr_string)
+
+            # skip this recording if the prediction is correct
+            if sr_string == pred_sr_string:
+                continue
 
             # decompose word list into structured syllables
             # a list of two lists, each in the shape of [C, V, C]
@@ -278,6 +292,16 @@ class TextRun:
                                              EVH.vowel_back_ae, sr_list)
             pred_sr_sylls = EVH.decompose_stimuli(EVH.onset_ae, EVH.coda_ae, EVH.vowel_front_ae,
                                              EVH.vowel_back_ae, pred_sr_list)
+
+            # skip this recording if the prediction has wrong syllable structure
+            if False in pred_sr_sylls[0] or False in pred_sr_sylls[1]:
+                continue
+
+            # compare the actual and predicted target surface form
+            # assume no error and change error from 0 to 1
+            c_error = 0
+            v1_error = 0
+            v2_error = 0
 
             ur_v1 = ur_sylls[0][1]
             ur_v2 = ur_sylls[1][1]
@@ -296,14 +320,6 @@ class TextRun:
             pred_sr_c1 = pred_sr_sylls[0][2]
             pred_sr_c2 = pred_sr_sylls[1][2]
 
-            # compare the actual and predicted target surface form
-            # assume no error and change error from 0 to 1
-            syll_error = 0
-            c_error = 0
-            v1_error = 0
-            v2_error = 0
-            if False in pred_sr_sylls[0] or False in pred_sr_sylls[1]:
-                syll_error = 1
             if sr_o1 != pred_sr_o1 or sr_o2 != pred_sr_o2 or \
                     sr_c1 != pred_sr_c1 or sr_c2 != pred_sr_c2:
                 c_error = 1
@@ -315,7 +331,6 @@ class TextRun:
             pred_lines['ur'].append(ur_string)
             pred_lines['sr'].append(sr_string)
             pred_lines['pred_sr'].append(pred_sr_string)
-            pred_lines['syll_error'].append(syll_error)
             pred_lines['c_error'].append(c_error)
             pred_lines['v1_error'].append(v1_error)
             pred_lines['v2_error'].append(v2_error)
@@ -326,8 +341,10 @@ class TextRun:
             pred_lines['pred_sr_v1'].append(pred_sr_v1)
             pred_lines['pred_sr_v2'].append(pred_sr_v2)
 
-        return pred_lines
+        return trg_strings, pred_strings, pred_lines
 
+    # a function that records accuracy rates into a dictionary
+    # the function is called at each training/evaluation epoch
     def record_acc(self, epoch, record_type, loss, acc):
         # add current accuracy data to the accuracy data storage
         self.acc_store['trial_num'].append(self.trial_num)
@@ -340,6 +357,8 @@ class TextRun:
         self.acc_store['loss'].append(loss)
         self.acc_store['acc'].append(acc)
 
+    # a function that records the prediction information line into a dictionary
+    # the function is called at each training/evaluation batch
     def record_pred(self, epoch, record_type, preds):
 
         # the size of recorded predictions
@@ -357,7 +376,6 @@ class TextRun:
         self.pred_store['ur'].extend(preds['ur'])
         self.pred_store['sr'].extend(preds['sr'])
         self.pred_store['pred_sr'].extend(preds['pred_sr'])
-        self.pred_store['syll_error'].extend(preds['syll_error'])
         self.pred_store['c_error'].extend(preds['c_error'])
         self.pred_store['v1_error'].extend(preds['v1_error'])
         self.pred_store['v2_error'].extend(preds['v2_error'])
