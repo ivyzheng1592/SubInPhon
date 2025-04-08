@@ -7,7 +7,7 @@ import os
 from mp3_to_wav import convert_mp3_to_wav
 
 # open file and select the first 200 pairs to generate audio files
-fileName = "EnglishBH_harmony.csv"
+fileName = "EnglishBH_aud_harmony.csv"
 with open(fileName, "r") as file:
     lines = file.readlines()[1:2]
 

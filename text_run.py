@@ -33,9 +33,16 @@ class TextRun:
         self.pred_store = {
             'trial_num': [], 'datatype': [], 'language': [], 'condition': [], 'run_num': [],
             'epoch': [], 'record_type': [], 'ur': [], 'sr': [], 'pred_sr': [],
-            'c_error': [], 'v1_error': [], 'v2_error': [],
+            'v1_error': [], 'v2_error': [],
             'ur_v1': [], 'ur_v2': [], 'sr_v1': [], 'sr_v2': [], 'pred_sr_v1': [], 'pred_sr_v2': []
         }
+        EVH_phone = (EVH.onset_ae + EVH.coda_ae +
+                    list(EVH.vowel_front_ae_txt.keys()) +
+                    list(EVH.vowel_back_ae_txt.keys()))
+        EVH_vowel = (list(EVH.vowel_front_ae_txt.keys()) +
+                    list(EVH.vowel_back_ae_txt.keys()))
+        self.embed_phone_store = {key: [] for key in EVH_phone}
+        self.embed_vowel_store = {key: [] for key in EVH_vowel}
 
         # results files
         self.acc_file = os.path.join("Results", trial_num + "_" + datatype,
@@ -50,6 +57,11 @@ class TextRun:
         self.acc_plot = os.path.join("Results", trial_num + "_" + datatype,
                                      language + "_" + condition +
                                      "_run" + str(run_num) + "_acc_plot.png")
+        self.embed_plot_dir = os.path.join("Results", trial_num + "_" + datatype,
+                                     language + "_" + condition +
+                                     "_run" + str(run_num) + "_embed_plots")
+        if not os.path.exists(self.embed_plot_dir):
+            os.mkdir(self.embed_plot_dir)
         self.att_plot_dir = os.path.join("Results", trial_num + "_" + datatype,
                                          language + "_" + condition +
                                          "_run" + str(run_num) + "_att_plots")
@@ -126,7 +138,7 @@ class TextRun:
             # trg = [trg_len, batch_size]
 
             self.optimizer.zero_grad()  # reset gradient at each iteration to 0
-            output, pred, _ = self.seq2seq(src, trg, teacher_forcing_ratio)
+            output, pred, _, _ = self.seq2seq(src, trg, teacher_forcing_ratio)
             # output = [trg_len, batch_size, output_dim]
             # pred = [trg_len, batch_size]
 
@@ -172,7 +184,7 @@ class TextRun:
                 # src = [src_len, batch_size]
                 # trg = [trg_len, batch_size]
 
-                output, pred, _ = self.seq2seq(src, trg, 0)  # turn off teacher forcing
+                output, pred, _, _ = self.seq2seq(src, trg, 0)  # turn off teacher forcing
                 # output = [trg_len, batch_size, output_dim]
                 # pred = [trg_len, batch_size]
 
@@ -215,8 +227,9 @@ class TextRun:
         self.seq2seq.eval()  # disable dropout in evaluation
         with torch.no_grad():  # disable gradient tracking
             # get attention weights
-            _, pred, att = self.seq2seq(src, trg, 0)  # turn off teacher forcing
+            _, pred, embed, att = self.seq2seq(src, trg, 0)  # turn off teacher forcing
             # pred = [trg_len, batch_size]
+            # embed = [trg_len, batch_size, embedding_dim]
             # att = [trg_len, batch_size, src_len]
 
             # for individual pairs in a batch
@@ -224,20 +237,48 @@ class TextRun:
                 ur = src[:, i]
                 sr = trg[:, i]
                 pred_sr = pred[:, i]
-                att_tensor = att[:, i, :]
-                # att_tensor = [trg_len, src_len]
 
                 # transform the pair
                 (ur_list, ur_string,
                  sr_list, sr_string,
                  pred_sr_list, pred_sr_string) = self.transform_one_pair(ur, sr, pred_sr)
 
+                # retrieve attention weights
+                # notice that trg_len and src_len have changed because padding was removed
+                src_len = len(ur_list)
+                trg_len = len(sr_list)
+                word_att = att[:trg_len, i, :src_len]
+                # word_att = [trg_len, src_len]
+
                 # plot attention
                 att_plot = os.path.join(self.att_plot_dir,
                                         ur_string + "_" + sr_string + ".png")
-                utils.plot_att(ur_list, pred_sr_list, att_tensor, att_plot)
+                utils.plot_att(ur_list, pred_sr_list, word_att, att_plot)
+                print(f"Attention plot {i} is saved for investigation")
 
-        print(f"{hp.batch_size} attention plots are saved for investigation")
+                # record the embedding of decoder input,
+                # which is the predicted sr w/ 0 teacher forcing
+                # since all runs reached 100% accuracy at the point of evaluation
+                # embedding of decoder input is also the actual sr
+
+                # for individual token in the predicted sr
+                # if the token embedding has not been recorded
+                # record its embedding values
+                for j, token in enumerate(pred_sr_list):
+                    if token in self.embed_phone_store and not self.embed_phone_store[token]:
+                        token_embed = embed[j, i, :]
+                        # token_embed = [embedding_dim]
+                        token_embed = token_embed.tolist()
+                        self.embed_phone_store[token] = token_embed
+                    if token in self.embed_vowel_store and not self.embed_vowel_store[token]:
+                        self.embed_vowel_store[token] = token_embed
+
+            # plot embedding for both all phones and only vowels
+            embed_phone_plot = os.path.join(self.embed_plot_dir, "phone.png")
+            embed_vowel_plot = os.path.join(self.embed_plot_dir, "vowel.png")
+            utils.plot_embed(self.embed_phone_store, embed_phone_plot, "phoneme embedding")
+            utils.plot_embed(self.embed_vowel_store, embed_vowel_plot, "vowel embedding")
+            print(f"Embedding plots are saved for investigation")
 
     # a function that transforms one pair of ur, sr, and pred_sr tensor to list and string
     def transform_one_pair(self, ur, sr, pred_sr):
@@ -260,7 +301,7 @@ class TextRun:
         # trg = [trg_len, batch_size]
 
         pred_lines = {
-            'ur': [], 'sr': [], 'pred_sr': [], 'c_error': [], 'v1_error': [], 'v2_error': [],
+            'ur': [], 'sr': [], 'pred_sr': [], 'v1_error': [], 'v2_error': [],
             'ur_v1': [], 'ur_v2': [], 'sr_v1': [], 'sr_v2': [], 'pred_sr_v1': [], 'pred_sr_v2': []
         }
         trg_strings = []
@@ -286,12 +327,12 @@ class TextRun:
 
             # decompose word list into structured syllables
             # a list of two lists, each in the shape of [C, V, C]
-            ur_sylls = EVH.decompose_stimuli(EVH.onset_ae, EVH.coda_ae, EVH.vowel_front_ae,
-                                             EVH.vowel_back_ae, ur_list)
-            sr_sylls = EVH.decompose_stimuli(EVH.onset_ae, EVH.coda_ae, EVH.vowel_front_ae,
-                                             EVH.vowel_back_ae, sr_list)
-            pred_sr_sylls = EVH.decompose_stimuli(EVH.onset_ae, EVH.coda_ae, EVH.vowel_front_ae,
-                                             EVH.vowel_back_ae, pred_sr_list)
+            ur_sylls = EVH.decompose_stimuli(EVH.onset_ae, EVH.coda_ae, EVH.vowel_front_ae_txt,
+                                             EVH.vowel_back_ae_txt, ur_list)
+            sr_sylls = EVH.decompose_stimuli(EVH.onset_ae, EVH.coda_ae, EVH.vowel_front_ae_txt,
+                                             EVH.vowel_back_ae_txt, sr_list)
+            pred_sr_sylls = EVH.decompose_stimuli(EVH.onset_ae, EVH.coda_ae, EVH.vowel_front_ae_txt,
+                                             EVH.vowel_back_ae_txt, pred_sr_list)
 
             # skip this recording if the prediction has wrong syllable structure
             if False in pred_sr_sylls[0] or False in pred_sr_sylls[1]:
@@ -299,7 +340,6 @@ class TextRun:
 
             # compare the actual and predicted target surface form
             # assume no error and change error from 0 to 1
-            c_error = 0
             v1_error = 0
             v2_error = 0
 
@@ -320,9 +360,10 @@ class TextRun:
             pred_sr_c1 = pred_sr_sylls[0][2]
             pred_sr_c2 = pred_sr_sylls[1][2]
 
+            # skip this recording if the prediction has wrong consonant
             if sr_o1 != pred_sr_o1 or sr_o2 != pred_sr_o2 or \
                     sr_c1 != pred_sr_c1 or sr_c2 != pred_sr_c2:
-                c_error = 1
+                continue
             if sr_v1 != pred_sr_v1:
                 v1_error = 1
             if sr_v2 != pred_sr_v2:
@@ -331,7 +372,6 @@ class TextRun:
             pred_lines['ur'].append(ur_string)
             pred_lines['sr'].append(sr_string)
             pred_lines['pred_sr'].append(pred_sr_string)
-            pred_lines['c_error'].append(c_error)
             pred_lines['v1_error'].append(v1_error)
             pred_lines['v2_error'].append(v2_error)
             pred_lines['ur_v1'].append(ur_v1)
@@ -376,7 +416,6 @@ class TextRun:
         self.pred_store['ur'].extend(preds['ur'])
         self.pred_store['sr'].extend(preds['sr'])
         self.pred_store['pred_sr'].extend(preds['pred_sr'])
-        self.pred_store['c_error'].extend(preds['c_error'])
         self.pred_store['v1_error'].extend(preds['v1_error'])
         self.pred_store['v2_error'].extend(preds['v2_error'])
         self.pred_store['ur_v1'].extend(preds['ur_v1'])

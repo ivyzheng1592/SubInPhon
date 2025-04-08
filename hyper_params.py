@@ -1,7 +1,7 @@
 """
 data structure:
 - "Dataset"
-    - {language} + "_" + {condition} + ".csv"
+    - {language} + "_" + {datatype} + "_" + {condition} + ".csv"
     - "audio"
         - {language}
             - {src}.mp3
@@ -43,7 +43,7 @@ decoder_dropout = 0.1  # 0.0 is equivalent to Identity function
 teacher_forcing_ratio = 0.5  # original=0.5
 
 # Training hyperparameters
-n_epochs = 30  # original=50. Note: must be >1 !!!
+n_epochs = 50  # original=50. Note: must be >1 !!!
 learning_rate = 5e-4
 batch_size = 32  # original=32
 #clip = 1.0

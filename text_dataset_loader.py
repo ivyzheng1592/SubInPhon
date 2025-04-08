@@ -30,7 +30,14 @@ class Alphabet:
 
     # convert each vector to a word
     def vec2word(self, vector):
-        word_list = [self.idx2char[idx] for idx in vector]
+        # in list format (including <SOS> and <EOS>)
+        word_list = []
+        for idx in vector:
+            word_list.append(self.idx2char[idx])
+            if self.idx2char[idx] == "<EOS>":
+                break
+
+        # in string format (excluding <SOS> and <EOS>)
         word_string = ""
         for char in word_list:
             if char not in self.specials:
@@ -125,7 +132,7 @@ if __name__ == "__main__":
     import hyper_params as hp
 
     print(" - Loading dataset:")
-    annotations_file = "Dataset/EnglishBH_harmony.csv"
+    annotations_file = "Dataset/EnglishBH_txt_harmony.csv"
     annotations = pd.read_csv(annotations_file)
     print(f"Dataset size: {len(annotations)}")
     print(f"Sample data token: {annotations.iloc[0]}")

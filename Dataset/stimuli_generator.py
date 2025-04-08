@@ -114,52 +114,41 @@ def decompose_stimuli(onset, coda, vowel_1, vowel_2, word):
     syll1 = [None, None, None]  # C, V, C
     syll2 = [None, None, None]
 
+    vowel_open_1 = [key for key, value in vowel_1.items() if value == "open"]
     vowel_close_1 = [key for key, value in vowel_1.items() if value == "closed"]
+    vowel_open_2 = [key for key, value in vowel_2.items() if value == "open"]
     vowel_close_2 = [key for key, value in vowel_2.items() if value == "closed"]
 
     if word and word[0] == "<SOS>":
     # remove start of sentence token
         word.pop(0)
-    if word and (word[0] in onset):
+    if word and word[0] in onset:
     # if first syllable has onset
         syll1[0] = word[0]
         word.pop(0)
-    while (len(word) >= 2 and
-           (word[0] not in vowel_1) and (word[0] not in vowel_2) and
-           (word[0]+word[1] != 'eɪ') and (word[0]+word[1] != 'oʊ')):
+    while word and word[0] not in vowel_1 and word[0] not in vowel_2:
     # if first phone is coda or next phone(s) are onset/coda
     # get rid of the phone until we meet a vowel
         syll1[0] = False
         word.pop(0)
 
-    if len(word) >= 2 and (word[0]+word[1] == 'eɪ' or word[0]+word[1] == 'oʊ'):
-    # if first vowel is a diphthong in an open syllable
-        syll1[1] = word[0]+word[1]
-        word.pop(0)
-        word.pop(0)
-        while word and (word[0] not in onset):
-        # the syllable needs to be immediately followed by an onset
-            syll1[2] = False
-            word.pop(0)
-    elif word and (word[0] == 'i' or word[0] == 'u'):
-    # if first vowel is a monophthong in an open syllable
+    if word and (word[0] in vowel_open_1 or word[0] in vowel_open_2):
+    # if first vowel is in an open syllable
         syll1[1] = word[0]
         word.pop(0)
-        while word and (word[0] not in onset):
+        while word and word[0] not in onset:
         # the syllable needs to be immediately followed by an onset
             syll1[2] = False
             word.pop(0)
     elif word and (word[0] in vowel_close_1 or word[0] in vowel_close_2):
-    # if the first vowel is in a closed syllable
+    # if first vowel is in a closed syllable
         syll1[1] = word[0]
         word.pop(0)
-        if word and (word[0] in coda):
+        if word and word[0] in coda:
         # the syllable needs a coda
             syll1[2] = word[0]
             word.pop(0)
-        while (len(word) >= 2 and
-               (word[0] not in vowel_1) and (word[0] not in vowel_2) and
-               (word[0] + word[1] != 'eɪ') and (word[0] + word[1] != 'oʊ')):
+        while word and word[0] not in vowel_1 and word[0] not in vowel_2:
             # the next syllable cannot have an onset
             # get rid of the phone until we meet a vowel
                 syll2[0] = False
@@ -167,36 +156,31 @@ def decompose_stimuli(onset, coda, vowel_1, vowel_2, word):
         else:
             syll1[2] = False
     else:
-    # if the first vowel looks weird
+    # if first vowel looks weird
         syll1[1] = False
-        while word and (word[0] not in onset):
+        while word and word[0] not in onset:
             # get rid of the phone until we meet the next syllable onset
             word.pop(0)
 
-    if word and (word[0] in onset):
+    if word and word[0] in onset:
     # if second syllable has onset
         syll2[0] = word[0]
         word.pop(0)
-    while word and (word[0] not in vowel_1) and (word[0] not in vowel_2):
-    # if the next phone(s) are onset/coda
+    while word and word[0] not in vowel_1 and word[0] not in vowel_2:
+    # if next phone(s) are onset/coda
     # get rid of the phone until we meet a vowel
         syll2[0] = False
         word.pop(0)
 
-    if len(word) >= 2 and (word[0]+word[1] == 'eɪ' or word[0]+word[1] == 'oʊ'):
-    # if second vowel is a diphthong in an open syllable
-        syll2[1] = word[0]+word[1]
-        word.pop(0)
-        word.pop(0)
-    elif word and (word[0] == 'i' or word[0] == 'u'):
-    # if second vowel is a monophthong in an open syllable
+    if word and (word[0] in vowel_open_1 or word[0] in vowel_open_2):
+    # if second vowel is in an open syllable
         syll2[1] = word[0]
         word.pop(0)
     elif word and (word[0] in vowel_close_1 or word[0] in vowel_close_2):
-    # if the second vowel is in a closed syllable
+    # if second vowel is in a closed syllable
         syll2[1] = word[0]
         word.pop(0)
-        if word and (word[0] in coda):
+        if word and word[0] in coda:
         # the syllable needs a coda
             syll2[2] = word[0]
             word.pop(0)
@@ -218,11 +202,11 @@ def decompose_stimuli(onset, coda, vowel_1, vowel_2, word):
 onset_ae = ['m', 'n', 'p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'v', 'z', 'ʃ', 'ʒ', 'θ', 'ð', 'h']
 coda_ae = ['m', 'n', 'ŋ', 'p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'v', 'z', 'ʃ', 'ʒ', 'θ', 'ð']
 # vowel for text input (control for number of symbols in a phoneme) -> abandoned
-#vowel_front_ae_txt = {'ɪ': "closed", 'ɛ': "closed", 'i': "open", 'e': "open"}
-#vowel_back_ae_txt = {'ʊ': "closed", 'ɔ': "closed", 'u': "open", 'o': "open"}
+vowel_front_ae_txt = {'ɪ': "closed", 'ɛ': "closed", 'i': "open", 'e': "open"}
+vowel_back_ae_txt = {'ʊ': "closed", 'ɔ': "closed", 'u': "open", 'o': "open"}
 # vowel for audio input (actual realization of phoneme)
-vowel_front_ae = {'ɪ': "closed", 'ɛ': "closed", 'i': "open", 'eɪ': "open"}
-vowel_back_ae = {'ʊ': "closed", 'ɔ': "closed", 'u': "open", 'oʊ': "open"}
+vowel_front_ae_aud = {'ɪ': "closed", 'ɛ': "closed", 'i': "open", 'eɪ': "open"}
+vowel_back_ae_aud = {'ʊ': "closed", 'ɔ': "closed", 'u': "open", 'oʊ': "open"}
 # Syllable structure:
 syll_struct_ae = ["V-CV", "V-CVC", "CV-CV", "CV-CVC",
                   "VC-V", "VC-VC", "CVC-V", "CVC-VC"]
@@ -231,8 +215,8 @@ syll_struct_ae = ["V-CV", "V-CVC", "CV-CV", "CV-CVC",
                   #"VC.V-CV", "VC.V-CVC", "VC.VC-V", "VC.VC-VC",
                   #"CVC.V-CV", "CVC.V-CVC","CVC.VC-V", "CVC.VC-VC"]
 # Stimuli
-#generate_stimuli(onset_ae, coda_ae, vowel_front_ae_txt, vowel_back_ae_txt, syll_struct_ae, "English_txt")
-#generate_stimuli(onset_ae, coda_ae, vowel_front_ae, vowel_back_ae, syll_struct_ae, "EnglishBH")
+#generate_stimuli(onset_ae, coda_ae, vowel_front_ae_txt, vowel_back_ae_txt, syll_struct_ae, "EnglishBH_txt")
+#generate_stimuli(onset_ae, coda_ae, vowel_front_ae_aud, vowel_back_ae_aud, syll_struct_ae, "EnglishBH_aud")
 
 # Language: Cantonese
 # Phoneme inventory:

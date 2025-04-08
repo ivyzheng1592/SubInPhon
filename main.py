@@ -15,7 +15,7 @@ import hyper_params as hp
 def text_condition(trial_num, datatype, language, condition, n_run, n_check, device):
 
     print(" - Loading dataset:")
-    annotations_file = os.path.join("Dataset", language + "_" + condition + ".csv")
+    annotations_file = os.path.join("Dataset", language + "_" + datatype + "_" + condition + ".csv")
     dataset = TextDataset(annotations_file, hp.special_tokens, device=device)
 
     print(" - Splitting dataset:")
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     print(f"Using {device} device")
 
     # defining the current trial of running
-    trial_num = "250406"
+    trial_num = "250408"
     datatype = "txt"
     if not os.path.exists(os.path.join("Results", trial_num + "_" + datatype)):
         os.mkdir(os.path.join("Results", trial_num + "_" + datatype))
@@ -107,7 +107,7 @@ if __name__ == "__main__":
     languages = ["EnglishBH"]
     conditions = ["harmony", "disharmony"]
     n_run = range(10)  # which run to complete
-    n_check = range(10)  # which run to inspect
+    n_check = range(0)  # which run to inspect
     for language in languages:
         for condition in conditions:
             text_condition(trial_num, "txt", language, condition, n_run, n_check, device)
