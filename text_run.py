@@ -24,25 +24,41 @@ class TextRun:
         self.condition = condition
         self.run_num = run_num
 
+        self.ur_alphabet = self.dataset.ur_alphabet
+        self.sr_alphabet = self.dataset.sr_alphabet
+
         # results storages: dictionary
         # we convert the dictionary to pandas dataframe and save to file
         self.acc_store = {
             'trial_num': [], 'datatype': [], 'language': [], 'condition': [], 'run_num': [],
             'epoch': [], 'record_type': [], 'loss': [], 'acc': []
         }
+
         self.pred_store = {
             'trial_num': [], 'datatype': [], 'language': [], 'condition': [], 'run_num': [],
             'epoch': [], 'record_type': [], 'ur': [], 'sr': [], 'pred_sr': [],
-            'v1_error': [], 'v2_error': [],
-            'ur_v1': [], 'ur_v2': [], 'sr_v1': [], 'sr_v2': [], 'pred_sr_v1': [], 'pred_sr_v2': []
+            #'o1_error': [], 'o2_error': [], 'c1_error': [], 'c2_error': [],
+            #'sr_o1': [], 'sr_o2': [], 'pred_sr_o1': [], 'pred_sr_o2': [],
+            #'sr_c1': [], 'sr_c2': [], 'pred_sr_c1': [], 'pred_sr_c2': [],
+            'v1_error': [], 'v2_error': [], 'ur_v1': [], 'ur_v2': [],
+            'sr_v1': [], 'sr_v2': [], 'pred_sr_v1': [], 'pred_sr_v2': []
         }
+
         EVH_phone = (EVH.onset_ae + EVH.coda_ae +
                     list(EVH.vowel_front_ae_txt.keys()) +
                     list(EVH.vowel_back_ae_txt.keys()))
         EVH_vowel = (list(EVH.vowel_front_ae_txt.keys()) +
                     list(EVH.vowel_back_ae_txt.keys()))
-        self.embed_phone_store = {key: [] for key in EVH_phone}
-        self.embed_vowel_store = {key: [] for key in EVH_vowel}
+        self.ur_embed_phone_store = {key: [] for key in EVH_phone}
+        self.ur_embed_vowel_store = {key: [] for key in EVH_vowel}
+        self.sr_embed_phone_store = {key: [] for key in EVH_phone}
+        self.sr_embed_vowel_store = {key: [] for key in EVH_vowel}
+
+        self.att_store = {
+            'ur': [], 'pred_sr': [], 'self/self': [1] * hp.batch_size,
+            'v1/v2': [0] * hp.batch_size, 'v2/v1': [0] * hp.batch_size,
+            'v/c': [0] * hp.batch_size, 'c/v': [0] * hp.batch_size
+        }
 
         # results files
         self.acc_file = os.path.join("Results", trial_num + "_" + datatype,
@@ -57,16 +73,21 @@ class TextRun:
         self.acc_plot = os.path.join("Results", trial_num + "_" + datatype,
                                      language + "_" + condition +
                                      "_run" + str(run_num) + "_acc_plot.png")
+
         self.embed_plot_dir = os.path.join("Results", trial_num + "_" + datatype,
                                      language + "_" + condition +
                                      "_run" + str(run_num) + "_embed_plots")
         if not os.path.exists(self.embed_plot_dir):
             os.mkdir(self.embed_plot_dir)
+        self.ur_alphabet_file = os.path.join(self.embed_plot_dir, "ur_alphabet.csv")
+        self.sr_alphabet_file = os.path.join(self.embed_plot_dir, "sr_alphabet.csv")
+
         self.att_plot_dir = os.path.join("Results", trial_num + "_" + datatype,
                                          language + "_" + condition +
                                          "_run" + str(run_num) + "_att_plots")
         if not os.path.exists(self.att_plot_dir):
             os.mkdir(self.att_plot_dir)
+        self.att_file = os.path.join(self.att_plot_dir, "att_type.csv")
 
         # model weight initialization
         for name, param in self.seq2seq.named_parameters():
@@ -226,10 +247,11 @@ class TextRun:
         self.seq2seq.load_state_dict(torch.load(self.model_file))
         self.seq2seq.eval()  # disable dropout in evaluation
         with torch.no_grad():  # disable gradient tracking
-            # get attention weights
-            _, pred, embed, att = self.seq2seq(src, trg, 0)  # turn off teacher forcing
+            # get decoder embedding and predicted attention weights
+            _, pred, src_embed, trg_embed, att = self.seq2seq(src, trg, 0)  # turn off teacher forcing
             # pred = [trg_len, batch_size]
-            # embed = [trg_len, batch_size, embedding_dim]
+            # src_embed = [src_len, batch_size, embedding_dim]
+            # trg_embed = [trg_len, batch_size, embedding_dim]
             # att = [trg_len, batch_size, src_len]
 
             # for individual pairs in a batch
@@ -254,31 +276,39 @@ class TextRun:
                 att_plot = os.path.join(self.att_plot_dir,
                                         ur_string + "_" + sr_string + ".png")
                 utils.plot_att(ur_list, pred_sr_list, word_att, att_plot)
-                print(f"Attention plot {i} is saved for investigation")
+                print(f"Run {self.run_num} attention plot {i} is saved for investigation")
 
-                # record the embedding of decoder input,
-                # which is the predicted sr w/ 0 teacher forcing
-                # since all runs reached 100% accuracy at the point of evaluation
-                # embedding of decoder input is also the actual sr
+                # decompose word list into structured syllables
+                # a list of two lists, each in the shape of [C, V, C]
+                pred_sr_sylls = EVH.decompose_stimuli(EVH.onset_ae, EVH.coda_ae, EVH.vowel_front_ae_txt,
+                                                      EVH.vowel_back_ae_txt, pred_sr_list)
 
-                # for individual token in the predicted sr
-                # if the token embedding has not been recorded
-                # record its embedding values
-                for j, token in enumerate(pred_sr_list):
-                    if token in self.embed_phone_store and not self.embed_phone_store[token]:
-                        token_embed = embed[j, i, :]
-                        # token_embed = [embedding_dim]
-                        token_embed = token_embed.tolist()
-                        self.embed_phone_store[token] = token_embed
-                    if token in self.embed_vowel_store and not self.embed_vowel_store[token]:
-                        self.embed_vowel_store[token] = token_embed
+                # record attention type of the predicted sr
+                self.record_att(i, pred_sr_sylls, word_att, ur_string, sr_string)
+
+                # record embedding of the ur and predicted sr
+                self.record_embed(i, ur_list, pred_sr_list, src_embed, trg_embed)
+
+            # save attention recording to file
+            utils.save_to_file(self.att_store, self.att_file)
+            print(f"Run {self.run_num} attention types are saved for investigation")
 
             # plot embedding for both all phones and only vowels
-            embed_phone_plot = os.path.join(self.embed_plot_dir, "phone.png")
-            embed_vowel_plot = os.path.join(self.embed_plot_dir, "vowel.png")
-            utils.plot_embed(self.embed_phone_store, embed_phone_plot, "phoneme embedding")
-            utils.plot_embed(self.embed_vowel_store, embed_vowel_plot, "vowel embedding")
-            print(f"Embedding plots are saved for investigation")
+            ur_embed_phone_plot = os.path.join(self.embed_plot_dir, "ur_phoneme.png")
+            ur_embed_vowel_plot = os.path.join(self.embed_plot_dir, "ur_vowel.png")
+            sr_embed_phone_plot = os.path.join(self.embed_plot_dir, "sr_phoneme.png")
+            sr_embed_vowel_plot = os.path.join(self.embed_plot_dir, "sr_vowel.png")
+            utils.plot_embed(self.ur_embed_phone_store, ur_embed_phone_plot, "phoneme embedding")
+            utils.plot_embed(self.ur_embed_vowel_store, ur_embed_vowel_plot, "vowel embedding")
+            utils.plot_embed(self.sr_embed_phone_store, sr_embed_phone_plot, "phoneme embedding")
+            utils.plot_embed(self.sr_embed_vowel_store, sr_embed_vowel_plot, "vowel embedding")
+            print(f"Run {self.run_num} embedding plots are saved for investigation")
+
+            # save ur and sr alphabet before embedding to file
+            ur_char2idx = {key: [value] for key, value in self.ur_alphabet.idx2char.items()}
+            sr_char2idx = {key: [value] for key, value in self.sr_alphabet.idx2char.items()}
+            utils.save_to_file(ur_char2idx, self.ur_alphabet_file)
+            utils.save_to_file(sr_char2idx, self.sr_alphabet_file)
 
     # a function that transforms one pair of ur, sr, and pred_sr tensor to list and string
     def transform_one_pair(self, ur, sr, pred_sr):
@@ -301,8 +331,12 @@ class TextRun:
         # trg = [trg_len, batch_size]
 
         pred_lines = {
-            'ur': [], 'sr': [], 'pred_sr': [], 'v1_error': [], 'v2_error': [],
-            'ur_v1': [], 'ur_v2': [], 'sr_v1': [], 'sr_v2': [], 'pred_sr_v1': [], 'pred_sr_v2': []
+            'ur': [], 'sr': [], 'pred_sr': [],
+            #'o1_error': [], 'o2_error': [], 'c1_error': [], 'c2_error': [],
+            #'sr_o1': [], 'sr_o2': [], 'pred_sr_o1': [], 'pred_sr_o2': [],
+            #'sr_c1': [], 'sr_c2': [], 'pred_sr_c1': [], 'pred_sr_c2': [],
+            'v1_error': [], 'v2_error': [], 'ur_v1': [], 'ur_v2': [],
+            'sr_v1': [], 'sr_v2': [], 'pred_sr_v1': [], 'pred_sr_v2': []
         }
         trg_strings = []
         pred_strings = []
@@ -340,6 +374,10 @@ class TextRun:
 
             # compare the actual and predicted target surface form
             # assume no error and change error from 0 to 1
+            #o1_error = 0
+            #o2_error = 0
+            #c1_error = 0
+            #c2_error = 0
             v1_error = 0
             v2_error = 0
 
@@ -364,14 +402,34 @@ class TextRun:
             if sr_o1 != pred_sr_o1 or sr_o2 != pred_sr_o2 or \
                     sr_c1 != pred_sr_c1 or sr_c2 != pred_sr_c2:
                 continue
-            if sr_v1 != pred_sr_v1:
-                v1_error = 1
-            if sr_v2 != pred_sr_v2:
-                v2_error = 1
+            #if sr_o1 != pred_sr_o1:
+                #o1_error = 1
+            #if sr_o2 != pred_sr_o2:
+                #o2_error = 1
+            #if sr_c1 != pred_sr_c1:
+                #c1_error = 1
+            #if sr_c2 != pred_sr_c2:
+                #c2_error = 1
+            #if sr_v1 != pred_sr_v1:
+                #v1_error = 1
+            #if sr_v2 != pred_sr_v2:
+                #v2_error = 1
 
             pred_lines['ur'].append(ur_string)
             pred_lines['sr'].append(sr_string)
             pred_lines['pred_sr'].append(pred_sr_string)
+            #pred_lines['o1_error'].append(o1_error)
+            #pred_lines['o2_error'].append(o2_error)
+            #pred_lines['c1_error'].append(c1_error)
+            #pred_lines['c2_error'].append(c2_error)
+            #pred_lines['sr_o1'].append(sr_o1)
+            #pred_lines['sr_o2'].append(sr_o2)
+            #pred_lines['pred_sr_o1'].append(pred_sr_o1)
+            #pred_lines['pred_sr_o2'].append(pred_sr_o2)
+            #pred_lines['sr_c1'].append(sr_c1)
+            #pred_lines['sr_c2'].append(sr_c2)
+            #pred_lines['pred_sr_c1'].append(pred_sr_c1)
+            #pred_lines['pred_sr_c2'].append(pred_sr_c2)
             pred_lines['v1_error'].append(v1_error)
             pred_lines['v2_error'].append(v2_error)
             pred_lines['ur_v1'].append(ur_v1)
@@ -416,6 +474,18 @@ class TextRun:
         self.pred_store['ur'].extend(preds['ur'])
         self.pred_store['sr'].extend(preds['sr'])
         self.pred_store['pred_sr'].extend(preds['pred_sr'])
+        #self.pred_store['o1_error'].extend(preds['o1_error'])
+        #self.pred_store['o2_error'].extend(preds['o2_error'])
+        #self.pred_store['c1_error'].extend(preds['c1_error'])
+        #self.pred_store['c2_error'].extend(preds['c2_error'])
+        #self.pred_store['sr_o1'].extend(preds['sr_o1'])
+        #self.pred_store['sr_o2'].extend(preds['sr_o2'])
+        #self.pred_store['pred_sr_o1'].extend(preds['pred_sr_o1'])
+        #self.pred_store['pred_sr_o2'].extend(preds['pred_sr_o2'])
+        #self.pred_store['sr_c1'].extend(preds['sr_c1'])
+        #self.pred_store['sr_c2'].extend(preds['sr_c2'])
+        #self.pred_store['pred_sr_c1'].extend(preds['pred_sr_c1'])
+        #self.pred_store['pred_sr_c2'].extend(preds['pred_sr_c2'])
         self.pred_store['v1_error'].extend(preds['v1_error'])
         self.pred_store['v2_error'].extend(preds['v2_error'])
         self.pred_store['ur_v1'].extend(preds['ur_v1'])
@@ -424,3 +494,90 @@ class TextRun:
         self.pred_store['sr_v2'].extend(preds['sr_v2'])
         self.pred_store['pred_sr_v1'].extend(preds['pred_sr_v1'])
         self.pred_store['pred_sr_v2'].extend(preds['pred_sr_v2'])
+
+    def record_att(self, i, pred_sr_sylls, word_att, ur_string, pred_sr_string):
+        # get the largest attention value for individual token in the predicted sr
+        max_att = torch.argmax(word_att, dim=1).tolist()
+        # max_att = [trg_len]
+
+        # for individual token in the predicted sr
+        # check the position of the largest attention value for each token
+        if pred_sr_sylls[0][0] is None and pred_sr_sylls[1][2] is None:  # <SOS>VCV<EOS>
+            if max_att[1] in [3]:
+                self.att_store['v1/v2'][i] = 1
+                self.att_store['self/self'][i] = 0
+            if max_att[3] in [1]:
+                self.att_store['v2/v1'][i] = 1
+                self.att_store['self/self'][i] = 0
+            if max_att[1] in [2, 4] or max_att[3] in [2, 4]:
+                self.att_store['v/c'][i] = 1
+                self.att_store['self/self'][i] = 0
+            if max_att[2] in [1, 3]:
+                self.att_store['c/v'][i] = 1
+                self.att_store['self/self'][i] = 0
+        if pred_sr_sylls[0][0] is None and pred_sr_sylls[1][2] is not None:  # <SOS>VCVC<EOS>
+            if max_att[1] in [3]:
+                self.att_store['v1/v2'][i] = 1
+                self.att_store['self/self'][i] = 0
+            if max_att[3] in [1]:
+                self.att_store['v2/v1'][i] = 1
+                self.att_store['self/self'][i] = 0
+            if max_att[1] in [2, 4] or max_att[3] in [2, 4]:
+                self.att_store['v/c'][i] = 1
+                self.att_store['self/self'][i] = 0
+            if max_att[2] in [1, 3] or max_att[4] in [1, 3]:
+                self.att_store['c/v'][i] = 1
+                self.att_store['self/self'][i] = 0
+        if pred_sr_sylls[0][0] is not None and pred_sr_sylls[1][2] is None:  # <SOS>CVCV<EOS>
+            if max_att[2] in [4]:
+                self.att_store['v1/v2'][i] = 1
+                self.att_store['self/self'][i] = 0
+            if max_att[4] in [2]:
+                self.att_store['v2/v1'][i] = 1
+                self.att_store['self/self'][i] = 0
+            if max_att[2] in [1, 3, 5] or max_att[4] in [1, 3, 5]:
+                self.att_store['v/c'][i] = 1
+                self.att_store['self/self'][i] = 0
+            if max_att[1] in [2, 4] or max_att[3] in [2, 4]:
+                self.att_store['c/v'][i] = 1
+                self.att_store['self/self'][i] = 0
+        if pred_sr_sylls[0][0] is not None and pred_sr_sylls[1][2] is not None:  # <SOS>CVCVC<EOS>
+            if max_att[2] in [4]:
+                self.att_store['v1/v2'][i] = 1
+                self.att_store['self/self'][i] = 0
+            if max_att[4] in [2]:
+                self.att_store['v2/v1'][i] = 1
+                self.att_store['self/self'][i] = 0
+            if max_att[2] in [1, 3, 5] or max_att[4] in [1, 3, 5]:
+                self.att_store['v/c'][i] = 1
+                self.att_store['self/self'][i] = 0
+            if max_att[1] in [2, 4] or max_att[3] in [2, 4] or max_att[5] in [2, 4]:
+                self.att_store['c/v'][i] = 1
+                self.att_store['self/self'][i] = 0
+
+        # append ur and pred sr of the current word
+        self.att_store['ur'].append(ur_string)
+        self.att_store['pred_sr'].append(pred_sr_string)
+
+    def record_embed(self, i, ur_list, pred_sr_list, src_embed, trg_embed):
+        # for individual token in the ur
+        # if the token embedding has not been recorded
+        # record its embedding values
+        for j, token in enumerate(ur_list):
+            if token in self.ur_embed_phone_store and not self.ur_embed_phone_store[token]:
+                src_token_embed = src_embed[j, i, :]
+                # token_embed = [embedding_dim]
+                src_token_embed = src_token_embed.tolist()
+                self.ur_embed_phone_store[token] = src_token_embed
+            if token in self.ur_embed_vowel_store and not self.ur_embed_vowel_store[token]:
+                self.ur_embed_vowel_store[token] = src_token_embed
+
+        # for individual token in the predicted sr
+        for j, token in enumerate(pred_sr_list):
+            if token in self.sr_embed_phone_store and not self.sr_embed_phone_store[token]:
+                trg_token_embed = trg_embed[j, i, :]
+                # token_embed = [embedding_dim]
+                trg_token_embed = trg_token_embed.tolist()
+                self.sr_embed_phone_store[token] = trg_token_embed
+            if token in self.sr_embed_vowel_store and not self.sr_embed_vowel_store[token]:
+                self.sr_embed_vowel_store[token] = trg_token_embed

@@ -98,7 +98,7 @@ if __name__ == "__main__":
     print(f"Using {device} device")
 
     # defining the current trial of running
-    trial_num = "250408"
+    trial_num = "250409"
     datatype = "txt"
     if not os.path.exists(os.path.join("Results", trial_num + "_" + datatype)):
         os.mkdir(os.path.join("Results", trial_num + "_" + datatype))

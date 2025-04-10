@@ -44,7 +44,7 @@ class Encoder(nn.Module):
         # cell = [batch_size, hidden_dim]
         # ignoring hidden = torch.tanh(hidden) in Ben Trevett tutorial because we are using LSTM
 
-        return encoder_states, hidden, cell
+        return encoder_states, hidden, cell, embedding
 
 
 class BahdanauAttention(nn.Module):
@@ -166,19 +166,21 @@ class TextSeq2Seq(nn.Module):
         # src = [src_len, batch_size]
         # trg = [trg_len, batch_size]
 
-        encoder_states, hidden, cell = self.encoder(src)
+        encoder_states, hidden, cell, src_embeddings = self.encoder(src)
         # encoder_states are all hidden states of the src input sequence
         # hidden and cell are the final forward and backward hidden and cell concatenated
+        # embeddings store the embedding for all src input token
         # encoder_states = [src_len, batch_size, encoder_hidden_dim * 2]
         # hidden = [batch_size, encoder_hidden_dim]
         # cell = [batch_size, encoder_hidden_dim]
+        # src_embeddings = [src_len, batch_size, encoder_embedding_dim]
 
         trg_len = trg.shape[0]
         batch_size = trg.shape[1]
         src_len = src.shape[0]
         decoder_outputs = torch.zeros(trg_len, batch_size, self.output_dim).to(self.device)
         predictions = torch.zeros(trg_len, batch_size).to(self.device)
-        embeddings = torch.zeros(trg_len, batch_size, self.decoder_embedding_dim).to(self.device)
+        trg_embeddings = torch.zeros(trg_len, batch_size, self.decoder_embedding_dim).to(self.device)
         attentions = torch.zeros(trg_len, batch_size, src_len).to(self.device)
         # decoder_outputs store the probability of all output vocabulary for each trg input token
         # predictions store the predicted output token for each trg input token
@@ -186,7 +188,7 @@ class TextSeq2Seq(nn.Module):
         # attentions store the attention weights for each trg input token
         # decoder_outputs = [trg_len, batch_size, output_dim]
         # predictions = [trg_len, batch_size]
-        # embeddings = [trg_len, batch_size, decoder_embedding_dim]
+        # trg_embeddings = [trg_len, batch_size, decoder_embedding_dim]
         # attentions = [trg_len, batch_size, src_len]
 
         input = trg[0]  # first input to the decoder is the <SOS> token
@@ -194,7 +196,7 @@ class TextSeq2Seq(nn.Module):
             # at every time step, insert trg input token, encoder_states, and previous hidden and cell
             # receive output and new hidden and cell
             # and get the best word predicted by the decoder
-            output, hidden, cell, embed, weight = self.decoder(input, encoder_states, hidden, cell)
+            output, hidden, cell, trg_embed, weight = self.decoder(input, encoder_states, hidden, cell)
             # output = [batch_size, output_dim]
             # hidden = [batch_size, decoder_hidden_dim]
             # cell = [batch_size, decoder_hidden_dim]
@@ -206,7 +208,7 @@ class TextSeq2Seq(nn.Module):
             # store output, best guess, input embedding, and attention weight for current time step
             decoder_outputs[t] = output
             predictions[t] = best_guess
-            embeddings[t] = embed
+            trg_embeddings[t] = trg_embed
             attentions[t] = weight
 
             # with probability of teacher_force_ratio we take the actual next word
@@ -215,7 +217,7 @@ class TextSeq2Seq(nn.Module):
             input = trg[t] if random.random() < teacher_forcing_ratio else best_guess
             # input = [batch_size]
 
-        return decoder_outputs, predictions, embeddings, attentions
+        return decoder_outputs, predictions, src_embeddings, trg_embeddings, attentions
 
 
 if __name__ == "__main__":

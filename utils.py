@@ -9,7 +9,7 @@ from nooverlap import push_text_free
 
 def save_to_file(data_store, save_file):
     # convert dictionary to pandas dataframe
-    data_df = pd.DataFrame(data_store)
+    data_df = pd.DataFrame.from_dict(data_store, orient='columns')
 
     # write to csv file
     data_df.to_csv(save_file, index=False)

@@ -111,6 +111,7 @@ def generate_stimuli(onset, coda, vowel_1, vowel_2, syll_struct, language):
 # Function to decompose stimuli for each language with specified phoneme inventory
 def decompose_stimuli(onset, coda, vowel_1, vowel_2, word):
 
+    word_copy = word.copy()  # copy of word for token removal
     syll1 = [None, None, None]  # C, V, C
     syll2 = [None, None, None]
 
@@ -119,78 +120,78 @@ def decompose_stimuli(onset, coda, vowel_1, vowel_2, word):
     vowel_open_2 = [key for key, value in vowel_2.items() if value == "open"]
     vowel_close_2 = [key for key, value in vowel_2.items() if value == "closed"]
 
-    if word and word[0] == "<SOS>":
+    if word_copy and word_copy[0] == "<SOS>":
     # remove start of sentence token
-        word.pop(0)
-    if word and word[0] in onset:
+        word_copy.pop(0)
+    if word_copy and word_copy[0] in onset:
     # if first syllable has onset
-        syll1[0] = word[0]
-        word.pop(0)
-    while word and word[0] not in vowel_1 and word[0] not in vowel_2:
+        syll1[0] = word_copy[0]
+        word_copy.pop(0)
+    while word_copy and word_copy[0] not in vowel_1 and word_copy[0] not in vowel_2:
     # if first phone is coda or next phone(s) are onset/coda
     # get rid of the phone until we meet a vowel
         syll1[0] = False
-        word.pop(0)
+        word_copy.pop(0)
 
-    if word and (word[0] in vowel_open_1 or word[0] in vowel_open_2):
+    if word_copy and (word_copy[0] in vowel_open_1 or word_copy[0] in vowel_open_2):
     # if first vowel is in an open syllable
-        syll1[1] = word[0]
-        word.pop(0)
-        while word and word[0] not in onset:
+        syll1[1] = word_copy[0]
+        word_copy.pop(0)
+        while word_copy and word_copy[0] not in onset:
         # the syllable needs to be immediately followed by an onset
             syll1[2] = False
-            word.pop(0)
-    elif word and (word[0] in vowel_close_1 or word[0] in vowel_close_2):
+            word_copy.pop(0)
+    elif word_copy and (word_copy[0] in vowel_close_1 or word_copy[0] in vowel_close_2):
     # if first vowel is in a closed syllable
-        syll1[1] = word[0]
-        word.pop(0)
-        if word and word[0] in coda:
+        syll1[1] = word_copy[0]
+        word_copy.pop(0)
+        if word_copy and word_copy[0] in coda:
         # the syllable needs a coda
-            syll1[2] = word[0]
-            word.pop(0)
-        while word and word[0] not in vowel_1 and word[0] not in vowel_2:
-            # the next syllable cannot have an onset
-            # get rid of the phone until we meet a vowel
-                syll2[0] = False
-                word.pop(0)
+            syll1[2] = word_copy[0]
+            word_copy.pop(0)
+            while word_copy and word_copy[0] not in vowel_1 and word_copy[0] not in vowel_2:
+                # the next syllable cannot have an onset
+                # get rid of the phone until we meet a vowel
+                    syll2[0] = False
+                    word_copy.pop(0)
         else:
             syll1[2] = False
     else:
     # if first vowel looks weird
         syll1[1] = False
-        while word and word[0] not in onset:
+        while word_copy and word_copy[0] not in onset:
             # get rid of the phone until we meet the next syllable onset
-            word.pop(0)
+            word_copy.pop(0)
 
-    if word and word[0] in onset:
+    if word_copy and word_copy[0] in onset:
     # if second syllable has onset
-        syll2[0] = word[0]
-        word.pop(0)
-    while word and word[0] not in vowel_1 and word[0] not in vowel_2:
+        syll2[0] = word_copy[0]
+        word_copy.pop(0)
+    while word_copy and word_copy[0] not in vowel_1 and word_copy[0] not in vowel_2:
     # if next phone(s) are onset/coda
     # get rid of the phone until we meet a vowel
         syll2[0] = False
-        word.pop(0)
+        word_copy.pop(0)
 
-    if word and (word[0] in vowel_open_1 or word[0] in vowel_open_2):
+    if word_copy and (word_copy[0] in vowel_open_1 or word_copy[0] in vowel_open_2):
     # if second vowel is in an open syllable
-        syll2[1] = word[0]
-        word.pop(0)
-    elif word and (word[0] in vowel_close_1 or word[0] in vowel_close_2):
+        syll2[1] = word_copy[0]
+        word_copy.pop(0)
+    elif word_copy and (word_copy[0] in vowel_close_1 or word_copy[0] in vowel_close_2):
     # if second vowel is in a closed syllable
-        syll2[1] = word[0]
-        word.pop(0)
-        if word and word[0] in coda:
+        syll2[1] = word_copy[0]
+        word_copy.pop(0)
+        if word_copy and word_copy[0] in coda:
         # the syllable needs a coda
-            syll2[2] = word[0]
-            word.pop(0)
+            syll2[2] = word_copy[0]
+            word_copy.pop(0)
         else:
             syll2[2] = False
     else:
     # if the second vowel looks weird
         syll2[1] = False
 
-    if word and word[0] != "<EOS>":  # there should be no more phones
+    if word_copy and word_copy[0] != "<EOS>":  # there should be no more phones
         syll2[2] = False
 
     sylls = [syll1, syll2]

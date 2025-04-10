@@ -68,7 +68,9 @@ class TextDataset(Dataset):
         self.device = device
 
         # get the list of ur and sr words
+        # and randomize word order for each instance of dataset
         self.annotations = pd.read_csv(annotations_file)
+        #self.annotations = annotations.sample(frac=1).reset_index(drop=True)
         self.ur = self.annotations["ur"]
         self.sr = self.annotations["sr"]
 
@@ -130,6 +132,7 @@ class TextDataset(Dataset):
 
 if __name__ == "__main__":
     import hyper_params as hp
+    import utils
 
     print(" - Loading dataset:")
     annotations_file = "Dataset/EnglishBH_txt_harmony.csv"
