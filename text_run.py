@@ -67,27 +67,30 @@ class TextRun:
         self.pred_file = os.path.join("Results", trial_num + "_" + datatype,
                                       language + "_" + condition +
                                       "_run" + str(run_num) + "_pred.csv")
-        self.model_file = os.path.join("Results", trial_num + "_" + datatype,
-                                       language + "_" + condition +
-                                       "_run" + str(run_num) + "_seq2seq.pth")
         self.acc_plot = os.path.join("Results", trial_num + "_" + datatype,
                                      language + "_" + condition +
                                      "_run" + str(run_num) + "_acc_plot.png")
 
-        self.embed_plot_dir = os.path.join("Results", trial_num + "_" + datatype,
-                                     language + "_" + condition +
-                                     "_run" + str(run_num) + "_embed_plots")
+        self.model_dir = os.path.join("Results", trial_num + "_" + datatype, "model_files")
+        if not os.path.exists(self.model_dir):
+            os.mkdir(self.model_dir)
+
+        self.embed_plot_dir = os.path.join("Results", trial_num + "_" + datatype, "embed_plots")
         if not os.path.exists(self.embed_plot_dir):
             os.mkdir(self.embed_plot_dir)
-        self.ur_alphabet_file = os.path.join(self.embed_plot_dir, "ur_alphabet.csv")
-        self.sr_alphabet_file = os.path.join(self.embed_plot_dir, "sr_alphabet.csv")
+        self.ur_alphabet_file = os.path.join(self.embed_plot_dir,
+                                             language + "_" + condition +
+                                             "_run" + str(run_num) + "ur_alphabet.csv")
+        self.sr_alphabet_file = os.path.join(self.embed_plot_dir,
+                                             language + "_" + condition +
+                                             "_run" + str(run_num) + "sr_alphabet.csv")
 
-        self.att_plot_dir = os.path.join("Results", trial_num + "_" + datatype,
-                                         language + "_" + condition +
-                                         "_run" + str(run_num) + "_att_plots")
+        self.att_plot_dir = os.path.join("Results", trial_num + "_" + datatype, "att_plots")
         if not os.path.exists(self.att_plot_dir):
             os.mkdir(self.att_plot_dir)
-        self.att_file = os.path.join(self.att_plot_dir, "att_type.csv")
+        self.att_file = os.path.join(self.att_plot_dir,
+                                     language + "_" + condition +
+                                     "_run" + str(run_num) + "att_type.csv")
 
         # model weight initialization
         for name, param in self.seq2seq.named_parameters():
@@ -120,8 +123,12 @@ class TextRun:
             self.record_acc(epoch, "valid", valid_loss, valid_acc)
 
             # save the model
-            torch.save(self.seq2seq.state_dict(), self.model_file)
-            print(f"Epoch {epoch} model trained and stored at {self.model_file}")
+            model_file = os.path.join(self.model_dir,
+                                      self.language + "_" + self.condition +
+                                      "_run" + str(self.run_num) +
+                                      "_epoch" + str(epoch) + "_seq2seq.pth")
+            torch.save(self.seq2seq.state_dict(), model_file)
+            print(f"Epoch {epoch} model trained and stored at {model_file}")
 
         # save loss, accuracy, and predicted results
         utils.save_to_file(self.acc_store, self.acc_file)
@@ -132,7 +139,11 @@ class TextRun:
     # a function that completes one repetition of evaluation at the end of training
     def test(self, test_dataloader):
         # load the model
-        self.seq2seq.load_state_dict(torch.load(self.model_file))
+        model_file = os.path.join(self.model_dir,
+                                  self.language + "_" + self.condition +
+                                  "_run" + str(self.run_num) +
+                                  "_epoch" + str(hp.n_epochs-1) + "_seq2seq.pth")
+        self.seq2seq.load_state_dict(torch.load(model_file))
 
         # check loss for the test dataset
         test_loss, test_acc = self.evaluate_one_epoch(hp.n_epochs, "test", test_dataloader)
@@ -159,7 +170,7 @@ class TextRun:
             # trg = [trg_len, batch_size]
 
             self.optimizer.zero_grad()  # reset gradient at each iteration to 0
-            output, pred, _, _ = self.seq2seq(src, trg, teacher_forcing_ratio)
+            output, pred, _, _, _ = self.seq2seq(src, trg, teacher_forcing_ratio)
             # output = [trg_len, batch_size, output_dim]
             # pred = [trg_len, batch_size]
 
@@ -205,7 +216,7 @@ class TextRun:
                 # src = [src_len, batch_size]
                 # trg = [trg_len, batch_size]
 
-                output, pred, _, _ = self.seq2seq(src, trg, 0)  # turn off teacher forcing
+                output, pred, _, _, _ = self.seq2seq(src, trg, 0)  # turn off teacher forcing
                 # output = [trg_len, batch_size, output_dim]
                 # pred = [trg_len, batch_size]
 
@@ -244,7 +255,11 @@ class TextRun:
         # trg = [trg_len, batch_size]
 
         # load the model
-        self.seq2seq.load_state_dict(torch.load(self.model_file))
+        model_file = os.path.join(self.model_dir,
+                                  self.language + "_" + self.condition +
+                                  "_run" + str(self.run_num) +
+                                  "_epoch" + str(hp.n_epochs-1) + "_seq2seq.pth")
+        self.seq2seq.load_state_dict(torch.load(model_file))
         self.seq2seq.eval()  # disable dropout in evaluation
         with torch.no_grad():  # disable gradient tracking
             # get decoder embedding and predicted attention weights
@@ -274,6 +289,8 @@ class TextRun:
 
                 # plot attention
                 att_plot = os.path.join(self.att_plot_dir,
+                                        self.language + "_" + self.condition +
+                                        "_run" + str(self.run_num) + "_" +
                                         ur_string + "_" + sr_string + ".png")
                 utils.plot_att(ur_list, pred_sr_list, word_att, att_plot)
                 print(f"Run {self.run_num} attention plot {i} is saved for investigation")
@@ -294,10 +311,18 @@ class TextRun:
             print(f"Run {self.run_num} attention types are saved for investigation")
 
             # plot embedding for both all phones and only vowels
-            ur_embed_phone_plot = os.path.join(self.embed_plot_dir, "ur_phoneme.png")
-            ur_embed_vowel_plot = os.path.join(self.embed_plot_dir, "ur_vowel.png")
-            sr_embed_phone_plot = os.path.join(self.embed_plot_dir, "sr_phoneme.png")
-            sr_embed_vowel_plot = os.path.join(self.embed_plot_dir, "sr_vowel.png")
+            ur_embed_phone_plot = os.path.join(self.embed_plot_dir,
+                                               self.language + "_" + self.condition +
+                                               "_run" + str(self.run_num) + "_ur_phoneme.png")
+            ur_embed_vowel_plot = os.path.join(self.embed_plot_dir,
+                                               self.language + "_" + self.condition +
+                                               "_run" + str(self.run_num) + "ur_vowel.png")
+            sr_embed_phone_plot = os.path.join(self.embed_plot_dir,
+                                               self.language + "_" + self.condition +
+                                               "_run" + str(self.run_num) + "sr_phoneme.png")
+            sr_embed_vowel_plot = os.path.join(self.embed_plot_dir,
+                                               self.language + "_" + self.condition +
+                                               "_run" + str(self.run_num) + "sr_vowel.png")
             utils.plot_embed(self.ur_embed_phone_store, ur_embed_phone_plot, "phoneme embedding")
             utils.plot_embed(self.ur_embed_vowel_store, ur_embed_vowel_plot, "vowel embedding")
             utils.plot_embed(self.sr_embed_phone_store, sr_embed_phone_plot, "phoneme embedding")
@@ -410,10 +435,10 @@ class TextRun:
                 #c1_error = 1
             #if sr_c2 != pred_sr_c2:
                 #c2_error = 1
-            #if sr_v1 != pred_sr_v1:
-                #v1_error = 1
-            #if sr_v2 != pred_sr_v2:
-                #v2_error = 1
+            if sr_v1 != pred_sr_v1:
+                v1_error = 1
+            if sr_v2 != pred_sr_v2:
+                v2_error = 1
 
             pred_lines['ur'].append(ur_string)
             pred_lines['sr'].append(sr_string)
@@ -495,6 +520,8 @@ class TextRun:
         self.pred_store['pred_sr_v1'].extend(preds['pred_sr_v1'])
         self.pred_store['pred_sr_v2'].extend(preds['pred_sr_v2'])
 
+    # a function that records the attention from each predicted sr to ur in a batch
+    # the function is called in evaluate one batch
     def record_att(self, i, pred_sr_sylls, word_att, ur_string, pred_sr_string):
         # get the largest attention value for individual token in the predicted sr
         max_att = torch.argmax(word_att, dim=1).tolist()
@@ -559,6 +586,8 @@ class TextRun:
         self.att_store['ur'].append(ur_string)
         self.att_store['pred_sr'].append(pred_sr_string)
 
+    # a function that records the embedding of each ur and sr in a batch
+    # the function is called in evaluate one batch
     def record_embed(self, i, ur_list, pred_sr_list, src_embed, trg_embed):
         # for individual token in the ur
         # if the token embedding has not been recorded
