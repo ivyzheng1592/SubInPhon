@@ -7,7 +7,6 @@
 
 import csv
 import itertools
-from os import remove
 
 
 # Function to generate stimuli for each language with specified phoneme inventory and syllable structure
