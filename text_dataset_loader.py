@@ -68,9 +68,7 @@ class TextDataset(Dataset):
         self.device = device
 
         # get the list of ur and sr words
-        # and randomize word order for each instance of dataset
         self.annotations = pd.read_csv(annotations_file)
-        self.annotations = self.annotations.sample(frac=1).reset_index(drop=True)
         self.ur = self.annotations["ur"]
         self.sr = self.annotations["sr"]
 

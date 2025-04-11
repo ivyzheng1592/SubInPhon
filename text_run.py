@@ -71,26 +71,32 @@ class TextRun:
                                      language + "_" + condition +
                                      "_run" + str(run_num) + "_acc_plot.png")
 
-        self.model_dir = os.path.join("Results", trial_num + "_" + datatype, "model_files")
+        self.model_dir = os.path.join("Results", trial_num + "_" + datatype,
+                                      language + "_" + condition +
+                                      "_run" + str(run_num) + "_model_files")
         if not os.path.exists(self.model_dir):
             os.mkdir(self.model_dir)
 
-        self.embed_plot_dir = os.path.join("Results", trial_num + "_" + datatype, "embed_plots")
+        self.embed_plot_dir = os.path.join("Results", trial_num + "_" + datatype,
+                                           language + "_" + condition +
+                                           "_run" + str(run_num) + "_embed_plots")
         if not os.path.exists(self.embed_plot_dir):
             os.mkdir(self.embed_plot_dir)
         self.ur_alphabet_file = os.path.join(self.embed_plot_dir,
                                              language + "_" + condition +
-                                             "_run" + str(run_num) + "ur_alphabet.csv")
+                                             "_run" + str(run_num) + "_ur_alphabet.csv")
         self.sr_alphabet_file = os.path.join(self.embed_plot_dir,
                                              language + "_" + condition +
-                                             "_run" + str(run_num) + "sr_alphabet.csv")
+                                             "_run" + str(run_num) + "_sr_alphabet.csv")
 
-        self.att_plot_dir = os.path.join("Results", trial_num + "_" + datatype, "att_plots")
+        self.att_plot_dir = os.path.join("Results", trial_num + "_" + datatype,
+                                         language + "_" + condition +
+                                         "_run" + str(run_num) + "_att_plots")
         if not os.path.exists(self.att_plot_dir):
             os.mkdir(self.att_plot_dir)
         self.att_file = os.path.join(self.att_plot_dir,
                                      language + "_" + condition +
-                                     "_run" + str(run_num) + "att_type.csv")
+                                     "_run" + str(run_num) + "_att_type.csv")
 
         # model weight initialization
         for name, param in self.seq2seq.named_parameters():
@@ -247,7 +253,7 @@ class TextRun:
         return epoch_loss, epoch_acc
 
     # a function that manages evaluation of one random batch
-    def evaluate_one_batch(self, test_dataloader):
+    def evaluate_one_batch(self, test_dataloader, eval_type="both"):
         # get one random batch of test data
         dataiter = iter(test_dataloader)
         src, trg = next(dataiter)
@@ -255,10 +261,11 @@ class TextRun:
         # trg = [trg_len, batch_size]
 
         # load the model
+        epoch = hp.n_epochs-1
         model_file = os.path.join(self.model_dir,
                                   self.language + "_" + self.condition +
                                   "_run" + str(self.run_num) +
-                                  "_epoch" + str(hp.n_epochs-1) + "_seq2seq.pth")
+                                  "_epoch" + str(epoch) + "_seq2seq.pth")
         self.seq2seq.load_state_dict(torch.load(model_file))
         self.seq2seq.eval()  # disable dropout in evaluation
         with torch.no_grad():  # disable gradient tracking
@@ -287,53 +294,69 @@ class TextRun:
                 word_att = att[:trg_len, i, :src_len]
                 # word_att = [trg_len, src_len]
 
-                # plot attention
-                att_plot = os.path.join(self.att_plot_dir,
-                                        self.language + "_" + self.condition +
-                                        "_run" + str(self.run_num) + "_" +
-                                        ur_string + "_" + sr_string + ".png")
-                utils.plot_att(ur_list, pred_sr_list, word_att, att_plot)
-                print(f"Run {self.run_num} attention plot {i} is saved for investigation")
+                if eval_type == "both" or eval_type == "attention":
+                    # plot attention
+                    att_plot = os.path.join(self.att_plot_dir,
+                                            self.language + "_" + self.condition +
+                                            "_run" + str(self.run_num) +
+                                            "_epoch" + str(epoch) + "_" +
+                                            ur_string + "_" + sr_string + ".png")
+                    utils.plot_att(ur_list, pred_sr_list, word_att, att_plot)
+                    print(f"Run {self.run_num} attention plot {i} is saved for investigation")
 
-                # decompose word list into structured syllables
-                # a list of two lists, each in the shape of [C, V, C]
-                pred_sr_sylls = EVH.decompose_stimuli(EVH.onset_ae, EVH.coda_ae, EVH.vowel_front_ae_txt,
-                                                      EVH.vowel_back_ae_txt, pred_sr_list)
+                    # decompose word list into structured syllables
+                    # a list of two lists, each in the shape of [C, V, C]
+                    pred_sr_sylls = EVH.decompose_stimuli(EVH.onset_ae, EVH.coda_ae, EVH.vowel_front_ae_txt,
+                                                          EVH.vowel_back_ae_txt, pred_sr_list)
 
-                # record attention type of the predicted sr
-                self.record_att(i, pred_sr_sylls, word_att, ur_string, sr_string)
+                    # record attention type of the predicted sr
+                    self.record_att(i, pred_sr_sylls, word_att, ur_string, sr_string)
 
-                # record embedding of the ur and predicted sr
-                self.record_embed(i, ur_list, pred_sr_list, src_embed, trg_embed)
+                if eval_type == "both" or eval_type == "embedding":
+                    # record embedding of the ur and predicted sr
+                    self.record_embed(i, ur_list, pred_sr_list, src_embed, trg_embed)
 
-            # save attention recording to file
-            utils.save_to_file(self.att_store, self.att_file)
-            print(f"Run {self.run_num} attention types are saved for investigation")
+            if eval_type == "both" or eval_type == "attention":
+                # save attention recording to file
+                utils.save_to_file(self.att_store, self.att_file)
+                print(f"Run {self.run_num} attention types are saved for investigation")
 
-            # plot embedding for both all phones and only vowels
-            ur_embed_phone_plot = os.path.join(self.embed_plot_dir,
-                                               self.language + "_" + self.condition +
-                                               "_run" + str(self.run_num) + "_ur_phoneme.png")
-            ur_embed_vowel_plot = os.path.join(self.embed_plot_dir,
-                                               self.language + "_" + self.condition +
-                                               "_run" + str(self.run_num) + "ur_vowel.png")
-            sr_embed_phone_plot = os.path.join(self.embed_plot_dir,
-                                               self.language + "_" + self.condition +
-                                               "_run" + str(self.run_num) + "sr_phoneme.png")
-            sr_embed_vowel_plot = os.path.join(self.embed_plot_dir,
-                                               self.language + "_" + self.condition +
-                                               "_run" + str(self.run_num) + "sr_vowel.png")
-            utils.plot_embed(self.ur_embed_phone_store, ur_embed_phone_plot, "phoneme embedding")
-            utils.plot_embed(self.ur_embed_vowel_store, ur_embed_vowel_plot, "vowel embedding")
-            utils.plot_embed(self.sr_embed_phone_store, sr_embed_phone_plot, "phoneme embedding")
-            utils.plot_embed(self.sr_embed_vowel_store, sr_embed_vowel_plot, "vowel embedding")
-            print(f"Run {self.run_num} embedding plots are saved for investigation")
+            if eval_type == "both" or eval_type == "embedding":
+                # plot embedding for both all phones and only vowels
+                ur_embed_phone_plot = os.path.join(self.embed_plot_dir,
+                                                   self.language + "_" + self.condition +
+                                                   "_run" + str(self.run_num) +
+                                                   "_epoch" + str(epoch) + "_ur_phoneme.png")
+                ur_embed_vowel_plot = os.path.join(self.embed_plot_dir,
+                                                   self.language + "_" + self.condition +
+                                                   "_run" + str(self.run_num) +
+                                                   "_epoch" + str(epoch) + "_ur_vowel.png")
+                sr_embed_phone_plot = os.path.join(self.embed_plot_dir,
+                                                   self.language + "_" + self.condition +
+                                                   "_run" + str(self.run_num) +
+                                                   "_epoch" + str(epoch) + "_sr_phoneme.png")
+                sr_embed_vowel_plot = os.path.join(self.embed_plot_dir,
+                                                   self.language + "_" + self.condition +
+                                                   "_run" + str(self.run_num) +
+                                                   "_epoch" + str(epoch) + "_sr_vowel.png")
 
-            # save ur and sr alphabet before embedding to file
-            ur_char2idx = {key: [value] for key, value in self.ur_alphabet.idx2char.items()}
-            sr_char2idx = {key: [value] for key, value in self.sr_alphabet.idx2char.items()}
-            utils.save_to_file(ur_char2idx, self.ur_alphabet_file)
-            utils.save_to_file(sr_char2idx, self.sr_alphabet_file)
+                try:
+                    # Code that might raise a runtime error
+                    #utils.plot_embed(self.ur_embed_phone_store, ur_embed_phone_plot, "phoneme embedding")
+                    utils.plot_embed(self.ur_embed_vowel_store, ur_embed_vowel_plot, "vowel embedding")
+                    #utils.plot_embed(self.sr_embed_phone_store, sr_embed_phone_plot, "phoneme embedding")
+                    utils.plot_embed(self.sr_embed_vowel_store, sr_embed_vowel_plot, "vowel embedding")
+                except Exception as e:
+                    print(f"The error {e} occurred in run {self.run_num}. Continue running ...")
+                    self.evaluate_one_batch(test_dataloader, "embedding")
+                print(f"Run {self.run_num} embedding plots are saved for investigation")
+
+                # save ur and sr alphabet before embedding to file
+                ur_char2idx = {key: [value] for key, value in self.ur_alphabet.idx2char.items()}
+                sr_char2idx = {key: [value] for key, value in self.sr_alphabet.idx2char.items()}
+                utils.save_to_file(ur_char2idx, self.ur_alphabet_file)
+                utils.save_to_file(sr_char2idx, self.sr_alphabet_file)
+                print(f"Run {self.run_num} alphabets are saved for investigation")
 
     # a function that transforms one pair of ur, sr, and pred_sr tensor to list and string
     def transform_one_pair(self, ur, sr, pred_sr):
