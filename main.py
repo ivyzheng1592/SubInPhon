@@ -47,7 +47,7 @@ def text_condition(trial_num, datatype, language, condition, n_run, n_check, dev
     print(" - Inspecting model outputs:")
     for check in n_check:
         rep = TextRun(seq2seq, dataset, trial_num, datatype, language, condition, check)
-        rep.evaluate_one_batch(test_dataloader)
+        rep.evaluate_one_batch(test_dataloader, "both")
 
 """
 # a function that loads audio dataset, initializes audio model
@@ -106,8 +106,8 @@ if __name__ == "__main__":
     # running each condition for x times
     languages = ["EnglishBH"]
     conditions = ["harmony", "disharmony"]
-    n_run = range(10)  # which run to complete
-    n_check = range(0)  # which run to inspect
+    n_run = range(0)  # which run to complete
+    n_check = range(10)  # which run to inspect
     for language in languages:
         for condition in conditions:
             text_condition(trial_num, "txt", language, condition, n_run, n_check, device)

@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from jmespath.ast import projection
 from matplotlib import colormaps
 from sklearn.decomposition import PCA
 from nooverlap import push_text_free
@@ -9,7 +10,7 @@ from nooverlap import push_text_free
 
 def save_to_file(data_store, save_file):
     # convert dictionary to pandas dataframe
-    data_df = pd.DataFrame.from_dict(data_store, orient='columns')
+    data_df = pd.DataFrame(data_store)
 
     # write to csv file
     data_df.to_csv(save_file, index=False)
@@ -74,16 +75,19 @@ def plot_att(ur, sr, attention, att_plot):
     plt.savefig(att_plot)
     #plt.show()
 
-def plot_embed(embed_store, embed_file, title="vowel embedding"):
+def plot_embed(embed_store, embed_file, embed_plot, title="vowel embedding"):
     # convert dictionary to pandas dataframe
     embed_df = pd.DataFrame.from_dict(embed_store, orient='index')
 
-    # use PCA to project the data from embedding_dim to 2D
-    pca = PCA(n_components=2)
+    # use PCA to project the data from embedding_dim to 3D
+    pca = PCA(n_components=3)
     reduced_data = pca.fit_transform(embed_df)
     reduced_df = pd.DataFrame(data=reduced_data,
-                              columns=['pc1', 'pc2'])
+                              columns=['pc1', 'pc2', 'pc3'])
     reduced_df['phone'] = embed_df.index
+
+    # save PCA results to file
+    save_to_file(reduced_df, embed_file)
 
     # decide a colormap based on whether the plot is on vowels or all phonemes
     if title == "phoneme embedding":
@@ -93,19 +97,23 @@ def plot_embed(embed_store, embed_file, title="vowel embedding"):
         colormap = colormaps.get_cmap('tab10')
         legend_col = 1
 
-    fig, ax = plt.subplots(1, 1)
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
     for i in reduced_df.index:
-        ax.scatter(x=reduced_df.loc[i, 'pc1'],
-                   y=reduced_df.loc[i, 'pc2'],
+        ax.scatter(xs=reduced_df.loc[i, 'pc1'],
+                   ys=reduced_df.loc[i, 'pc2'],
+                   zs=reduced_df.loc[i, 'pc3'],
                    c=colormap(i%20), # if there are more than 20 categories, reuse from top
                    label=reduced_df.loc[i, 'phone'])
         ax.text(x=reduced_df.loc[i, 'pc1'],
                 y=reduced_df.loc[i, 'pc2'],
+                z=reduced_df.loc[i, 'pc3'],
                 s=reduced_df.loc[i, 'phone'])
     ax.set_xlabel("pc1")
-    ax.set_xlabel("pc2")
+    ax.set_ylabel("pc2")
+    ax.set_zlabel("pc3")
     ax.set_title(title)
     fig.legend(ncols=legend_col)
     push_text_free(fig, ax)
-    plt.savefig(embed_file)
+    plt.savefig(embed_plot)
     #plt.show()

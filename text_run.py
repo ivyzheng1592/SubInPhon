@@ -44,14 +44,14 @@ class TextRun:
             'sr_v1': [], 'sr_v2': [], 'pred_sr_v1': [], 'pred_sr_v2': []
         }
 
-        EVH_phone = (EVH.onset_ae + EVH.coda_ae +
-                    list(EVH.vowel_front_ae_txt.keys()) +
-                    list(EVH.vowel_back_ae_txt.keys()))
+        #EVH_phone = (EVH.onset_ae + EVH.coda_ae +
+                    #list(EVH.vowel_front_ae_txt.keys()) +
+                    #list(EVH.vowel_back_ae_txt.keys()))
         EVH_vowel = (list(EVH.vowel_front_ae_txt.keys()) +
                     list(EVH.vowel_back_ae_txt.keys()))
-        self.ur_embed_phone_store = {key: [] for key in EVH_phone}
+        #self.ur_embed_phone_store = {key: [] for key in EVH_phone}
         self.ur_embed_vowel_store = {key: [] for key in EVH_vowel}
-        self.sr_embed_phone_store = {key: [] for key in EVH_phone}
+        #self.sr_embed_phone_store = {key: [] for key in EVH_phone}
         self.sr_embed_vowel_store = {key: [] for key in EVH_vowel}
 
         self.att_store = {
@@ -82,12 +82,6 @@ class TextRun:
                                            "_run" + str(run_num) + "_embed_plots")
         if not os.path.exists(self.embed_plot_dir):
             os.mkdir(self.embed_plot_dir)
-        self.ur_alphabet_file = os.path.join(self.embed_plot_dir,
-                                             language + "_" + condition +
-                                             "_run" + str(run_num) + "_ur_alphabet.csv")
-        self.sr_alphabet_file = os.path.join(self.embed_plot_dir,
-                                             language + "_" + condition +
-                                             "_run" + str(run_num) + "_sr_alphabet.csv")
 
         self.att_plot_dir = os.path.join("Results", trial_num + "_" + datatype,
                                          language + "_" + condition +
@@ -268,6 +262,7 @@ class TextRun:
                                   "_epoch" + str(epoch) + "_seq2seq.pth")
         self.seq2seq.load_state_dict(torch.load(model_file))
         self.seq2seq.eval()  # disable dropout in evaluation
+
         with torch.no_grad():  # disable gradient tracking
             # get decoder embedding and predicted attention weights
             _, pred, src_embed, trg_embed, att = self.seq2seq(src, trg, 0)  # turn off teacher forcing
@@ -302,7 +297,6 @@ class TextRun:
                                             "_epoch" + str(epoch) + "_" +
                                             ur_string + "_" + sr_string + ".png")
                     utils.plot_att(ur_list, pred_sr_list, word_att, att_plot)
-                    print(f"Run {self.run_num} attention plot {i} is saved for investigation")
 
                     # decompose word list into structured syllables
                     # a list of two lists, each in the shape of [C, V, C]
@@ -319,44 +313,47 @@ class TextRun:
             if eval_type == "both" or eval_type == "attention":
                 # save attention recording to file
                 utils.save_to_file(self.att_store, self.att_file)
-                print(f"Run {self.run_num} attention types are saved for investigation")
+                print(f"Run {self.run_num} attention plots and types are saved for investigation")
 
             if eval_type == "both" or eval_type == "embedding":
                 # plot embedding for both all phones and only vowels
-                ur_embed_phone_plot = os.path.join(self.embed_plot_dir,
-                                                   self.language + "_" + self.condition +
-                                                   "_run" + str(self.run_num) +
-                                                   "_epoch" + str(epoch) + "_ur_phoneme.png")
+                #ur_embed_phone_plot = os.path.join(self.embed_plot_dir,
+                                                   #self.language + "_" + self.condition +
+                                                   #"_run" + str(self.run_num) +
+                                                   #"_epoch" + str(epoch) + "_ur_phoneme.png")
                 ur_embed_vowel_plot = os.path.join(self.embed_plot_dir,
                                                    self.language + "_" + self.condition +
                                                    "_run" + str(self.run_num) +
                                                    "_epoch" + str(epoch) + "_ur_vowel.png")
-                sr_embed_phone_plot = os.path.join(self.embed_plot_dir,
+                ur_embed_vowel_file = os.path.join(self.embed_plot_dir,
                                                    self.language + "_" + self.condition +
                                                    "_run" + str(self.run_num) +
-                                                   "_epoch" + str(epoch) + "_sr_phoneme.png")
+                                                   "_epoch" + str(epoch) + "_ur_vowel.csv")
+                #sr_embed_phone_plot = os.path.join(self.embed_plot_dir,
+                                                   #self.language + "_" + self.condition +
+                                                   #"_run" + str(self.run_num) +
+                                                   #"_epoch" + str(epoch) + "_sr_phoneme.png")
                 sr_embed_vowel_plot = os.path.join(self.embed_plot_dir,
                                                    self.language + "_" + self.condition +
                                                    "_run" + str(self.run_num) +
                                                    "_epoch" + str(epoch) + "_sr_vowel.png")
+                sr_embed_vowel_file = os.path.join(self.embed_plot_dir,
+                                                   self.language + "_" + self.condition +
+                                                   "_run" + str(self.run_num) +
+                                                   "_epoch" + str(epoch) + "_sr_vowel.csv")
 
                 try:
                     # Code that might raise a runtime error
                     #utils.plot_embed(self.ur_embed_phone_store, ur_embed_phone_plot, "phoneme embedding")
-                    utils.plot_embed(self.ur_embed_vowel_store, ur_embed_vowel_plot, "vowel embedding")
+                    utils.plot_embed(self.ur_embed_vowel_store, ur_embed_vowel_file, ur_embed_vowel_plot,
+                                     "vowel embedding")
                     #utils.plot_embed(self.sr_embed_phone_store, sr_embed_phone_plot, "phoneme embedding")
-                    utils.plot_embed(self.sr_embed_vowel_store, sr_embed_vowel_plot, "vowel embedding")
+                    utils.plot_embed(self.sr_embed_vowel_store, sr_embed_vowel_file, sr_embed_vowel_plot,
+                                     "vowel embedding")
                 except Exception as e:
                     print(f"The error {e} occurred in run {self.run_num}. Continue running ...")
                     self.evaluate_one_batch(test_dataloader, "embedding")
-                print(f"Run {self.run_num} embedding plots are saved for investigation")
-
-                # save ur and sr alphabet before embedding to file
-                ur_char2idx = {key: [value] for key, value in self.ur_alphabet.idx2char.items()}
-                sr_char2idx = {key: [value] for key, value in self.sr_alphabet.idx2char.items()}
-                utils.save_to_file(ur_char2idx, self.ur_alphabet_file)
-                utils.save_to_file(sr_char2idx, self.sr_alphabet_file)
-                print(f"Run {self.run_num} alphabets are saved for investigation")
+                print(f"Run {self.run_num} embedding plots and files are saved for investigation")
 
     # a function that transforms one pair of ur, sr, and pred_sr tensor to list and string
     def transform_one_pair(self, ur, sr, pred_sr):
@@ -616,20 +613,20 @@ class TextRun:
         # if the token embedding has not been recorded
         # record its embedding values
         for j, token in enumerate(ur_list):
-            if token in self.ur_embed_phone_store and not self.ur_embed_phone_store[token]:
+            #if token in self.ur_embed_phone_store and not self.ur_embed_phone_store[token]:
+                #self.ur_embed_phone_store[token] = src_token_embed
+            if token in self.ur_embed_vowel_store and not self.ur_embed_vowel_store[token]:
                 src_token_embed = src_embed[j, i, :]
                 # token_embed = [embedding_dim]
                 src_token_embed = src_token_embed.tolist()
-                self.ur_embed_phone_store[token] = src_token_embed
-            if token in self.ur_embed_vowel_store and not self.ur_embed_vowel_store[token]:
                 self.ur_embed_vowel_store[token] = src_token_embed
 
         # for individual token in the predicted sr
         for j, token in enumerate(pred_sr_list):
-            if token in self.sr_embed_phone_store and not self.sr_embed_phone_store[token]:
+            #if token in self.sr_embed_phone_store and not self.sr_embed_phone_store[token]:
+                #self.sr_embed_phone_store[token] = trg_token_embed
+            if token in self.sr_embed_vowel_store and not self.sr_embed_vowel_store[token]:
                 trg_token_embed = trg_embed[j, i, :]
                 # token_embed = [embedding_dim]
                 trg_token_embed = trg_token_embed.tolist()
-                self.sr_embed_phone_store[token] = trg_token_embed
-            if token in self.sr_embed_vowel_store and not self.sr_embed_vowel_store[token]:
                 self.sr_embed_vowel_store[token] = trg_token_embed
