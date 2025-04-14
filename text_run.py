@@ -37,21 +37,21 @@ class TextRun:
         self.pred_store = {
             'trial_num': [], 'datatype': [], 'language': [], 'condition': [], 'run_num': [],
             'epoch': [], 'record_type': [], 'ur': [], 'sr': [], 'pred_sr': [],
-            #'o1_error': [], 'o2_error': [], 'c1_error': [], 'c2_error': [],
-            #'sr_o1': [], 'sr_o2': [], 'pred_sr_o1': [], 'pred_sr_o2': [],
-            #'sr_c1': [], 'sr_c2': [], 'pred_sr_c1': [], 'pred_sr_c2': [],
+            'o1_error': [], 'o2_error': [], 'c1_error': [], 'c2_error': [],
+            'sr_o1': [], 'sr_o2': [], 'pred_sr_o1': [], 'pred_sr_o2': [],
+            'sr_c1': [], 'sr_c2': [], 'pred_sr_c1': [], 'pred_sr_c2': [],
             'v1_error': [], 'v2_error': [], 'ur_v1': [], 'ur_v2': [],
             'sr_v1': [], 'sr_v2': [], 'pred_sr_v1': [], 'pred_sr_v2': []
         }
 
-        #EVH_phone = (EVH.onset_ae + EVH.coda_ae +
-                    #list(EVH.vowel_front_ae_txt.keys()) +
-                    #list(EVH.vowel_back_ae_txt.keys()))
+        EVH_phone = (EVH.onset_ae + EVH.coda_ae +
+                    list(EVH.vowel_front_ae_txt.keys()) +
+                    list(EVH.vowel_back_ae_txt.keys()))
         EVH_vowel = (list(EVH.vowel_front_ae_txt.keys()) +
                     list(EVH.vowel_back_ae_txt.keys()))
-        #self.ur_embed_phone_store = {key: [] for key in EVH_phone}
+        self.ur_embed_phone_store = {key: [] for key in EVH_phone}
         self.ur_embed_vowel_store = {key: [] for key in EVH_vowel}
-        #self.sr_embed_phone_store = {key: [] for key in EVH_phone}
+        self.sr_embed_phone_store = {key: [] for key in EVH_phone}
         self.sr_embed_vowel_store = {key: [] for key in EVH_vowel}
 
         self.att_store = {
@@ -247,7 +247,7 @@ class TextRun:
         return epoch_loss, epoch_acc
 
     # a function that manages evaluation of one random batch
-    def evaluate_one_batch(self, test_dataloader, eval_type="both"):
+    def evaluate_one_batch(self, test_dataloader, eval_epoch = hp.n_epochs-1, eval_type="both"):
         # get one random batch of test data
         dataiter = iter(test_dataloader)
         src, trg = next(dataiter)
@@ -255,11 +255,10 @@ class TextRun:
         # trg = [trg_len, batch_size]
 
         # load the model
-        epoch = hp.n_epochs-1
         model_file = os.path.join(self.model_dir,
                                   self.language + "_" + self.condition +
                                   "_run" + str(self.run_num) +
-                                  "_epoch" + str(epoch) + "_seq2seq.pth")
+                                  "_epoch" + str(eval_epoch) + "_seq2seq.pth")
         self.seq2seq.load_state_dict(torch.load(model_file))
         self.seq2seq.eval()  # disable dropout in evaluation
 
@@ -294,7 +293,7 @@ class TextRun:
                     att_plot = os.path.join(self.att_plot_dir,
                                             self.language + "_" + self.condition +
                                             "_run" + str(self.run_num) +
-                                            "_epoch" + str(epoch) + "_" +
+                                            "_epoch" + str(eval_epoch) + "_" +
                                             ur_string + "_" + sr_string + ".png")
                     utils.plot_att(ur_list, pred_sr_list, word_att, att_plot)
 
@@ -317,42 +316,52 @@ class TextRun:
 
             if eval_type == "both" or eval_type == "embedding":
                 # plot embedding for both all phones and only vowels
-                #ur_embed_phone_plot = os.path.join(self.embed_plot_dir,
-                                                   #self.language + "_" + self.condition +
-                                                   #"_run" + str(self.run_num) +
-                                                   #"_epoch" + str(epoch) + "_ur_phoneme.png")
+                ur_embed_phone_plot = os.path.join(self.embed_plot_dir,
+                                                   self.language + "_" + self.condition +
+                                                   "_run" + str(self.run_num) +
+                                                   "_epoch" + str(eval_epoch) + "_ur_phoneme.png")
+                ur_embed_phone_file = os.path.join(self.embed_plot_dir,
+                                                   self.language + "_" + self.condition +
+                                                   "_run" + str(self.run_num) +
+                                                   "_epoch" + str(eval_epoch) + "_ur_phoneme.csv")
                 ur_embed_vowel_plot = os.path.join(self.embed_plot_dir,
                                                    self.language + "_" + self.condition +
                                                    "_run" + str(self.run_num) +
-                                                   "_epoch" + str(epoch) + "_ur_vowel.png")
+                                                   "_epoch" + str(eval_epoch) + "_ur_vowel.png")
                 ur_embed_vowel_file = os.path.join(self.embed_plot_dir,
                                                    self.language + "_" + self.condition +
                                                    "_run" + str(self.run_num) +
-                                                   "_epoch" + str(epoch) + "_ur_vowel.csv")
-                #sr_embed_phone_plot = os.path.join(self.embed_plot_dir,
-                                                   #self.language + "_" + self.condition +
-                                                   #"_run" + str(self.run_num) +
-                                                   #"_epoch" + str(epoch) + "_sr_phoneme.png")
+                                                   "_epoch" + str(eval_epoch) + "_ur_vowel.csv")
+                sr_embed_phone_plot = os.path.join(self.embed_plot_dir,
+                                                   self.language + "_" + self.condition +
+                                                   "_run" + str(self.run_num) +
+                                                   "_epoch" + str(eval_epoch) + "_sr_phoneme.png")
+                sr_embed_phone_file = os.path.join(self.embed_plot_dir,
+                                                   self.language + "_" + self.condition +
+                                                   "_run" + str(self.run_num) +
+                                                   "_epoch" + str(eval_epoch) + "_sr_phoneme.csv")
                 sr_embed_vowel_plot = os.path.join(self.embed_plot_dir,
                                                    self.language + "_" + self.condition +
                                                    "_run" + str(self.run_num) +
-                                                   "_epoch" + str(epoch) + "_sr_vowel.png")
+                                                   "_epoch" + str(eval_epoch) + "_sr_vowel.png")
                 sr_embed_vowel_file = os.path.join(self.embed_plot_dir,
                                                    self.language + "_" + self.condition +
                                                    "_run" + str(self.run_num) +
-                                                   "_epoch" + str(epoch) + "_sr_vowel.csv")
+                                                   "_epoch" + str(eval_epoch) + "_sr_vowel.csv")
 
                 try:
                     # Code that might raise a runtime error
-                    #utils.plot_embed(self.ur_embed_phone_store, ur_embed_phone_plot, "phoneme embedding")
+                    utils.plot_embed(self.ur_embed_phone_store, ur_embed_phone_file, ur_embed_phone_plot,
+                                     "phoneme embedding")
                     utils.plot_embed(self.ur_embed_vowel_store, ur_embed_vowel_file, ur_embed_vowel_plot,
                                      "vowel embedding")
-                    #utils.plot_embed(self.sr_embed_phone_store, sr_embed_phone_plot, "phoneme embedding")
+                    utils.plot_embed(self.sr_embed_phone_store, sr_embed_phone_file, sr_embed_phone_plot,
+                                     "phoneme embedding")
                     utils.plot_embed(self.sr_embed_vowel_store, sr_embed_vowel_file, sr_embed_vowel_plot,
                                      "vowel embedding")
                 except Exception as e:
                     print(f"The error {e} occurred in run {self.run_num}. Continue running ...")
-                    self.evaluate_one_batch(test_dataloader, "embedding")
+                    self.evaluate_one_batch(test_dataloader, eval_epoch=eval_epoch, eval_type="embedding")
                 print(f"Run {self.run_num} embedding plots and files are saved for investigation")
 
     # a function that transforms one pair of ur, sr, and pred_sr tensor to list and string
@@ -377,9 +386,9 @@ class TextRun:
 
         pred_lines = {
             'ur': [], 'sr': [], 'pred_sr': [],
-            #'o1_error': [], 'o2_error': [], 'c1_error': [], 'c2_error': [],
-            #'sr_o1': [], 'sr_o2': [], 'pred_sr_o1': [], 'pred_sr_o2': [],
-            #'sr_c1': [], 'sr_c2': [], 'pred_sr_c1': [], 'pred_sr_c2': [],
+            'o1_error': [], 'o2_error': [], 'c1_error': [], 'c2_error': [],
+            'sr_o1': [], 'sr_o2': [], 'pred_sr_o1': [], 'pred_sr_o2': [],
+            'sr_c1': [], 'sr_c2': [], 'pred_sr_c1': [], 'pred_sr_c2': [],
             'v1_error': [], 'v2_error': [], 'ur_v1': [], 'ur_v2': [],
             'sr_v1': [], 'sr_v2': [], 'pred_sr_v1': [], 'pred_sr_v2': []
         }
@@ -419,10 +428,10 @@ class TextRun:
 
             # compare the actual and predicted target surface form
             # assume no error and change error from 0 to 1
-            #o1_error = 0
-            #o2_error = 0
-            #c1_error = 0
-            #c2_error = 0
+            o1_error = 0
+            o2_error = 0
+            c1_error = 0
+            c2_error = 0
             v1_error = 0
             v2_error = 0
 
@@ -444,17 +453,17 @@ class TextRun:
             pred_sr_c2 = pred_sr_sylls[1][2]
 
             # skip this recording if the prediction has wrong consonant
-            if sr_o1 != pred_sr_o1 or sr_o2 != pred_sr_o2 or \
-                    sr_c1 != pred_sr_c1 or sr_c2 != pred_sr_c2:
-                continue
-            #if sr_o1 != pred_sr_o1:
-                #o1_error = 1
-            #if sr_o2 != pred_sr_o2:
-                #o2_error = 1
-            #if sr_c1 != pred_sr_c1:
-                #c1_error = 1
-            #if sr_c2 != pred_sr_c2:
-                #c2_error = 1
+            #if sr_o1 != pred_sr_o1 or sr_o2 != pred_sr_o2 or \
+                    #sr_c1 != pred_sr_c1 or sr_c2 != pred_sr_c2:
+                #continue
+            if sr_o1 != pred_sr_o1:
+                o1_error = 1
+            if sr_o2 != pred_sr_o2:
+                o2_error = 1
+            if sr_c1 != pred_sr_c1:
+                c1_error = 1
+            if sr_c2 != pred_sr_c2:
+                c2_error = 1
             if sr_v1 != pred_sr_v1:
                 v1_error = 1
             if sr_v2 != pred_sr_v2:
@@ -463,18 +472,18 @@ class TextRun:
             pred_lines['ur'].append(ur_string)
             pred_lines['sr'].append(sr_string)
             pred_lines['pred_sr'].append(pred_sr_string)
-            #pred_lines['o1_error'].append(o1_error)
-            #pred_lines['o2_error'].append(o2_error)
-            #pred_lines['c1_error'].append(c1_error)
-            #pred_lines['c2_error'].append(c2_error)
-            #pred_lines['sr_o1'].append(sr_o1)
-            #pred_lines['sr_o2'].append(sr_o2)
-            #pred_lines['pred_sr_o1'].append(pred_sr_o1)
-            #pred_lines['pred_sr_o2'].append(pred_sr_o2)
-            #pred_lines['sr_c1'].append(sr_c1)
-            #pred_lines['sr_c2'].append(sr_c2)
-            #pred_lines['pred_sr_c1'].append(pred_sr_c1)
-            #pred_lines['pred_sr_c2'].append(pred_sr_c2)
+            pred_lines['o1_error'].append(o1_error)
+            pred_lines['o2_error'].append(o2_error)
+            pred_lines['c1_error'].append(c1_error)
+            pred_lines['c2_error'].append(c2_error)
+            pred_lines['sr_o1'].append(sr_o1)
+            pred_lines['sr_o2'].append(sr_o2)
+            pred_lines['pred_sr_o1'].append(pred_sr_o1)
+            pred_lines['pred_sr_o2'].append(pred_sr_o2)
+            pred_lines['sr_c1'].append(sr_c1)
+            pred_lines['sr_c2'].append(sr_c2)
+            pred_lines['pred_sr_c1'].append(pred_sr_c1)
+            pred_lines['pred_sr_c2'].append(pred_sr_c2)
             pred_lines['v1_error'].append(v1_error)
             pred_lines['v2_error'].append(v2_error)
             pred_lines['ur_v1'].append(ur_v1)
@@ -519,18 +528,18 @@ class TextRun:
         self.pred_store['ur'].extend(preds['ur'])
         self.pred_store['sr'].extend(preds['sr'])
         self.pred_store['pred_sr'].extend(preds['pred_sr'])
-        #self.pred_store['o1_error'].extend(preds['o1_error'])
-        #self.pred_store['o2_error'].extend(preds['o2_error'])
-        #self.pred_store['c1_error'].extend(preds['c1_error'])
-        #self.pred_store['c2_error'].extend(preds['c2_error'])
-        #self.pred_store['sr_o1'].extend(preds['sr_o1'])
-        #self.pred_store['sr_o2'].extend(preds['sr_o2'])
-        #self.pred_store['pred_sr_o1'].extend(preds['pred_sr_o1'])
-        #self.pred_store['pred_sr_o2'].extend(preds['pred_sr_o2'])
-        #self.pred_store['sr_c1'].extend(preds['sr_c1'])
-        #self.pred_store['sr_c2'].extend(preds['sr_c2'])
-        #self.pred_store['pred_sr_c1'].extend(preds['pred_sr_c1'])
-        #self.pred_store['pred_sr_c2'].extend(preds['pred_sr_c2'])
+        self.pred_store['o1_error'].extend(preds['o1_error'])
+        self.pred_store['o2_error'].extend(preds['o2_error'])
+        self.pred_store['c1_error'].extend(preds['c1_error'])
+        self.pred_store['c2_error'].extend(preds['c2_error'])
+        self.pred_store['sr_o1'].extend(preds['sr_o1'])
+        self.pred_store['sr_o2'].extend(preds['sr_o2'])
+        self.pred_store['pred_sr_o1'].extend(preds['pred_sr_o1'])
+        self.pred_store['pred_sr_o2'].extend(preds['pred_sr_o2'])
+        self.pred_store['sr_c1'].extend(preds['sr_c1'])
+        self.pred_store['sr_c2'].extend(preds['sr_c2'])
+        self.pred_store['pred_sr_c1'].extend(preds['pred_sr_c1'])
+        self.pred_store['pred_sr_c2'].extend(preds['pred_sr_c2'])
         self.pred_store['v1_error'].extend(preds['v1_error'])
         self.pred_store['v2_error'].extend(preds['v2_error'])
         self.pred_store['ur_v1'].extend(preds['ur_v1'])
@@ -613,20 +622,20 @@ class TextRun:
         # if the token embedding has not been recorded
         # record its embedding values
         for j, token in enumerate(ur_list):
-            #if token in self.ur_embed_phone_store and not self.ur_embed_phone_store[token]:
-                #self.ur_embed_phone_store[token] = src_token_embed
-            if token in self.ur_embed_vowel_store and not self.ur_embed_vowel_store[token]:
+            if token in self.ur_embed_phone_store and not self.ur_embed_phone_store[token]:
                 src_token_embed = src_embed[j, i, :]
                 # token_embed = [embedding_dim]
                 src_token_embed = src_token_embed.tolist()
+                self.ur_embed_phone_store[token] = src_token_embed
+            if token in self.ur_embed_vowel_store and not self.ur_embed_vowel_store[token]:
                 self.ur_embed_vowel_store[token] = src_token_embed
 
         # for individual token in the predicted sr
         for j, token in enumerate(pred_sr_list):
-            #if token in self.sr_embed_phone_store and not self.sr_embed_phone_store[token]:
-                #self.sr_embed_phone_store[token] = trg_token_embed
-            if token in self.sr_embed_vowel_store and not self.sr_embed_vowel_store[token]:
+            if token in self.sr_embed_phone_store and not self.sr_embed_phone_store[token]:
                 trg_token_embed = trg_embed[j, i, :]
                 # token_embed = [embedding_dim]
                 trg_token_embed = trg_token_embed.tolist()
+                self.sr_embed_phone_store[token] = trg_token_embed
+            if token in self.sr_embed_vowel_store and not self.sr_embed_vowel_store[token]:
                 self.sr_embed_vowel_store[token] = trg_token_embed

@@ -12,7 +12,8 @@ import hyper_params as hp
 
 # a function that loads text dataset, initializes text model
 # and completes multiple runs of training and evaluation of one condition
-def text_condition(trial_num, datatype, language, condition, n_run, n_check, device):
+def text_condition(trial_num, datatype, language, condition,
+                   n_run, n_check, check_epoch, check_type, device):
 
     print(" - Loading dataset:")
     annotations_file = os.path.join("Dataset", language + "_" + datatype + "_" + condition + ".csv")
@@ -47,7 +48,7 @@ def text_condition(trial_num, datatype, language, condition, n_run, n_check, dev
     print(" - Inspecting model outputs:")
     for check in n_check:
         rep = TextRun(seq2seq, dataset, trial_num, datatype, language, condition, check)
-        rep.evaluate_one_batch(test_dataloader, "both")
+        rep.evaluate_one_batch(test_dataloader, check_epoch, check_type)
 
 """
 # a function that loads audio dataset, initializes audio model
@@ -98,7 +99,7 @@ if __name__ == "__main__":
     print(f"Using {device} device")
 
     # defining the current trial of running
-    trial_num = "250411"
+    trial_num = "250414"
     datatype = "txt"
     if not os.path.exists(os.path.join("Results", trial_num + "_" + datatype)):
         os.mkdir(os.path.join("Results", trial_num + "_" + datatype))
@@ -107,8 +108,9 @@ if __name__ == "__main__":
     languages = ["EnglishBH"]
     conditions = ["harmony", "disharmony"]
     n_run = range(0)  # which run to complete
-    n_check = range(10)  # which run to inspect
+    n_check = range(2)  # which run to inspect
     for language in languages:
         for condition in conditions:
-            text_condition(trial_num, "txt", language, condition, n_run, n_check, device)
+            text_condition(trial_num, "txt", language, condition, n_run, n_check,
+                           check_epoch=hp.n_epochs-1, check_type="both", device=device)
             #audio_condition(trial_num, language, "aud", condition, n_run, n_check, device)
