@@ -186,8 +186,8 @@ if __name__ == "__main__":
     import utils
 
     print(" - Loading dataset:")
-    audio_dir = "Dataset/audio/English"
-    annotations_file = "Dataset/English_aud_harmony.csv"
+    audio_dir = "Dataset/audio/EnglishBH"
+    annotations_file = "Dataset/EnglishBH_aud_harmony.csv"
     annotations = pd.read_csv(annotations_file)
     print(f"Dataset size: {len(annotations)}")
     print(f"Sample data token: {annotations.iloc[0]}")

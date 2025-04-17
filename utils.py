@@ -2,7 +2,6 @@ import torch
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from jmespath.ast import projection
 from matplotlib import colormaps
 from sklearn.decomposition import PCA
 from nooverlap import push_text_free
