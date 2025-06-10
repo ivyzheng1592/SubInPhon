@@ -1,6 +1,5 @@
 # created 2025/01/15
 # A script to load custom text dataset with self-defined class inherited from torch Dataset
-
 import re
 import pandas as pd
 import torch
@@ -11,8 +10,8 @@ from torch.nn.utils.rnn import pad_sequence
 class Alphabet:
     def __init__(self, name, special_tokens):
         self.name = name
-        self.idx2char = {} # {index: char}
-        self.char2idx = {}  # {char: index}
+        self.idx2char = {} # {index: character}
+        self.char2idx = {}  # {character: index}
         self.char2count = {}  # {char: number of occurrences}
         self.specials = special_tokens
 
@@ -77,12 +76,12 @@ class TextDataset(Dataset):
         self.pad_idx = self.specials.index("<PAD>")
 
         # build ur alphabet
-        self.ur_name = re.split('[/_.]', annotations_file)[2] + "_ur"
+        self.ur_name = re.split('[/_.]', annotations_file)[1] + "_ur"
         self.ur_alphabet = Alphabet(self.ur_name, self.specials)
         self.ur_alphabet.build_alphabet(self.ur)
 
         # build sr alphabet
-        self.sr_name = re.split('[/_.]', annotations_file)[2] + "_sr"
+        self.sr_name = re.split('[/_.]', annotations_file)[1] + "_sr"
         self.sr_alphabet = Alphabet(self.sr_name, self.specials)
         self.sr_alphabet.build_alphabet(self.sr)
 
@@ -130,7 +129,6 @@ class TextDataset(Dataset):
 
 if __name__ == "__main__":
     import hyper_params as hp
-    import utils
 
     print(" - Loading dataset:")
     annotations_file = "Dataset/EnglishBH_txt_harmony.csv"

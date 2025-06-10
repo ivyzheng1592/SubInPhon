@@ -11,7 +11,7 @@ import torchaudio
 import torchaudio.transforms as T
 from torch.utils.data import Dataset, DataLoader, random_split
 from torch.nn.utils.rnn import pad_sequence
-from text_dataset_loader import Alphabet
+from text_dataset import Alphabet
 
 
 class AudioDataset(Dataset):

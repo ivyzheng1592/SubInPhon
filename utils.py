@@ -12,8 +12,8 @@ def save_to_file(data_store, save_file):
     # convert dictionary to pandas dataframe
     data_df = pd.DataFrame(data_store)
 
-    # write to csv file
-    data_df.to_csv(save_file, index=False)
+    # append to csv file
+    data_df.to_csv(save_file, index=False, mode='a')
 
 def plot_waveform(waveform, sample_rate, title="Waveform"):
     waveform = waveform.cpu().numpy()  # [n_channels, n_samples]
@@ -44,9 +44,9 @@ def plot_spectrogram(spectrogram1, spectrogram2, spectrogram1_name, spectrogram2
     fig.suptitle(title)
     plt.show()
 
-def plot_acc(acc_file, acc_plot):
+def plot_acc(acc_store, acc_plot):
     # read in accuracy data and separate into training and validation
-    acc_data = pd.read_csv(acc_file)
+    acc_data = pd.DataFrame(acc_store)
     train_data = acc_data[acc_data["record_type"] == "train"]
     valid_data = acc_data[acc_data["record_type"] == "valid"]
 

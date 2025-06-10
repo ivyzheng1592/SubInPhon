@@ -8,9 +8,9 @@ import random
 import hyper_params as hp
 
 
-class Encoder(nn.Module):
+class TextEncoder(nn.Module):
     def __init__(self, input_dim, embedding_dim, hidden_dim, n_layers, dropout):
-        super(Encoder, self).__init__()
+        super(TextEncoder, self).__init__()
 
         self.input_dim = input_dim
         self.embedding_dim = embedding_dim
@@ -77,9 +77,9 @@ class BahdanauAttention(nn.Module):
         return weight
 
 
-class Decoder(nn.Module):
+class TextDecoder(nn.Module):
     def __init__(self, input_dim, embedding_dim, hidden_dim, output_dim, n_layers, dropout, attention):
-        super(Decoder, self).__init__()
+        super(TextDecoder, self).__init__()
 
         self.input_dim = input_dim
         self.embedding_dim = embedding_dim
@@ -157,10 +157,10 @@ class TextSeq2Seq(nn.Module):
 
         # model components
         self.attention = BahdanauAttention(hidden_dim)
-        self.encoder = Encoder(encoder_input_dim, encoder_embedding_dim, hidden_dim,
-                               n_layers, encoder_dropout).to(self.device)
-        self.decoder = Decoder(decoder_input_dim, decoder_embedding_dim, hidden_dim, output_dim,
-                               n_layers, decoder_dropout, self.attention).to(self.device)
+        self.encoder = TextEncoder(encoder_input_dim, encoder_embedding_dim, hidden_dim,
+                                   n_layers, encoder_dropout).to(self.device)
+        self.decoder = TextDecoder(decoder_input_dim, decoder_embedding_dim, hidden_dim, output_dim,
+                                   n_layers, decoder_dropout, self.attention).to(self.device)
 
     def forward(self, src, trg, teacher_forcing_ratio=0.5):
         # src = [src_len, batch_size]
@@ -228,7 +228,15 @@ if __name__ == "__main__":
     decoder_input_dim = 30
     output_dim = 30
 
-    seq2seq = TextSeq2Seq(encoder_input_dim, decoder_input_dim, hp.encoder_embedding_dim, hp.decoder_embedding_dim,
-                          hp.n_layers, hp.hidden_dim, output_dim, hp.encoder_dropout, hp.decoder_dropout, device='cpu').to('cpu')
+    seq2seq = TextSeq2Seq(encoder_input_dim, decoder_input_dim,
+                          hp.encoder_embedding_dim, hp.decoder_embedding_dim,
+                          hp.n_layers, hp.hidden_dim, output_dim,
+                          hp.encoder_dropout, hp.decoder_dropout, device='cpu').to('cpu')
 
-    torchinfo.summary(seq2seq, input_size = [(8, 32), (8, 32)], dtypes=[torch.long, torch.long], device='cpu')
+    # inspect model structure
+    torchinfo.summary(seq2seq, input_size = [(8, 32), (8, 32)], dtypes=[torch.long, torch.long],
+                      device='cpu')
+
+    # inspect model parameters
+    for name, param in seq2seq.named_parameters():
+        print(name, param.data.shape)
