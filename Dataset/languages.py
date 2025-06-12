@@ -2,7 +2,7 @@
 # instances of languages together with their phoneme inventory and syllable structure
 
 
-from language_generator import *
+from Dataset.language_generator import *
 
 
 # Language: English
@@ -26,6 +26,9 @@ syll_struct_ae = ["V-CV", "V-CVC", "CV-CV", "CV-CVC",
 EnglishBH_txt = BacknessHarmony(onset_ae, coda_ae, vowel_front_ae_txt, vowel_back_ae_txt,
                                 syll_struct_ae, "EnglishBH_txt")
 #EnglishBH_txt.generate_stimuli()
+EnglishBH_fea = BacknessHarmony(onset_ae, coda_ae, vowel_front_ae_txt, vowel_back_ae_txt,
+                                syll_struct_ae, "EnglishBH_fea")
+#EnglishBH_fea.generate_stimuli()
 EnglishBH_aud = BacknessHarmony(onset_ae, coda_ae, vowel_front_ae_aud, vowel_back_ae_aud,
                                 syll_struct_ae, "EnglishBH_aud")
 #EnglishBH_aud.generate_stimuli()
@@ -51,6 +54,7 @@ CantoneseBH = BacknessHarmony(onset_c, coda_c, vowel_front_c, vowel_back_c, syll
 
 languages = {
     "EnglishBH_txt": EnglishBH_txt,
+    "EnglishBH_fea": EnglishBH_fea,
     "EnglishBH_aud": EnglishBH_aud,
     "CantoneseBH": CantoneseBH
 }

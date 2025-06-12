@@ -1,3 +1,4 @@
+import os
 import torch
 import numpy as np
 import pandas as pd
@@ -11,8 +12,11 @@ def save_to_file(data_store, save_file):
     # convert dictionary to pandas dataframe
     data_df = pd.DataFrame(data_store)
 
-    # append to csv file
-    data_df.to_csv(save_file, index=False, mode='a')
+    # write to new csv file or append to existing file
+    if os.path.exists(save_file):
+        data_df.to_csv(save_file, header=False, index=False, mode='a')
+    else:
+        data_df.to_csv(save_file, header=True, index=False, mode='w')
 
 def plot_waveform(waveform, sample_rate, title="Waveform"):
     waveform = waveform.cpu().numpy()  # [n_channels, n_samples]
@@ -24,7 +28,8 @@ def plot_waveform(waveform, sample_rate, title="Waveform"):
     axs.plot(time_axis, waveform[0], linewidth=1)
     axs.grid(visible=True)
     fig.suptitle(title)
-    plt.show()
+    plt.close()
+    #plt.show()
 
 def plot_spectrogram(spectrogram1, spectrogram2, spectrogram1_name, spectrogram2_name,
                      title="Spectrogram"):
@@ -41,7 +46,8 @@ def plot_spectrogram(spectrogram1, spectrogram2, spectrogram1_name, spectrogram2
     axs2.imshow(spectrogram2, origin='lower', aspect='auto')
     #fig.colorbar()
     fig.suptitle(title)
-    plt.show()
+    plt.close()
+    #plt.show()
 
 def plot_acc(acc_store, acc_plot):
     # read in accuracy data and separate into training and validation
@@ -60,6 +66,7 @@ def plot_acc(acc_store, acc_plot):
     ax2.set_title("Acc")
 
     plt.savefig(acc_plot)
+    plt.close()
     #plt.show()
 
 def plot_att(ur, sr, attention, att_plot):
@@ -72,9 +79,10 @@ def plot_att(ur, sr, attention, att_plot):
     ax.set_yticks(ticks=np.arange(len(sr)), labels=sr)
     fig.colorbar(im)
     plt.savefig(att_plot)
+    plt.close()
     #plt.show()
 
-def plot_embed(embed_store, embed_file, embed_plot, title="vowel embedding"):
+def plot_embed(embed_store, embed_plot, title="vowel embedding"):
     # convert dictionary to pandas dataframe
     embed_df = pd.DataFrame.from_dict(embed_store, orient='index')
 
@@ -86,7 +94,7 @@ def plot_embed(embed_store, embed_file, embed_plot, title="vowel embedding"):
     reduced_df['phone'] = embed_df.index
 
     # save PCA results to file
-    save_to_file(reduced_df, embed_file)
+    #save_to_file(reduced_df, embed_file)
 
     # decide a colormap based on whether the plot is on vowels or all phonemes
     if title == "phoneme embedding":
@@ -115,4 +123,5 @@ def plot_embed(embed_store, embed_file, embed_plot, title="vowel embedding"):
     fig.legend(ncols=legend_col)
     push_text_free(fig, ax)
     plt.savefig(embed_plot)
+    plt.close()
     #plt.show()

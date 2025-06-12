@@ -10,8 +10,11 @@ import itertools
 
 class LanguagePattern:
     def __init__(self, onset, coda, vowel_1, vowel_2, syll_struct, lang_name):
+
         self.lang_name = lang_name
-        self.syll_struct = syll_struct
+        self.syll_struct_sep = syll_struct  # syllable structure separated into stem-suffix
+        self.syll_struct_com = [struct.replace("-", "") for struct in self.syll_struct_sep]  # syllable structure combining stem and suffix
+        self.syll_struct = list(set(self.syll_struct_com))  # remove duplicates
 
         self.onset = onset
         self.coda = coda
@@ -55,7 +58,7 @@ class BacknessHarmony(LanguagePattern):
         syll_dict_2["CVC"] = [o + v + c for o, v, c in itertools.product(self.onset, vowel_close_2, self.coda)]
 
         # for each syllable structure
-        for struct in self.syll_struct:
+        for struct in self.syll_struct_sep:
             # separate stem and suffix
             stem_struct = struct.split("-")[0]
             suffix_struct = struct.split("-")[1]
@@ -100,8 +103,8 @@ class BacknessHarmony(LanguagePattern):
             print(f"Example {struct} disharmony pair: {disharmony_list[len(disharmony_list) - 1]}")
 
         print(" - Writing to file:")
-        harmony_file = self.language + "_harmony.csv"
-        disharmony_file = self.language + "_disharmony.csv"
+        harmony_file = self.lang_name + "_harmony.csv"
+        disharmony_file = self.lang_name + "_disharmony.csv"
 
         with open(harmony_file, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
@@ -127,18 +130,14 @@ class BacknessHarmony(LanguagePattern):
     # function to decompose vowel harmony stimuli with specified phoneme inventory
     def decompose_stimuli(self, word_list):
 
-        word_copy = word_list.copy()  # copy of word for token removal
-        syll1 = [None, None, None]  # C, V, C
-        syll2 = [None, None, None]  # C, V ,C
-        sylls = [syll1, syll2]
-
         # separate vowels that can occur in open/closed syllables
         vowel_open = [key for key, value in self.vowel.items() if value == "open"]
         vowel_close = [key for key, value in self.vowel.items() if value == "closed"]
 
-        # get all possible syllable structure without duplicates
-        syll_struct = [struct.replace("-", "") for struct in self.syll_struct]
-        syll_struct = list(set(syll_struct))
+        word_copy = word_list.copy()  # copy of word for token removal
+        syll1 = [None, None, None]  # C, V, C
+        syll2 = [None, None, None]  # C, V ,C
+        sylls = [syll1, syll2]
 
         # remove SOS token in word
         if word_copy and word_copy[0] == "<SOS>":
@@ -159,59 +158,57 @@ class BacknessHarmony(LanguagePattern):
                 word_struct = word_struct + "V"
             else:
                 word_struct = "False"
-        if word_struct not in syll_struct:
+        if word_struct not in self.syll_struct_com:
             syll1[0] = False
             syll2[0] = False
             return sylls
 
         # if first syllable has onset
-        if word_copy and word_copy[0] in self.onset:
+        if word_copy and (word_copy[0] in self.coda or word_copy[0] in self.onset):
             syll1[0] = word_copy[0]
-            word_copy.pop()
+            word_copy.pop(0)
 
         # if first syllable has close vowel
         if word_copy and word_copy[0] in vowel_close:
             syll1[1] = word_copy[0]
-            word_copy.pop()
+            word_copy.pop(0)
             # the following consonant should be coda
             if word_copy and word_copy[0] in self.coda:
                 syll1[2] = word_copy[0]
-                word_copy.pop()
+                word_copy.pop(0)
             elif word_copy and word_copy[0] in self.onset:
                 syll2[0] = word_copy[0]
-                word_copy.pop()
+                word_copy.pop(0)
             else:
-                raise RuntimeError("Problem with output recording.")
+                raise RuntimeError(f"Problem with output recording.{word_list}")
         # if first syllable has open vowel
         elif word_copy and word_copy[0] in vowel_open:
             syll1[1] = word_copy[0]
-            word_copy.pop()
+            word_copy.pop(0)
             # the following consonant should be onset
             if word_copy and word_copy[0] in self.onset:
                 syll2[0] = word_copy[0]
-                word_copy.pop()
+                word_copy.pop(0)
             elif word_copy and word_copy[0] in self.coda:
                 syll1[2] = word_copy[0]
-                word_copy.pop()
+                word_copy.pop(0)
             else:
-                raise RuntimeError("Problem with output recording.")
+                raise RuntimeError(f"Problem with output recording.{word_list}")
         else:
-            raise RuntimeError("Problem with output recording.")
+            raise RuntimeError(f"Problem with output recording.{word_list}")
 
         # the second syllable should have vowel
         if word_copy and (word_copy[0] in vowel_close or word_copy[0] in vowel_open):
             syll2[1] = word_copy[0]
-            word_copy.pop()
+            word_copy.pop(0)
         else:
-            raise RuntimeError("Problem with output recording.")
+            raise RuntimeError(f"Problem with output recording.{word_list}")
 
         # the following consonant should be coda
         if word_copy and (word_copy[0] in self.coda or word_copy[0] in self.onset):
             syll2[2] = word_copy[0]
-            word_copy.pop()
-        elif not word_copy:
-            pass
-        else:
-            raise RuntimeError("Problem with output recording.")
+            word_copy.pop(0)
+        elif word_copy:
+            raise RuntimeError(f"Problem with output recording.{word_list}")
 
         return sylls

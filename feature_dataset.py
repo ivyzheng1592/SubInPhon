@@ -52,7 +52,7 @@ if __name__ == "__main__":
     print(f"Feature space of SR vocab: {sr_embedding_weight.shape}")
 
     print(" - Creating dataloader:")
-    feature_dataloader = feature_dataset.get_dataloader(hp.batch_size)
+    feature_dataloader = feature_dataset.get_dataloader(feature_dataset, hp.batch_size)
     dataiter = iter(feature_dataloader)
     source, target = next(dataiter)
     print(f"Sample source: {source.shape}")

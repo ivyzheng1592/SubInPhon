@@ -115,14 +115,16 @@ class TextDataset(Dataset):
             return srcs, trgs
         return collate_fn
 
-    def get_dataloader(self, batch_size, shuffle=True):
+    def get_dataloader(self, dataset, batch_size, shuffle=True):
+
         collate_fn = self.get_collate_fn()
 
         data_loader = DataLoader(
-            dataset=self,
+            dataset=dataset,
             batch_size=batch_size,
             shuffle=shuffle,
-            collate_fn=collate_fn
+            collate_fn=collate_fn,
+            drop_last=True  # drop incomplete batch
         )
         return data_loader
 
@@ -145,7 +147,7 @@ if __name__ == "__main__":
     print(f"Sample target: {trg.shape}")
 
     print(" - Creating dataloader:")
-    text_dataloader = text_dataset.get_dataloader(hp.batch_size)
+    text_dataloader = text_dataset.get_dataloader(text_dataset, hp.batch_size)
     dataiter = iter(text_dataloader)
     source, target = next(dataiter)
     print(f"Sample source: {source.shape}")

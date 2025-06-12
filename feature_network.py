@@ -5,33 +5,35 @@ from text_network import *
 
 
 class FeatureEncoder(TextEncoder):
-    def __init__(self, input_dim, embedding_dim, hidden_dim, embedding_weight, n_layers, dropout):
+    def __init__(self, input_dim, embedding_dim, hidden_dim, embedding_weight, n_layers, dropout, freeze):
         super().__init__(input_dim, embedding_dim, hidden_dim, n_layers, dropout)
-        self.embedding = self.embedding.from_pretrained(embedding_weight, freeze=True)  # parse pretrained weight to embedding
+        self.embedding = self.embedding.from_pretrained(embedding_weight, freeze=freeze)  # parse pretrained weight to embedding
 
 
 class FeatureDecoder(TextDecoder):
     def __init__(self, input_dim, embedding_dim, hidden_dim, output_dim, embedding_weight,
-                 n_layers, dropout, attention):
+                 n_layers, dropout, freeze, attention):
         super().__init__(input_dim, embedding_dim, hidden_dim, output_dim,
                          n_layers, dropout, attention)
-        self.embedding = self.embedding.from_pretrained(embedding_weight, freeze=True)
+        self.embedding = self.embedding.from_pretrained(embedding_weight, freeze=freeze)
 
 
 class FeatureSeq2Seq(TextSeq2Seq):
     def __init__(self, encoder_input_dim, decoder_input_dim, encoder_embedding_dim, decoder_embedding_dim,
                  encoder_embedding_weight, decoder_embedding_weight, n_layers, hidden_dim, output_dim,
-                 encoder_dropout, decoder_dropout, device='cuda'):
+                 encoder_dropout, decoder_dropout, freeze, device='cuda'):
         super().__init__(encoder_input_dim, decoder_input_dim, encoder_embedding_dim, decoder_embedding_dim,
                          n_layers, hidden_dim, output_dim, encoder_dropout, decoder_dropout, device)
         self.encoder_embedding_weight = encoder_embedding_weight
         self.decoder_embedding_weight = decoder_embedding_weight
+        self.freeze = freeze
 
         # model components
         self.encoder = FeatureEncoder(encoder_input_dim, encoder_embedding_dim, hidden_dim,
-                                      encoder_embedding_weight, n_layers, encoder_dropout).to(self.device)
+                                      encoder_embedding_weight, n_layers, encoder_dropout, freeze).to(self.device)
         self.decoder = FeatureDecoder(decoder_input_dim, decoder_embedding_dim, hidden_dim, output_dim,
-                                      decoder_embedding_weight, n_layers, decoder_dropout, self.attention).to(self.device)
+                                      decoder_embedding_weight, n_layers, decoder_dropout, freeze,
+                                      self.attention).to(self.device)
 
 
 if __name__ == "__main__":
@@ -54,7 +56,8 @@ if __name__ == "__main__":
                              hp.encoder_embedding_dim, hp.decoder_embedding_dim,
                              encoder_embedding_weight, decoder_embedding_weight,
                              hp.n_layers, hp.hidden_dim, output_dim,
-                             hp.encoder_dropout, hp.decoder_dropout, device='cpu').to('cpu')
+                             hp.encoder_dropout, hp.decoder_dropout,
+                             freeze=False, device='cpu').to('cpu')
 
     # inspect model structure
     torchinfo.summary(seq2seq, input_size=[(8, 32), (8, 32)], dtypes=[torch.long, torch.long],
@@ -62,4 +65,4 @@ if __name__ == "__main__":
 
     # inspect model parameters
     for name, param in seq2seq.named_parameters():
-        print(name, param.data.shape)
+        print(name, param.data)
