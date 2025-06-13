@@ -8,7 +8,6 @@ from text_run import TextRun
 from text_record import TextRecorder
 from feature_dataset import FeatureDataset
 from feature_network import FeatureSeq2Seq
-from feature_run import FeatureRun
 from audio_dataset_loader import AudioDataset
 from audio_network_1 import AudioSeq2Seq
 from audio_run import AudioRun
@@ -18,6 +17,8 @@ import hyper_params as hp
 # a function that loads text dataset, initializes text model for each run of each condition
 def text(trial_num, lang_name, conditions, runs, check_epoch, check_type, device):
 
+    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name), exist_ok=True)
+
     for condition in conditions:
         print(" - Instantiating language pattern:")
         language = languages[lang_name]
@@ -26,32 +27,42 @@ def text(trial_num, lang_name, conditions, runs, check_epoch, check_type, device
         annotations_file = os.path.join("Dataset", lang_name + "_" + condition + ".csv")
         dataset = TextDataset(annotations_file, hp.special_tokens, device=device)
 
-        print(" - Initializing model:")
-        # model hyperparameters
-        encoder_input_dim = len(dataset.ur_alphabet)
-        decoder_input_dim = len(dataset.sr_alphabet)
-        output_dim = len(dataset.sr_alphabet)
-
-        # model initialization
-        seq2seq = TextSeq2Seq(encoder_input_dim, decoder_input_dim,
-                              hp.encoder_embedding_dim, hp.decoder_embedding_dim,
-                              hp.n_layers, hp.hidden_dim, output_dim,
-                              hp.encoder_dropout, hp.decoder_dropout, device=device)
-
         for run_num in runs:
+
+            print(" - Splitting dataset:")
+            train_data, valid_data, test_data = dataset.split_dataset(hp.data_split_ratio)
+
+            print(" - Creating dataloader:")
+            train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
+            valid_dataloader = dataset.get_dataloader(valid_data, hp.batch_size)
+            test_dataloader = dataset.get_dataloader(test_data, hp.batch_size)
+
+            print(" - Initializing model:")
+            # model hyperparameters
+            encoder_input_dim = len(dataset.ur_alphabet)
+            decoder_input_dim = len(dataset.sr_alphabet)
+            output_dim = len(dataset.sr_alphabet)
+
+            # model initialization
+            seq2seq = TextSeq2Seq(encoder_input_dim, decoder_input_dim,
+                                  hp.encoder_embedding_dim, hp.decoder_embedding_dim,
+                                  hp.n_layers, hp.hidden_dim, output_dim,
+                                  hp.encoder_dropout, hp.decoder_dropout, device=device)
+
             print(" - Preparing data recorder:")
             recorder = TextRecorder(dataset, trial_num, language, condition, run_num)
 
             print(" - Training and evaluating model:")
             rep = TextRun(dataset, seq2seq, recorder)
-            rep.initialize_weight()
-            rep.train()
-            rep.test()
-            rep.evaluate_one_batch(check_epoch, check_type)
+            #rep.train(train_dataloader, valid_dataloader)
+            #rep.test(test_dataloader)
+            rep.evaluate_one_batch(test_dataloader, check_epoch, check_type)
 
 
 # a function that loads text dataset, initializes text model for each run of each condition
 def feature(trial_num, lang_name, conditions, runs, check_epoch, check_type, freeze, device):
+
+    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name), exist_ok=True)
 
     for condition in conditions:
         print(" - Instantiating language pattern:")
@@ -62,31 +73,39 @@ def feature(trial_num, lang_name, conditions, runs, check_epoch, check_type, fre
         feature_file = os.path.join("Dataset", lang_name.split("_")[0] + "_features.xlsx")
         dataset = FeatureDataset(annotations_file, feature_file, hp.special_tokens, device=device)
 
-        print(" - Initializing model:")
-        # model hyperparameters
-        encoder_input_dim = len(dataset.ur_alphabet)
-        decoder_input_dim = len(dataset.sr_alphabet)
-        output_dim = len(dataset.sr_alphabet)
-        encoder_embedding_weight = dataset.ur_embedding
-        decoder_embedding_weight = dataset.sr_embedding
-
-        # model initialization
-        seq2seq = FeatureSeq2Seq(encoder_input_dim, decoder_input_dim,
-                                 hp.encoder_embedding_dim, hp.decoder_embedding_dim,
-                                 encoder_embedding_weight, decoder_embedding_weight,
-                                 hp.n_layers, hp.hidden_dim, output_dim,
-                                 hp.encoder_dropout, hp.decoder_dropout, freeze=freeze, device=device)
-
         for run_num in runs:
+            print(" - Splitting dataset:")
+            train_data, valid_data, test_data = dataset.split_dataset(hp.data_split_ratio)
+
+            print(" - Creating dataloader:")
+            train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
+            valid_dataloader = dataset.get_dataloader(valid_data, hp.batch_size)
+            test_dataloader = dataset.get_dataloader(test_data, hp.batch_size)
+
+            print(" - Initializing model:")
+            # model hyperparameters
+            encoder_input_dim = len(dataset.ur_alphabet)
+            decoder_input_dim = len(dataset.sr_alphabet)
+            output_dim = len(dataset.sr_alphabet)
+            encoder_embedding_weight = dataset.ur_embedding
+            decoder_embedding_weight = dataset.sr_embedding
+
+            # model initialization
+            seq2seq = FeatureSeq2Seq(encoder_input_dim, decoder_input_dim,
+                                     hp.encoder_embedding_dim, hp.decoder_embedding_dim,
+                                     encoder_embedding_weight, decoder_embedding_weight,
+                                     hp.n_layers, hp.hidden_dim, output_dim,
+                                     hp.encoder_dropout, hp.decoder_dropout,
+                                     freeze=freeze, device=device)
+
             print(" - Preparing data recorder:")
             recorder = TextRecorder(dataset, trial_num, language, condition, run_num)
 
             print(" - Training and evaluating model:")
-            rep = FeatureRun(dataset, seq2seq, recorder)
-            rep.initialize_weight()
-            rep.train()
-            rep.test()
-            rep.evaluate_one_batch(check_epoch, check_type)
+            rep = TextRun(dataset, seq2seq, recorder)
+            rep.train(train_dataloader, valid_dataloader)
+            rep.test(test_dataloader)
+            rep.evaluate_one_batch(test_dataloader, check_epoch, check_type)
 
 
 """
@@ -138,18 +157,24 @@ if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using {device} device")
 
-    trial_num = "2506121850"  # time stamp
+    trial_num = "250612"  # time stamp
     lang_name = "EnglishBH_txt"
     conditions = ["harmony", "disharmony"]
-    runs = range(2)
-    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name), exist_ok=True)
-    text(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs-1, check_type="both",
+    runs = range(1)
+    text(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs-1, check_type="embedding",
          device=device)
-
-    trial_num = "250612_freeze_no_dropout"  # time stamp
+"""
+    trial_num = "250612_unfreeze"  # time stamp
     lang_name = "EnglishBH_fea"
     conditions = ["harmony", "disharmony"]
-    runs = range(0)
-    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name), exist_ok=True)
+    runs = range(5)
     feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, check_type="both",
-            freeze=True, device=device)
+            freeze=False, device=device)
+
+    trial_num = "250612_unfreeze"  # time stamp
+    lang_name = "EnglishBH_fea"
+    conditions = ["harmony", "disharmony"]
+    runs = range(5)
+    feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, check_type="both",
+            freeze=False, device=device)
+"""
