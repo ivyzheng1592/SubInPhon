@@ -217,20 +217,20 @@ class TextRun:
 
             if eval_type != "attention":
 
-                # check if some phoneme embedding is missing
+                # if some phoneme embedding is missing, redo evaluate embedding
                 if any(not lst for lst in self.recorder.ur_embed_phone_store.values()) \
-                        or any(not lst for lst in self.recorder.ur_embed_phone_store.values()) \
-                        or any(not lst for lst in self.recorder.ur_embed_phone_store.values()) \
-                        or any(not lst for lst in self.recorder.ur_embed_phone_store.values()):
+                        or any(not lst for lst in self.recorder.ur_embed_vowel_store.values()) \
+                        or any(not lst for lst in self.recorder.sr_embed_phone_store.values()) \
+                        or any(not lst for lst in self.recorder.sr_embed_vowel_store.values()):
                     # clear embedding recording
-                    for lst in self.recorder.ur_embed_phone_store.values():
-                        lst.clear()
-                    for lst in self.recorder.ur_embed_vowel_store.values():
-                        lst.clear()
-                    for lst in self.recorder.sr_embed_phone_store.values():
-                        lst.clear()
-                    for lst in self.recorder.sr_embed_vowel_store.values():
-                        lst.clear()
+                    for key in self.recorder.ur_embed_phone_store:
+                        self.recorder.ur_embed_phone_store[key].clear()
+                    for key in self.recorder.ur_embed_vowel_store:
+                        self.recorder.ur_embed_vowel_store[key].clear()
+                    for key in self.recorder.sr_embed_phone_store:
+                        self.recorder.sr_embed_phone_store[key].clear()
+                    for key in self.recorder.sr_embed_vowel_store:
+                        self.recorder.sr_embed_vowel_store[key].clear()
                     # redo check embedding
                     self.evaluate_one_batch(test_dataloader, eval_epoch=eval_epoch, eval_type="embedding")
 
