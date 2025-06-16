@@ -30,10 +30,10 @@ class TextRecorder:
             'trial_num': [], 'language': [], 'condition': [],
             'run_num': [], 'epoch': [], 'record_type': [],
             'ur': [], 'sr': [], 'pred_sr': [],
-            'o1_error': [], 'o2_error': [],
-            'sr_o1': [], 'sr_o2': [], 'pred_sr_o1': [], 'pred_sr_o2': [],
-            'c1_error': [], 'c2_error': [],
-            'sr_c1': [], 'sr_c2': [], 'pred_sr_c1': [], 'pred_sr_c2': [],
+            #'o1_error': [], 'o2_error': [],
+            #'sr_o1': [], 'sr_o2': [], 'pred_sr_o1': [], 'pred_sr_o2': [],
+            #'c1_error': [], 'c2_error': [],
+            #'sr_c1': [], 'sr_c2': [], 'pred_sr_c1': [], 'pred_sr_c2': [],
             'v1_error': [], 'v2_error': [], 'ur_v1': [], 'ur_v2': [],
             'sr_v1': [], 'sr_v2': [], 'pred_sr_v1': [], 'pred_sr_v2': []
         }
@@ -86,9 +86,9 @@ class TextRecorder:
     # a function that converts one pair of ur, sr, and pred_sr tensor to list
     def tensor2list(self, ur, sr, pred_sr):
         # convert tensor to vector
-        ur_vector = [int(x) for x in ur.tolist()]
-        sr_vector = [int(x) for x in sr.tolist()]
-        pred_sr_vector = [int(x) for x in pred_sr.tolist()]
+        ur_vector = ur.cpu().numpy()
+        sr_vector = sr.cpu().numpy()
+        pred_sr_vector = pred_sr.cpu().numpy()
 
         # convert vector to word list and string
         ur_list, _ = self.dataset.ur_alphabet.vec2word(ur_vector)
@@ -100,9 +100,9 @@ class TextRecorder:
     # a function that converts one pair of ur, sr, and pred_sr tensor to string
     def tensor2string(self, ur, sr, pred_sr):
         # convert tensor to vector
-        ur_vector = [int(x) for x in ur.tolist()]
-        sr_vector = [int(x) for x in sr.tolist()]
-        pred_sr_vector = [int(x) for x in pred_sr.tolist()]
+        ur_vector = ur.cpu().numpy()
+        sr_vector = sr.cpu().numpy()
+        pred_sr_vector = pred_sr.cpu().numpy()
 
         # convert vector to word list and string
         _, ur_string = self.dataset.ur_alphabet.vec2word(ur_vector)
@@ -166,10 +166,10 @@ class TextRecorder:
 
             # compare the actual and predicted target surface form
             # assume no error and change error from 0 to 1
-            o1_error = 0
-            o2_error = 0
-            c1_error = 0
-            c2_error = 0
+            #o1_error = 0
+            #o2_error = 0
+            #c1_error = 0
+            #c2_error = 0
             v1_error = 0
             v2_error = 0
 
@@ -191,17 +191,17 @@ class TextRecorder:
             pred_sr_c2 = pred_sr_sylls[1][2]
 
             # skip this recording if the prediction has wrong consonant
-            #if sr_o1 != pred_sr_o1 or sr_o2 != pred_sr_o2 or \
-                #sr_c1 != pred_sr_c1 or sr_c2 != pred_sr_c2:
-                #continue
-            if sr_o1 != pred_sr_o1:
-                o1_error = 1
-            if sr_o2 != pred_sr_o2:
-                o2_error = 1
-            if sr_c1 != pred_sr_c1:
-                c1_error = 1
-            if sr_c2 != pred_sr_c2:
-                c2_error = 1
+            if sr_o1 != pred_sr_o1 or sr_o2 != pred_sr_o2 or \
+                sr_c1 != pred_sr_c1 or sr_c2 != pred_sr_c2:
+                continue
+            #if sr_o1 != pred_sr_o1:
+                #o1_error = 1
+            #if sr_o2 != pred_sr_o2:
+                #o2_error = 1
+            #if sr_c1 != pred_sr_c1:
+                #c1_error = 1
+            #if sr_c2 != pred_sr_c2:
+                #c2_error = 1
             if sr_v1 != pred_sr_v1:
                 v1_error = 1
             if sr_v2 != pred_sr_v2:
@@ -218,18 +218,18 @@ class TextRecorder:
             self.pred_store['sr'].append(sr_string)
             self.pred_store['pred_sr'].append(pred_sr_string)
 
-            self.pred_store['o1_error'].append(o1_error)
-            self.pred_store['o2_error'].append(o2_error)
-            self.pred_store['sr_o1'].append(sr_o1)
-            self.pred_store['sr_o2'].append(sr_o2)
-            self.pred_store['pred_sr_o1'].append(pred_sr_o1)
-            self.pred_store['pred_sr_o2'].append(pred_sr_o2)
-            self.pred_store['c1_error'].append(c1_error)
-            self.pred_store['c2_error'].append(c2_error)
-            self.pred_store['sr_c1'].append(sr_c1)
-            self.pred_store['sr_c2'].append(sr_c2)
-            self.pred_store['pred_sr_c1'].append(pred_sr_c1)
-            self.pred_store['pred_sr_c2'].append(pred_sr_c2)
+            #self.pred_store['o1_error'].append(o1_error)
+            #self.pred_store['o2_error'].append(o2_error)
+            #self.pred_store['sr_o1'].append(sr_o1)
+            #self.pred_store['sr_o2'].append(sr_o2)
+            #self.pred_store['pred_sr_o1'].append(pred_sr_o1)
+            #self.pred_store['pred_sr_o2'].append(pred_sr_o2)
+            #self.pred_store['c1_error'].append(c1_error)
+            #self.pred_store['c2_error'].append(c2_error)
+            #self.pred_store['sr_c1'].append(sr_c1)
+            #self.pred_store['sr_c2'].append(sr_c2)
+            #self.pred_store['pred_sr_c1'].append(pred_sr_c1)
+            #self.pred_store['pred_sr_c2'].append(pred_sr_c2)
             self.pred_store['v1_error'].append(v1_error)
             self.pred_store['v2_error'].append(v2_error)
             self.pred_store['ur_v1'].append(ur_v1)
@@ -242,7 +242,7 @@ class TextRecorder:
         return batch_correct
 
     # a function that records and plots attention from each predicted sr to ur in a batch
-    # the function is called in evaluate one batch
+    # the function is called in evaluate attention
     def record_att(self, i, pred_sr_sylls, word_att, ur_string, pred_sr_string):
 
         # get the largest attention value for individual token in the predicted sr
@@ -309,27 +309,25 @@ class TextRecorder:
         self.att_store['ur'].append(ur_string)
         self.att_store['pred_sr'].append(pred_sr_string)
 
-    # a function that records the embedding of each ur and sr in a batch
-    # the function is called in evaluate one batch
-    def record_embed(self, i, ur_list, pred_sr_list, src_embed, trg_embed):
-        # for individual token in the ur
-        # if the token embedding has not been recorded
-        # record its embedding values
-        for j, token in enumerate(ur_list):
-            src_token_embed = src_embed[j, i, :]
-            # token_embed = [embedding_dim]
-            src_token_embed = src_token_embed.tolist()
-            if token in self.ur_embed_phone_store and not self.ur_embed_phone_store[token]:
-                self.ur_embed_phone_store[token] = src_token_embed
-            if token in self.ur_embed_vowel_store and not self.ur_embed_vowel_store[token]:
-                self.ur_embed_vowel_store[token] = src_token_embed
+    # a function that records source and target embedding
+    # the function is called in evaluate embedding
+    def record_embed(self, ur_embed, sr_embed):
+        ur_embed = ur_embed.cpu().numpy()
+        sr_embed = sr_embed.cpu().numpy()
+        # ur_embed = [input_dim, embedding_dim]
+        # sr_embed = [input_dim, embedding_dim]
 
-        # for individual token in the predicted sr
-        for j, token in enumerate(pred_sr_list):
-            trg_token_embed = trg_embed[j, i, :]
-            # token_embed = [embedding_dim]
-            trg_token_embed = trg_token_embed.tolist()
-            if token in self.sr_embed_phone_store and not self.sr_embed_phone_store[token]:
-                self.sr_embed_phone_store[token] = trg_token_embed
-            if token in self.sr_embed_vowel_store and not self.sr_embed_vowel_store[token]:
-                self.sr_embed_vowel_store[token] = trg_token_embed
+        # for individual embedding in ur_embed and sr_embed
+        input_dim = ur_embed.shape[0]
+        for i in range(input_dim):
+            ur_char = self.dataset.ur_alphabet.idx2char[i]
+            sr_char = self.dataset.sr_alphabet.idx2char[i]
+
+            if ur_char in self.ur_embed_phone_store:
+                self.ur_embed_phone_store[ur_char] = ur_embed[i]
+            if ur_char in self.ur_embed_vowel_store:
+                self.ur_embed_vowel_store[ur_char] = ur_embed[i]
+            if sr_char in self.sr_embed_phone_store:
+                self.sr_embed_phone_store[sr_char] = sr_embed[i]
+            if sr_char in self.sr_embed_vowel_store:
+                self.sr_embed_vowel_store[sr_char] = sr_embed[i]

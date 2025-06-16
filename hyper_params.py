@@ -49,8 +49,8 @@ encoder_embedding_dim = 11  # original=300
 decoder_embedding_dim = 11  # original=300
 hidden_dim = 4  # original=256
 n_layers = 1
-encoder_dropout = 0.1  # 0.0 is equivalent to Identity function
-decoder_dropout = 0.1  # 0.0 is equivalent to Identity function
+encoder_dropout = 0.2  # 0.0 is equivalent to Identity function
+decoder_dropout = 0.2  # 0.0 is equivalent to Identity function
 teacher_forcing_ratio = 0.5  # original=0.5
 
 # Training hyperparameters

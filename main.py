@@ -15,7 +15,7 @@ import hyper_params as hp
 
 
 # a function that loads text dataset, initializes text model for each run of each condition
-def text(trial_num, lang_name, conditions, runs, check_epoch, check_type, device):
+def text(trial_num, lang_name, conditions, runs, check_epoch, device):
 
     os.makedirs(os.path.join("Results", trial_num + "_" + lang_name), exist_ok=True)
 
@@ -56,11 +56,12 @@ def text(trial_num, lang_name, conditions, runs, check_epoch, check_type, device
             rep = TextRun(dataset, seq2seq, recorder)
             rep.train(train_dataloader, valid_dataloader)
             rep.test(test_dataloader)
-            rep.evaluate_one_batch(test_dataloader, check_epoch, check_type)
+            rep.evaluate_attention(test_dataloader, check_epoch)
+            rep.evaluate_embedding(check_epoch)
 
 
 # a function that loads text dataset, initializes text model for each run of each condition
-def feature(trial_num, lang_name, conditions, runs, check_epoch, check_type, freeze, device):
+def feature(trial_num, lang_name, conditions, runs, check_epoch, freeze, device):
 
     os.makedirs(os.path.join("Results", trial_num + "_" + lang_name), exist_ok=True)
 
@@ -105,7 +106,8 @@ def feature(trial_num, lang_name, conditions, runs, check_epoch, check_type, fre
             rep = TextRun(dataset, seq2seq, recorder)
             rep.train(train_dataloader, valid_dataloader)
             rep.test(test_dataloader)
-            rep.evaluate_one_batch(test_dataloader, check_epoch, check_type)
+            rep.evaluate_attention(test_dataloader, check_epoch)
+            rep.evaluate_embedding(check_epoch)
 
 
 """
@@ -161,19 +163,16 @@ if __name__ == "__main__":
     lang_name = "EnglishBH_txt"
     conditions = ["disharmony", "harmony"]
     runs = range(5)
-    text(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs-1, check_type="embedding",
-         device=device)
+    text(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs-1, device=device)
 
     trial_num = "2506161750_unfreeze"  # time stamp
     lang_name = "EnglishBH_fea"
-    conditions = ["harmony", "disharmony"]
+    conditions = ["disharmony", "harmony"]
     runs = range(5)
-    feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, check_type="both",
-            freeze=False, device=device)
+    feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, freeze=False, device=device)
 
     trial_num = "2506161750_freeze"  # time stamp
     lang_name = "EnglishBH_fea"
     conditions = ["disharmony", "harmony"]
     runs = range(5)
-    feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, check_type="both",
-            freeze=True, device=device)
+    feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, freeze=True, device=device)
