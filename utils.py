@@ -50,8 +50,10 @@ def plot_spectrogram(spectrogram1, spectrogram2, spectrogram1_name, spectrogram2
     #plt.show()
 
 def plot_acc(acc_store, acc_plot):
-    # read in accuracy data and separate into training and validation
+    # convert dictionary to pandas dataframe
     acc_data = pd.DataFrame(acc_store)
+
+    # separate into training and validation
     train_data = acc_data[acc_data["record_type"] == "train"]
     valid_data = acc_data[acc_data["record_type"] == "valid"]
 

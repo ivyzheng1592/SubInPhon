@@ -312,8 +312,8 @@ class TextRecorder:
     # a function that records source and target embedding
     # the function is called in evaluate embedding
     def record_embed(self, ur_embed, sr_embed):
-        ur_embed = ur_embed.cpu().numpy()
-        sr_embed = sr_embed.cpu().numpy()
+        ur_embed = ur_embed.detach().numpy()
+        sr_embed = sr_embed.detach().numpy()
         # ur_embed = [input_dim, embedding_dim]
         # sr_embed = [input_dim, embedding_dim]
 

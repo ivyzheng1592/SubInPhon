@@ -5,7 +5,6 @@
 import torch
 import torch.nn as nn
 import random
-import hyper_params as hp
 
 
 class TextEncoder(nn.Module):
@@ -215,6 +214,7 @@ class TextSeq2Seq(nn.Module):
 
 if __name__ == "__main__":
     import torchinfo
+    import hyper_params as hp
 
     print(" - Initializing model:")
     encoder_input_dim = 30
