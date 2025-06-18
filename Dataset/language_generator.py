@@ -9,25 +9,21 @@ import itertools
 
 
 class LanguagePattern:
-    def __init__(self, onset, coda, vowel_1, vowel_2, syll_struct, lang_name):
+    def __init__(self, onset, coda, vowel_open, vowel_closed, syll_struct, lang_name):
 
         self.lang_name = lang_name
-        self.syll_struct_sep = syll_struct  # syllable structure separated into stem-suffix
-        self.syll_struct_com = [struct.replace("-", "") for struct in self.syll_struct_sep]  # syllable structure combining stem and suffix
-        self.syll_struct = list(set(self.syll_struct_com))  # remove duplicates
-
+        self.syll_struct = syll_struct
         self.onset = onset
         self.coda = coda
-        self.consonant = onset + coda
-        self.vowel_1 = vowel_1
-        self.vowel_2 = vowel_2
-        self.vowel = {**vowel_1, **vowel_2}
-        self.phone = self.consonant + list(self.vowel.keys())
+        self.vowel_open = vowel_open
+        self.vowel_closed = vowel_closed
+        self.focus = {}  # different focus for different language pattern
 
 
 class BacknessHarmony(LanguagePattern):
-    def __init__(self, onset, coda, vowel_1, vowel_2, syll_struct, lang_name):
-        super().__init__(onset, coda, vowel_1, vowel_2, syll_struct, lang_name)
+    def __init__(self, onset, coda, vowel_open, vowel_closed, syll_struct, lang_name):
+        super().__init__(onset, coda, vowel_open, vowel_closed, syll_struct, lang_name)
+        self.focus = {**vowel_open, **vowel_closed}
 
     # function to generate vowel harmony stimuli with specified phoneme inventory and syllable structure
     def generate_stimuli(self):
@@ -35,30 +31,26 @@ class BacknessHarmony(LanguagePattern):
         harmony_list = []
         disharmony_list = []
 
-        # separate vowels that can occur in open/closed syllables
-        vowel_open_1 = [key for key, value in self.vowel_1.items() if value == "open"]
-        vowel_close_1 = [key for key, value in self.vowel_1.items() if value == "closed"]
-        if not vowel_close_1:
-            vowel_close_1 = vowel_open_1
-        vowel_open_2 = [key for key, value in self.vowel_2.items() if value == "open"]
-        vowel_close_2 = [key for key, value in self.vowel_2.items() if value == "closed"]
-        if not vowel_close_2:
-            vowel_close_2 = vowel_open_2
+        # separate front and back vowels
+        vowel_open_1 = [key for key, value in self.vowel_open.items() if value == "front"]
+        vowel_closed_1 = [key for key, value in self.vowel_closed.items() if value == "front"]
+        vowel_open_2 = [key for key, value in self.vowel_open.items() if value == "back"]
+        vowel_closed_2 = [key for key, value in self.vowel_closed.items() if value == "back"]
 
         # create two dictionaries with all kinds of syllables
         syll_dict_1 = {key: None for key in ["V", "VC", "CV", "CVC"]}
         syll_dict_1["V"] = [v for v in vowel_open_1]
-        syll_dict_1["VC"] = [v + c for v, c in itertools.product(vowel_close_1, self.coda)]
+        syll_dict_1["VC"] = [v + c for v, c in itertools.product(vowel_closed_1, self.coda)]
         syll_dict_1["CV"] = [o + v for o, v in itertools.product(self.onset, vowel_open_1)]
-        syll_dict_1["CVC"] = [o + v + c for o, v, c in itertools.product(self.onset, vowel_close_1, self.coda)]
+        syll_dict_1["CVC"] = [o + v + c for o, v, c in itertools.product(self.onset, vowel_closed_1, self.coda)]
         syll_dict_2 = {key: None for key in ["V", "VC", "CV", "CVC"]}
         syll_dict_2["V"] = [v for v in vowel_open_2]
-        syll_dict_2["VC"] = [v + c for v, c in itertools.product(vowel_close_2, self.coda)]
+        syll_dict_2["VC"] = [v + c for v, c in itertools.product(vowel_closed_2, self.coda)]
         syll_dict_2["CV"] = [o + v for o, v in itertools.product(self.onset, vowel_open_2)]
-        syll_dict_2["CVC"] = [o + v + c for o, v, c in itertools.product(self.onset, vowel_close_2, self.coda)]
+        syll_dict_2["CVC"] = [o + v + c for o, v, c in itertools.product(self.onset, vowel_closed_2, self.coda)]
 
         # for each syllable structure
-        for struct in self.syll_struct_sep:
+        for struct in self.syll_struct:
             # separate stem and suffix
             stem_struct = struct.split("-")[0]
             suffix_struct = struct.split("-")[1]
@@ -131,8 +123,8 @@ class BacknessHarmony(LanguagePattern):
     def decompose_stimuli(self, word_list):
 
         # separate vowels that can occur in open/closed syllables
-        vowel_open = [key for key, value in self.vowel.items() if value == "open"]
-        vowel_close = [key for key, value in self.vowel.items() if value == "closed"]
+        vowel_open = list(self.vowel_open.keys())
+        vowel_closed = list(self.vowel_closed.keys())
 
         word_copy = word_list.copy()  # copy of word for token removal
         syll1 = [None, None, None]  # C, V, C
@@ -149,16 +141,20 @@ class BacknessHarmony(LanguagePattern):
         while word_copy and word_copy[-1] == "<EOS>":
             word_copy.pop()
 
+        # get possible syllable structures combining stem and suffix
+        syll_struct = [struct.replace("-", "") for struct in self.syll_struct]
+        syll_struct = list(set(syll_struct))  # remove duplicates
+
         # check syllable structure of word
         word_struct = ""
         for char in word_copy:
             if char in self.onset or char in self.coda:
                 word_struct = word_struct + "C"
-            elif char in self.vowel_1 or char in self.vowel_2:
+            elif char in self.vowel_open or char in self.vowel_closed:
                 word_struct = word_struct + "V"
             else:
                 word_struct = "False"
-        if word_struct not in self.syll_struct_com:
+        if word_struct not in syll_struct:
             syll1[0] = False
             syll2[0] = False
             return sylls
@@ -169,7 +165,7 @@ class BacknessHarmony(LanguagePattern):
             word_copy.pop(0)
 
         # if first syllable has close vowel
-        if word_copy and word_copy[0] in vowel_close:
+        if word_copy and word_copy[0] in vowel_closed:
             syll1[1] = word_copy[0]
             word_copy.pop(0)
             # the following consonant should be coda
@@ -180,7 +176,7 @@ class BacknessHarmony(LanguagePattern):
                 syll2[0] = word_copy[0]
                 word_copy.pop(0)
             else:
-                raise RuntimeError(f"Problem with output recording.{word_list}")
+                raise RuntimeError(f"Problem with output recording {word_list}")
         # if first syllable has open vowel
         elif word_copy and word_copy[0] in vowel_open:
             syll1[1] = word_copy[0]
@@ -193,22 +189,22 @@ class BacknessHarmony(LanguagePattern):
                 syll1[2] = word_copy[0]
                 word_copy.pop(0)
             else:
-                raise RuntimeError(f"Problem with output recording.{word_list}")
+                raise RuntimeError(f"Problem with output recording {word_list}")
         else:
-            raise RuntimeError(f"Problem with output recording.{word_list}")
+            raise RuntimeError(f"Problem with output recording {word_list}")
 
         # the second syllable should have vowel
-        if word_copy and (word_copy[0] in vowel_close or word_copy[0] in vowel_open):
+        if word_copy and (word_copy[0] in vowel_closed or word_copy[0] in vowel_open):
             syll2[1] = word_copy[0]
             word_copy.pop(0)
         else:
-            raise RuntimeError(f"Problem with output recording.{word_list}")
+            raise RuntimeError(f"Problem with output recording {word_list}")
 
         # the following consonant should be coda
         if word_copy and (word_copy[0] in self.coda or word_copy[0] in self.onset):
             syll2[2] = word_copy[0]
             word_copy.pop(0)
         elif word_copy:
-            raise RuntimeError(f"Problem with output recording.{word_list}")
+            raise RuntimeError(f"Problem with output recording {word_list}")
 
         return sylls

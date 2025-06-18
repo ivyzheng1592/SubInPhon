@@ -84,46 +84,62 @@ def plot_att(ur, sr, attention, att_plot):
     plt.close()
     #plt.show()
 
-def plot_embed(embed_store, embed_plot, title="vowel embedding"):
+def plot_embed(embed_df, focus_embed_df, embed_plot):
     # convert dictionary to pandas dataframe
-    embed_df = pd.DataFrame.from_dict(embed_store, orient='index')
+    #embed_df = pd.DataFrame.from_dict(embed_store, orient='index')
+    #focus_embed_df = pd.DataFrame.from_dict(focus_embed_store, orient='index')
 
     # use PCA to project the data from embedding_dim to 3D
     pca = PCA(n_components=3)
     reduced_data = pca.fit_transform(embed_df)
     reduced_df = pd.DataFrame(data=reduced_data,
                               columns=['pc1', 'pc2', 'pc3'])
-    reduced_df['phone'] = embed_df.index
+    reduced_df['phoneme'] = embed_df.index
 
-    # save PCA results to file
-    #save_to_file(reduced_df, embed_file)
+    focus_pca = PCA(n_components=3)
+    focus_reduced_data = focus_pca.fit_transform(focus_embed_df)
+    focus_reduced_df = pd.DataFrame(data=focus_reduced_data,
+                                    columns=['pc1', 'pc2', 'pc3'])
+    focus_reduced_df['phoneme'] = focus_embed_df.index
 
-    # decide a colormap based on whether the plot is on vowels or all phonemes
-    if title == "phoneme embedding":
-        colormap = colormaps.get_cmap('tab20')
-        legend_col = 2
-    else:
-        colormap = colormaps.get_cmap('tab10')
-        legend_col = 1
-
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
+    fig = plt.figure(figsize=(9,12))
+    ax1 = fig.add_subplot(211, projection='3d')
     for i in reduced_df.index:
-        ax.scatter(xs=reduced_df.loc[i, 'pc1'],
+        ax1.scatter(xs=reduced_df.loc[i, 'pc1'],
                    ys=reduced_df.loc[i, 'pc2'],
                    zs=reduced_df.loc[i, 'pc3'],
-                   color=colormap(i%20), # if there are more than 20 categories, reuse from top
-                   label=reduced_df.loc[i, 'phone'])
-        ax.text(x=reduced_df.loc[i, 'pc1'],
-                y=reduced_df.loc[i, 'pc2'],
-                z=reduced_df.loc[i, 'pc3'],
-                s=reduced_df.loc[i, 'phone'])
-    ax.set_xlabel("pc1")
-    ax.set_ylabel("pc2")
-    ax.set_zlabel("pc3")
-    ax.set_title(title)
-    fig.legend(ncols=legend_col)
-    push_text_free(fig, ax)
+                   #color=colormaps.get_cmap('tab20')(i%20), # if there are more than 20 categories, reuse from top
+                   label=reduced_df.loc[i, 'phoneme'])
+        ax1.text(x=reduced_df.loc[i, 'pc1'],
+                 y=reduced_df.loc[i, 'pc2'],
+                 z=reduced_df.loc[i, 'pc3'],
+                 s=reduced_df.loc[i, 'phoneme'])
+    ax1.set_xlabel("pc1")
+    ax1.set_ylabel("pc2")
+    ax1.set_zlabel("pc3")
+    ax1.set_title("Phoneme embedding")
+    ax1.legend(ncols=2, loc='center left', bbox_to_anchor=(1.1, 0.5))
+    push_text_free(fig, ax1)
+
+    ax2 = fig.add_subplot(212, projection='3d')
+    for i in focus_reduced_df.index:
+        ax2.scatter(xs=focus_reduced_df.loc[i, 'pc1'],
+                    ys=focus_reduced_df.loc[i, 'pc2'],
+                    zs=focus_reduced_df.loc[i, 'pc3'],
+                    label=focus_reduced_df.loc[i, 'phoneme'])
+        ax2.text(x=focus_reduced_df.loc[i, 'pc1'],
+                 y=focus_reduced_df.loc[i, 'pc2'],
+                 z=focus_reduced_df.loc[i, 'pc3'],
+                 s=focus_reduced_df.loc[i, 'phoneme'])
+    ax2.set_xlabel("pc1")
+    ax2.set_ylabel("pc2")
+    ax2.set_zlabel("pc3")
+    ax2.set_title("Vowel embedding")
+    ax2.legend(loc='center left', bbox_to_anchor=(1.1, 0.5))
+    push_text_free(fig, ax2)
     plt.savefig(embed_plot)
     plt.close()
     #plt.show()
+
+if __name__ == "__main__":
+    pass

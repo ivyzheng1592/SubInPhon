@@ -13,10 +13,9 @@ import hyper_params as hp
 
 
 class TextRun:
-    def __init__(self, dataset, seq2seq, recorder):
+    def __init__(self, seq2seq, recorder):
 
         # condition hyperparameters
-        self.dataset = dataset
         self.seq2seq = seq2seq
         self.recorder = recorder
 
@@ -186,7 +185,6 @@ class TextRun:
                 # convert predictions
                 ur_string, _, pred_sr_string = self.recorder.tensor2string(ur, sr, pred_sr)
                 ur_list, _, pred_sr_list = self.recorder.tensor2list(ur, sr, pred_sr)
-                _, _, pred_sr_sylls = self. recorder.tensor2syll(ur, sr, pred_sr)
 
                 # retrieve attention weights
                 # notice that trg_len and src_len have changed because padding was removed
@@ -195,18 +193,13 @@ class TextRun:
                 word_att = att[:trg_len, i, :src_len]
                 # word_att = [trg_len, src_len]
 
-                # record attention type
-                self.recorder.record_att(i, pred_sr_sylls, word_att, ur_string, pred_sr_string)
                 # plot attention
                 att_plot = os.path.join(self.recorder.att_plot_dir,
                                         self.recorder.lang_name + "_" + self.recorder.condition +
                                         "_run" + str(self.recorder.run_num) + "_" +
                                         ur_string + "_" + pred_sr_string + ".png")
                 utils.plot_att(ur_list, pred_sr_list, word_att, att_plot)
-
-            # save attention recording to file
-            utils.save_to_file(self.recorder.att_store, self.recorder.att_file)
-            print(f"Run {self.recorder.run_num} attention plots and types are saved for investigation")
+            print(f"Run {self.recorder.run_num} attention plots are saved for investigation")
 
     def evaluate_embedding(self, eval_epoch=hp.n_epochs-1):
 
@@ -221,62 +214,34 @@ class TextRun:
         src_embed = self.seq2seq.encoder.embedding.weight
         trg_embed = self.seq2seq.decoder.embedding.weight
 
-        # record embedding
-        self.recorder.record_embed(src_embed, trg_embed)
+        # define focus group (different for different patterns)
+        focus_group = self.recorder.language.focus
 
-        ur_embed_phone_plot = os.path.join(self.recorder.embed_plot_dir,
-                                           self.recorder.lang_name + "_" + self.recorder.condition +
-                                           "_run" + str(self.recorder.run_num) +
-                                           "_epoch" + str(eval_epoch) +
-                                           "_ur_phoneme.png")
-        ur_embed_phone_file = os.path.join(self.recorder.embed_plot_dir,
-                                           self.recorder.lang_name + "_" + self.recorder.condition +
-                                           "_run" + str(self.recorder.run_num) +
-                                           "_epoch" + str(eval_epoch) +
-                                           "_ur_phoneme.csv")
-        ur_embed_vowel_plot = os.path.join(self.recorder.embed_plot_dir,
-                                           self.recorder.lang_name + "_" + self.recorder.condition +
-                                           "_run" + str(self.recorder.run_num) +
-                                           "_epoch" + str(eval_epoch) +
-                                           "_ur_vowel.png")
-        ur_embed_vowel_file = os.path.join(self.recorder.embed_plot_dir,
-                                           self.recorder.lang_name + "_" + self.recorder.condition +
-                                           "_run" + str(self.recorder.run_num) +
-                                           "_epoch" + str(eval_epoch) +
-                                           "_ur_vowel.csv")
-        sr_embed_phone_plot = os.path.join(self.recorder.embed_plot_dir,
-                                           self.recorder.lang_name + "_" + self.recorder.condition +
-                                           "_run" + str(self.recorder.run_num) +
-                                           "_epoch" + str(eval_epoch) +
-                                           "_sr_phoneme.png")
-        sr_embed_phone_file = os.path.join(self.recorder.embed_plot_dir,
-                                           self.recorder.lang_name + "_" + self.recorder.condition +
-                                           "_run" + str(self.recorder.run_num) +
-                                           "_epoch" + str(eval_epoch) +
-                                           "_sr_phoneme.csv")
-        sr_embed_vowel_plot = os.path.join(self.recorder.embed_plot_dir,
-                                           self.recorder.lang_name + "_" + self.recorder.condition +
-                                           "_run" + str(self.recorder.run_num) +
-                                           "_epoch" + str(eval_epoch) +
-                                           "_sr_vowel.png")
-        sr_embed_vowel_file = os.path.join(self.recorder.embed_plot_dir,
-                                           self.recorder.lang_name + "_" + self.recorder.condition +
-                                           "_run" + str(self.recorder.run_num) +
-                                           "_epoch" + str(eval_epoch) +
-                                           "_sr_vowel.csv")
+        # retrieve embedding of all phonemes and focus group
+        ur_phone_space, ur_focus_space = self.recorder.dataset.ur_alphabet.embed2fea(src_embed, focus_group)
+        sr_phone_space, sr_focus_space = self.recorder.dataset.sr_alphabet.embed2fea(trg_embed, focus_group)
+
+        ur_embed_plot = os.path.join(self.recorder.embed_plot_dir,
+                                     self.recorder.lang_name + "_" + self.recorder.condition +
+                                     "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
+                                     "_ur_embedding.png")
+        ur_embed_file = os.path.join(self.recorder.embed_plot_dir,
+                                     self.recorder.lang_name + "_" + self.recorder.condition +
+                                     "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
+                                     "_ur_embedding.csv")
+        sr_embed_plot = os.path.join(self.recorder.embed_plot_dir,
+                                     self.recorder.lang_name + "_" + self.recorder.condition +
+                                     "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
+                                     "_sr_embedding.png")
+        sr_embed_file = os.path.join(self.recorder.embed_plot_dir,
+                                     self.recorder.lang_name + "_" + self.recorder.condition +
+                                     "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
+                                     "_sr_embedding.csv")
 
         # plot embedding
-        utils.plot_embed(self.recorder.ur_embed_phone_store, ur_embed_phone_plot,
-                         "phoneme embedding")
-        utils.plot_embed(self.recorder.ur_embed_vowel_store, ur_embed_vowel_plot,
-                         "vowel embedding")
-        utils.plot_embed(self.recorder.sr_embed_phone_store, sr_embed_phone_plot,
-                         "phoneme embedding")
-        utils.plot_embed(self.recorder.sr_embed_vowel_store, sr_embed_vowel_plot,
-                         "vowel embedding")
+        utils.plot_embed(ur_phone_space, ur_focus_space, ur_embed_plot)
+        utils.plot_embed(sr_phone_space, sr_focus_space, sr_embed_plot)
         # save embedding recording to file
-        utils.save_to_file(self.recorder.ur_embed_phone_store, ur_embed_phone_file)
-        utils.save_to_file(self.recorder.ur_embed_vowel_store, ur_embed_vowel_file)
-        utils.save_to_file(self.recorder.sr_embed_phone_store, sr_embed_phone_file)
-        utils.save_to_file(self.recorder.sr_embed_vowel_store, sr_embed_vowel_file)
+        utils.save_to_file(ur_phone_space, ur_embed_file)
+        utils.save_to_file(sr_phone_space, sr_embed_file)
         print(f"Run {self.recorder.run_num} embedding plots and files are saved for investigation")

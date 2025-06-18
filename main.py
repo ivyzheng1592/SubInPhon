@@ -53,7 +53,7 @@ def text(trial_num, lang_name, conditions, runs, check_epoch, device):
             recorder = TextRecorder(dataset, trial_num, language, condition, run_num)
 
             print(" - Training and evaluating model:")
-            rep = TextRun(dataset, seq2seq, recorder)
+            rep = TextRun(seq2seq, recorder)
             rep.train(train_dataloader, valid_dataloader)
             rep.test(test_dataloader)
             rep.evaluate_attention(test_dataloader, check_epoch)
@@ -103,7 +103,7 @@ def feature(trial_num, lang_name, conditions, runs, check_epoch, freeze, device)
             recorder = TextRecorder(dataset, trial_num, language, condition, run_num)
 
             print(" - Training and evaluating model:")
-            rep = TextRun(dataset, seq2seq, recorder)
+            rep = TextRun(seq2seq, recorder)
             rep.train(train_dataloader, valid_dataloader)
             rep.test(test_dataloader)
             rep.evaluate_attention(test_dataloader, check_epoch)
@@ -159,19 +159,19 @@ if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using {device} device")
 
-    trial_num = "2506161750"  # time stamp
+    trial_num = "2506182210"  # time stamp
     lang_name = "EnglishBH_txt"
     conditions = ["disharmony", "harmony"]
     runs = range(5)
     text(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs-1, device=device)
 
-    trial_num = "2506161750_unfreeze"  # time stamp
+    trial_num = "2506182210_unfreeze"  # time stamp
     lang_name = "EnglishBH_fea"
     conditions = ["disharmony", "harmony"]
     runs = range(5)
     feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, freeze=False, device=device)
 
-    trial_num = "2506161750_freeze"  # time stamp
+    trial_num = "2506182210_freeze"  # time stamp
     lang_name = "EnglishBH_fea"
     conditions = ["disharmony", "harmony"]
     runs = range(5)

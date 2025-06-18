@@ -7,9 +7,8 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from torch.nn.utils.rnn import pad_sequence
 
 
-class Alphabet:
-    def __init__(self, name, special_tokens):
-        self.name = name
+class TextAlphabet:
+    def __init__(self, special_tokens):
         self.idx2char = {} # {index: character}
         self.char2idx = {}  # {character: index}
         self.char2count = {}  # {char: number of occurrences}
@@ -68,35 +67,33 @@ class TextDataset(Dataset):
 
         # get the list of ur and sr words
         self.annotations = pd.read_csv(annotations_file)
-        self.ur = self.annotations["ur"]
-        self.sr = self.annotations["sr"]
+        self.ur_words = self.annotations["ur"]
+        self.sr_words = self.annotations["sr"]
 
         # define special characters
         self.specials = special_tokens
         self.pad_idx = self.specials.index("<PAD>")
 
         # build ur alphabet
-        self.ur_name = re.split('[/_.]', annotations_file)[1] + "_ur"
-        self.ur_alphabet = Alphabet(self.ur_name, self.specials)
-        self.ur_alphabet.build_alphabet(self.ur)
+        self.ur_alphabet = TextAlphabet(self.specials)
+        self.ur_alphabet.build_alphabet(self.ur_words)
 
         # build sr alphabet
-        self.sr_name = re.split('[/_.]', annotations_file)[1] + "_sr"
-        self.sr_alphabet = Alphabet(self.sr_name, self.specials)
-        self.sr_alphabet.build_alphabet(self.sr)
+        self.sr_alphabet = TextAlphabet(self.specials)
+        self.sr_alphabet.build_alphabet(self.sr_words)
 
     def __len__(self):
         return len(self.annotations)
 
     def __getitem__(self, index):
         # get source word
-        src = self.ur[index]
-        src_vector = self.ur_alphabet.word2vec(src)
+        src_word = self.ur_words[index]
+        src_vector = self.ur_alphabet.word2vec(src_word)
         src_tensor = torch.tensor(src_vector).to(self.device)
 
         # get target word
-        trg = self.sr[index]
-        trg_vector = self.sr_alphabet.word2vec(trg)
+        trg_word = self.sr_words[index]
+        trg_vector = self.sr_alphabet.word2vec(trg_word)
         trg_tensor = torch.tensor(trg_vector).to(self.device)
 
         return src_tensor, trg_tensor

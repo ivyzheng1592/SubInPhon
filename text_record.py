@@ -3,7 +3,6 @@
 # Dictionary data are saved to file using utils in TextRun
 
 import os
-import torch
 import hyper_params as hp
 
 
@@ -38,16 +37,6 @@ class TextRecorder:
             'sr_v1': [], 'sr_v2': [], 'pred_sr_v1': [], 'pred_sr_v2': []
         }
 
-        self.att_store = {
-            'ur': [], 'pred_sr': [], 'self/self': [1] * hp.batch_size,
-            'v1/v2': [0] * hp.batch_size, 'v2/v1': [0] * hp.batch_size,
-            'v/c': [0] * hp.batch_size, 'c/v': [0] * hp.batch_size
-        }
-
-        self.ur_embed_phone_store = {key: [] for key in self.language.phone}
-        self.ur_embed_vowel_store = {key: [] for key in self.language.vowel}
-        self.sr_embed_phone_store = {key: [] for key in self.language.phone}
-        self.sr_embed_vowel_store = {key: [] for key in self.language.vowel}
 
         # results files and directories
         self.acc_file = os.path.join("Results", trial_num + "_" + self.lang_name,
@@ -73,9 +62,6 @@ class TextRecorder:
                                          self.lang_name + "_" + self.condition +
                                          "_run" + str(self.run_num) + "_att_plots")
         os.makedirs(self.att_plot_dir, exist_ok=True)
-        self.att_file = os.path.join(self.att_plot_dir,
-                                     self.lang_name + "_" + self.condition +
-                                     "_run" + str(self.run_num) + "_att_type.csv")
 
         self.embed_plot_dir = os.path.join("Results", trial_num + "_" + self.lang_name,
                                            self.lang_name + "_embed_plots",
@@ -91,9 +77,9 @@ class TextRecorder:
         pred_sr_vector = pred_sr.cpu().numpy()
 
         # convert vector to word list and string
-        ur_list, _ = self.dataset.ur_alphabet.vec2word(ur_vector)
-        sr_list, _ = self.dataset.sr_alphabet.vec2word(sr_vector)
-        pred_sr_list, _ = self.dataset.sr_alphabet.vec2word(pred_sr_vector)
+        ur_list, _ = self.ur_alphabet.vec2word(ur_vector)
+        sr_list, _ = self.sr_alphabet.vec2word(sr_vector)
+        pred_sr_list, _ = self.sr_alphabet.vec2word(pred_sr_vector)
 
         return ur_list, sr_list, pred_sr_list
 
@@ -105,9 +91,9 @@ class TextRecorder:
         pred_sr_vector = pred_sr.cpu().numpy()
 
         # convert vector to word list and string
-        _, ur_string = self.dataset.ur_alphabet.vec2word(ur_vector)
-        _, sr_string = self.dataset.sr_alphabet.vec2word(sr_vector)
-        _, pred_sr_string = self.dataset.sr_alphabet.vec2word(pred_sr_vector)
+        _, ur_string = self.ur_alphabet.vec2word(ur_vector)
+        _, sr_string = self.sr_alphabet.vec2word(sr_vector)
+        _, pred_sr_string = self.sr_alphabet.vec2word(pred_sr_vector)
 
         return ur_string, sr_string, pred_sr_string
 
@@ -240,94 +226,3 @@ class TextRecorder:
             self.pred_store['pred_sr_v2'].append(pred_sr_v2)
 
         return batch_correct
-
-    # a function that records and plots attention from each predicted sr to ur in a batch
-    # the function is called in evaluate attention
-    def record_att(self, i, pred_sr_sylls, word_att, ur_string, pred_sr_string):
-
-        # get the largest attention value for individual token in the predicted sr
-        max_att = torch.argmax(word_att, dim=1).tolist()
-        # max_att = [trg_len]
-
-        # for individual token in the predicted sr
-        # check the position of the largest attention value for each token
-        # assume attention is self/self and change from 1 to 0 if not
-        if pred_sr_sylls[0][0] is None and pred_sr_sylls[1][2] is None:  # <SOS>VCV<EOS>
-            if max_att[1] in [3]:
-                self.att_store['v1/v2'][i] = 1
-                self.att_store['self/self'][i] = 0
-            if max_att[3] in [1]:
-                self.att_store['v2/v1'][i] = 1
-                self.att_store['self/self'][i] = 0
-            if max_att[1] in [2, 4] or max_att[3] in [2, 4]:
-                self.att_store['v/c'][i] = 1
-                self.att_store['self/self'][i] = 0
-            if max_att[2] in [1, 3]:
-                self.att_store['c/v'][i] = 1
-                self.att_store['self/self'][i] = 0
-        if pred_sr_sylls[0][0] is None and pred_sr_sylls[1][2] is not None:  # <SOS>VCVC<EOS>
-            if max_att[1] in [3]:
-                self.att_store['v1/v2'][i] = 1
-                self.att_store['self/self'][i] = 0
-            if max_att[3] in [1]:
-                self.att_store['v2/v1'][i] = 1
-                self.att_store['self/self'][i] = 0
-            if max_att[1] in [2, 4] or max_att[3] in [2, 4]:
-                self.att_store['v/c'][i] = 1
-                self.att_store['self/self'][i] = 0
-            if max_att[2] in [1, 3] or max_att[4] in [1, 3]:
-                self.att_store['c/v'][i] = 1
-                self.att_store['self/self'][i] = 0
-        if pred_sr_sylls[0][0] is not None and pred_sr_sylls[1][2] is None:  # <SOS>CVCV<EOS>
-            if max_att[2] in [4]:
-                self.att_store['v1/v2'][i] = 1
-                self.att_store['self/self'][i] = 0
-            if max_att[4] in [2]:
-                self.att_store['v2/v1'][i] = 1
-                self.att_store['self/self'][i] = 0
-            if max_att[2] in [1, 3, 5] or max_att[4] in [1, 3, 5]:
-                self.att_store['v/c'][i] = 1
-                self.att_store['self/self'][i] = 0
-            if max_att[1] in [2, 4] or max_att[3] in [2, 4]:
-                self.att_store['c/v'][i] = 1
-                self.att_store['self/self'][i] = 0
-        if pred_sr_sylls[0][0] is not None and pred_sr_sylls[1][2] is not None:  # <SOS>CVCVC<EOS>
-            if max_att[2] in [4]:
-                self.att_store['v1/v2'][i] = 1
-                self.att_store['self/self'][i] = 0
-            if max_att[4] in [2]:
-                self.att_store['v2/v1'][i] = 1
-                self.att_store['self/self'][i] = 0
-            if max_att[2] in [1, 3, 5] or max_att[4] in [1, 3, 5]:
-                self.att_store['v/c'][i] = 1
-                self.att_store['self/self'][i] = 0
-            if max_att[1] in [2, 4] or max_att[3] in [2, 4] or max_att[5] in [2, 4]:
-                self.att_store['c/v'][i] = 1
-                self.att_store['self/self'][i] = 0
-
-        # append ur and pred sr of the current word
-        self.att_store['ur'].append(ur_string)
-        self.att_store['pred_sr'].append(pred_sr_string)
-
-    # a function that records source and target embedding
-    # the function is called in evaluate embedding
-    def record_embed(self, ur_embed, sr_embed):
-        ur_embed = ur_embed.detach().numpy()
-        sr_embed = sr_embed.detach().numpy()
-        # ur_embed = [input_dim, embedding_dim]
-        # sr_embed = [input_dim, embedding_dim]
-
-        # for individual embedding in ur_embed and sr_embed
-        input_dim = ur_embed.shape[0]
-        for i in range(input_dim):
-            ur_char = self.dataset.ur_alphabet.idx2char[i]
-            sr_char = self.dataset.sr_alphabet.idx2char[i]
-
-            if ur_char in self.ur_embed_phone_store:
-                self.ur_embed_phone_store[ur_char] = ur_embed[i]
-            if ur_char in self.ur_embed_vowel_store:
-                self.ur_embed_vowel_store[ur_char] = ur_embed[i]
-            if sr_char in self.sr_embed_phone_store:
-                self.sr_embed_phone_store[sr_char] = sr_embed[i]
-            if sr_char in self.sr_embed_vowel_store:
-                self.sr_embed_vowel_store[sr_char] = sr_embed[i]
