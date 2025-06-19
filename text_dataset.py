@@ -7,7 +7,7 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from torch.nn.utils.rnn import pad_sequence
 
 
-class TextAlphabet:
+class Alphabet:
     def __init__(self, special_tokens):
         self.idx2char = {} # {index: character}
         self.char2idx = {}  # {character: index}
@@ -60,6 +60,31 @@ class TextAlphabet:
                 else:
                     self.char2count[char] += 1
 
+    def fea2embed(self, feature_df):
+        # set all features of special characters to -1
+        num_feature = feature_df.shape[1]
+        num_special = len(self.specials)
+        special_feature_tensor = torch.full((num_special, num_feature), -1)
+
+        # sort dataframe with char2idx and convert to tensor
+        feature_df = feature_df.rename(self.char2idx).sort_index()
+        feature_tensor = torch.tensor(feature_df.values)
+        embedding_tensor = torch.cat((special_feature_tensor, feature_tensor), dim=0)
+        embedding_tensor = embedding_tensor.to(torch.float32)  # convert to type of pretrained weight
+
+        return embedding_tensor
+
+    def embed2fea(self, embedding_tensor, focus_group):
+        embedding_list = embedding_tensor.cpu().detach().numpy()
+        # embedding_tensor = [input_dim, embedding_dim]
+
+        # add embedding of each character to entire and focus feature space
+        feature_space = {char: embedding_list[idx] for idx, char in self.idx2char.items()
+                         if char not in self.specials}
+        focus_feature_space = {char: embedding_list[idx] for idx, char in self.idx2char.items()
+                               if char in focus_group}
+
+        return feature_space, focus_feature_space
 
 class TextDataset(Dataset):
     def __init__(self, annotations_file, special_tokens, device='cuda'):
@@ -75,11 +100,11 @@ class TextDataset(Dataset):
         self.pad_idx = self.specials.index("<PAD>")
 
         # build ur alphabet
-        self.ur_alphabet = TextAlphabet(self.specials)
+        self.ur_alphabet = Alphabet(self.specials)
         self.ur_alphabet.build_alphabet(self.ur_words)
 
         # build sr alphabet
-        self.sr_alphabet = TextAlphabet(self.specials)
+        self.sr_alphabet = Alphabet(self.specials)
         self.sr_alphabet.build_alphabet(self.sr_words)
 
     def __len__(self):

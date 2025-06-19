@@ -4,37 +4,6 @@
 from text_dataset import *
 
 
-class FeatureAlphabet(TextAlphabet):
-    def __init__(self, special_tokens):
-        super().__init__(special_tokens)
-
-    def fea2embed(self, feature_df):
-        # set all features of special characters to -1
-        num_feature = feature_df.shape[1]
-        num_special = len(self.specials)
-        special_feature_tensor = torch.full((num_special, num_feature), -1)
-
-        # sort dataframe with char2idx and convert to tensor
-        feature_df = feature_df.rename(self.char2idx).sort_index()
-        feature_tensor = torch.tensor(feature_df.values)
-        embedding_tensor = torch.cat((special_feature_tensor, feature_tensor), dim=0)
-        embedding_tensor = embedding_tensor.to(torch.float32)  # convert to type of pretrained weight
-
-        return embedding_tensor
-
-    def embed2fea(self, embedding_tensor, focus_group):
-        embedding_list = embedding_tensor.cpu().detach().numpy()
-        # embedding_tensor = [input_dim, embedding_dim]
-
-        # add embedding of each character to entire and focus feature space
-        feature_space = {char: embedding_list[idx] for idx, char in self.idx2char.items()
-                         if char not in self.specials}
-        focus_feature_space = {char: embedding_list[idx] for idx, char in self.idx2char.items()
-                               if char in focus_group}
-
-        return feature_space, focus_feature_space
-
-
 class FeatureDataset(TextDataset):
     def __init__(self, annotations_file, feature_file, special_tokens, device='cuda'):
         super().__init__(annotations_file, special_tokens, device)
@@ -43,12 +12,12 @@ class FeatureDataset(TextDataset):
         self.feature_df = pd.read_excel(feature_file, sheet_name=0, index_col=0)
 
         # build ur alphabet and embedding
-        self.ur_alphabet = FeatureAlphabet(self.specials)
+        self.ur_alphabet = Alphabet(self.specials)
         self.ur_alphabet.build_alphabet(self.ur_words)
         self.ur_embedding = self.ur_alphabet.fea2embed(self.feature_df)
 
         # build sr alphabet and embedding
-        self.sr_alphabet = FeatureAlphabet(self.specials)
+        self.sr_alphabet = Alphabet(self.specials)
         self.sr_alphabet.build_alphabet(self.sr_words)
         self.sr_embedding = self.sr_alphabet.fea2embed(self.feature_df)
 

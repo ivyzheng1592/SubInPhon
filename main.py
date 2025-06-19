@@ -171,8 +171,8 @@ if __name__ == "__main__":
     runs = range(5)
     feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, freeze=False, device=device)
 
-    trial_num = "2506182210_freeze"  # time stamp
-    lang_name = "EnglishBH_fea"
-    conditions = ["disharmony", "harmony"]
-    runs = range(5)
-    feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, freeze=True, device=device)
+    #trial_num = "2506182210_freeze"  # time stamp
+    #lang_name = "EnglishBH_fea"
+    #conditions = ["disharmony", "harmony"]
+    #runs = range(5)
+    #feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, freeze=True, device=device)

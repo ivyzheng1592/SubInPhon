@@ -84,10 +84,10 @@ def plot_att(ur, sr, attention, att_plot):
     plt.close()
     #plt.show()
 
-def plot_embed(embed_df, focus_embed_df, embed_plot):
+def plot_embed(embed_store, focus_embed_store, embed_plot):
     # convert dictionary to pandas dataframe
-    #embed_df = pd.DataFrame.from_dict(embed_store, orient='index')
-    #focus_embed_df = pd.DataFrame.from_dict(focus_embed_store, orient='index')
+    embed_df = pd.DataFrame.from_dict(embed_store, orient='index')
+    focus_embed_df = pd.DataFrame.from_dict(focus_embed_store, orient='index')
 
     # use PCA to project the data from embedding_dim to 3D
     pca = PCA(n_components=3)
