@@ -3,7 +3,6 @@ import torch
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib import colormaps
 from sklearn.decomposition import PCA
 from nooverlap import push_text_free
 
@@ -140,6 +139,3 @@ def plot_embed(embed_store, focus_embed_store, embed_plot):
     plt.savefig(embed_plot)
     plt.close()
     #plt.show()
-
-if __name__ == "__main__":
-    pass

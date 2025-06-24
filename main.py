@@ -159,20 +159,21 @@ if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using {device} device")
 
-    trial_num = "2506182210"  # time stamp
-    lang_name = "EnglishBH_txt"
-    conditions = ["disharmony", "harmony"]
-    runs = range(5)
-    text(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs-1, device=device)
-
-    trial_num = "2506182210_unfreeze"  # time stamp
+    trial_num = "2506232020_freeze_new"  # time stamp
     lang_name = "EnglishBH_fea"
-    conditions = ["disharmony", "harmony"]
-    runs = range(5)
+    conditions = ["harmony", "disharmony"]
+    runs = range(3)
+    feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, freeze=True, device=device)
+
+    trial_num = "2506232020_unfreeze_new"  # time stamp
+    lang_name = "EnglishBH_fea"
+    conditions = ["harmony", "disharmony"]
+    runs = range(3)
     feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, freeze=False, device=device)
 
-    #trial_num = "2506182210_freeze"  # time stamp
-    #lang_name = "EnglishBH_fea"
-    #conditions = ["disharmony", "harmony"]
-    #runs = range(5)
-    #feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, freeze=True, device=device)
+    trial_num = "2506232020_new"  # time stamp
+    lang_name = "EnglishBH_txt"
+    conditions = ["harmony", "disharmony"]
+    runs = range(3)
+    text(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, device=device)
+
