@@ -39,11 +39,20 @@ syll_struct_ae = ["V-CV", "V-CVC", "CV-CV", "CV-CVC",
                   #"VC.V-CV", "VC.V-CVC", "VC.VC-V", "VC.VC-VC",
                   #"CVC.V-CV", "CVC.V-CVC","CVC.VC-V", "CVC.VC-VC"]
 # Stimuli
-EnglishBH_txt = BacknessHarmony(onset_ae, coda_ae, vowel_ae_txt, syll_struct_ae, "EnglishBH_txt")
+EnglishBH_txt = BacknessHarmony(onset_ae, coda_ae, vowel_ae_txt, syll_struct_ae,
+                                "EnglishBH_txt")
 #EnglishBH_txt.generate_stimuli()
-EnglishBH_fea = BacknessHarmony(onset_ae, coda_ae, vowel_ae_txt, syll_struct_ae, "EnglishBH_fea")
+EnglishBH_nonidentical_txt = BacknessHarmony(onset_ae, coda_ae, vowel_ae_txt, syll_struct_ae,
+                                             "EnglishBH_nonidentical_txt")
+#EnglishBH_nonidentical_txt.generate_stimuli()
+EnglishBH_fea = BacknessHarmony(onset_ae, coda_ae, vowel_ae_txt, syll_struct_ae,
+                                "EnglishBH_fea")
 #EnglishBH_fea.generate_stimuli()
-EnglishBH_aud = BacknessHarmony(onset_ae, coda_ae, vowel_ae_aud, syll_struct_ae, "EnglishBH_aud")
+EnglishBH_nonidentical_fea = BacknessHarmony(onset_ae, coda_ae, vowel_ae_txt, syll_struct_ae,
+                                             "EnglishBH_nonidentical_fea")
+#EnglishBH_nonidentical_fea.generate_stimuli()
+EnglishBH_aud = BacknessHarmony(onset_ae, coda_ae, vowel_ae_aud, syll_struct_ae,
+                                "EnglishBH_aud")
 #EnglishBH_aud.generate_stimuli()
 
 
@@ -73,6 +82,8 @@ syll_struct_c = ["V-CV", "V-CVC", "CV-CV", "CV-CVC",
 
 languages = {
     "EnglishBH_txt": EnglishBH_txt,
+    "EnglishBH_nonidentical_txt": EnglishBH_nonidentical_txt,
     "EnglishBH_fea": EnglishBH_fea,
+    "EnglishBH_nonidentical_fea": EnglishBH_nonidentical_fea,
     "EnglishBH_aud": EnglishBH_aud,
 }

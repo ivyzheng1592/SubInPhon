@@ -1,5 +1,6 @@
 import os
 import torch
+import torch.nn as nn
 
 from Dataset.languages import languages
 from text_dataset import TextDataset
@@ -48,6 +49,11 @@ def text(trial_num, lang_name, conditions, runs, check_epoch, device):
                                   hp.encoder_embedding_dim, hp.decoder_embedding_dim,
                                   hp.n_layers, hp.hidden_dim, output_dim,
                                   hp.encoder_dropout, hp.decoder_dropout, device=device)
+
+            # embedding weight initialization
+            for name, param in seq2seq.named_parameters():
+                if "embedding.weight" in name:
+                    nn.init.uniform_(param.data, a=0, b=0.01)
 
             print(" - Preparing data recorder:")
             recorder = TextRecorder(dataset, trial_num, language, condition, run_num)
@@ -159,21 +165,21 @@ if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using {device} device")
 
-    trial_num = "2506232020_freeze_new"  # time stamp
-    lang_name = "EnglishBH_fea"
-    conditions = ["harmony", "disharmony"]
-    runs = range(3)
-    feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, freeze=True, device=device)
+    #trial_num = "2506232020_freeze_new"  # time stamp
+    #lang_name = "EnglishBH_fea"
+    #conditions = ["harmony", "disharmony"]
+    #runs = range(3)
+    #feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, freeze=True, device=device)
 
-    trial_num = "2506232020_unfreeze_new"  # time stamp
-    lang_name = "EnglishBH_fea"
+    trial_num = "2506281720_unfreeze"  # time stamp
+    lang_name = "EnglishBH_nonidentical_fea"
     conditions = ["harmony", "disharmony"]
-    runs = range(3)
+    runs = range(5)
     feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, freeze=False, device=device)
 
-    trial_num = "2506232020_new"  # time stamp
-    lang_name = "EnglishBH_txt"
+    trial_num = "2506281720"  # time stamp
+    lang_name = "EnglishBH_nonidentical_txt"
     conditions = ["harmony", "disharmony"]
-    runs = range(3)
+    runs = range(5)
     text(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, device=device)
 
