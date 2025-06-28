@@ -9,89 +9,98 @@ import itertools
 
 
 class LanguagePattern:
-    def __init__(self, onset, coda, vowel_open, vowel_closed, syll_struct, lang_name):
+    def __init__(self, onset, coda, vowel, syll_struct, lang_name):
 
         self.lang_name = lang_name
         self.syll_struct = syll_struct
         self.onset = onset
         self.coda = coda
-        self.vowel_open = vowel_open
-        self.vowel_closed = vowel_closed
+        self.vowel = vowel
         self.focus = {}  # different focus for different language pattern
 
 
 class BacknessHarmony(LanguagePattern):
-    def __init__(self, onset, coda, vowel_open, vowel_closed, syll_struct, lang_name):
-        super().__init__(onset, coda, vowel_open, vowel_closed, syll_struct, lang_name)
-        self.focus = {**vowel_open, **vowel_closed}
+    def __init__(self, onset, coda, vowel, syll_struct, lang_name):
+        super().__init__(onset, coda, vowel, syll_struct, lang_name)
+        self.focus = self.vowel
 
     # function to generate vowel harmony stimuli with specified phoneme inventory and syllable structure
     def generate_stimuli(self):
         print(" - Generating stimuli:")
+
+        # identify possible stem-suffix vowel combinations for each condition
+        h_v_combinations = []
+        dh_v_combinations = []
+        for stem_v in self.vowel:
+            for ur_suffix_v in self.vowel:
+                # disallowing identical vowels, i.e. vowels w/ identical height and tenseness
+                if not (self.vowel[ur_suffix_v][1] == self.vowel[stem_v][1]
+                        and self.vowel[ur_suffix_v][2] == self.vowel[stem_v][2]):
+                    for sr_suffix_v in self.vowel:
+                        # harmomny
+                        if (self.vowel[sr_suffix_v][1] == self.vowel[ur_suffix_v][1]
+                            and self.vowel[sr_suffix_v][2] == self.vowel[ur_suffix_v][2]
+                            and self.vowel[sr_suffix_v][0] == self.vowel[stem_v][0]):
+                            h_v_combinations.append([stem_v, ur_suffix_v, sr_suffix_v])
+                        # disharmony
+                        if (self.vowel[sr_suffix_v][1] == self.vowel[ur_suffix_v][1]
+                            and self.vowel[sr_suffix_v][2] == self.vowel[ur_suffix_v][2]
+                            and self.vowel[sr_suffix_v][0] != self.vowel[stem_v][0]):
+                            dh_v_combinations.append([stem_v, ur_suffix_v, sr_suffix_v])
+
+        # create a dictionary with all kinds of syllables for each vowel
+        syll_dict = {
+            v: {key: [] for key in ["V", "VC", "CV", "CVC"]}
+            for v in self.vowel
+        }
+        for v, v_dict in syll_dict.items():
+            if self.vowel[v][2] == "tense":  # for tense vowels, only V and CV
+                v_dict["V"] = [v]
+                v_dict["CV"] = [o + v for o in self.onset]
+            elif self.vowel[v][2] == "lax":  # for lax vowels, only VC and CVC
+                v_dict["VC"] = [v + c for c in self.coda]
+                v_dict["CVC"] = [o + v + c for o, c in itertools.product(self.onset, self.coda)]
+            else:
+                raise RuntimeError(f"Incorrect vowel feature value {self.vowel[v][2]}")
+
+        # generate all possible vowel combinations for each syllable structure
         harmony_list = []
         disharmony_list = []
-
-        # separate front and back vowels
-        vowel_open_1 = [key for key, value in self.vowel_open.items() if value == "front"]
-        vowel_closed_1 = [key for key, value in self.vowel_closed.items() if value == "front"]
-        vowel_open_2 = [key for key, value in self.vowel_open.items() if value == "back"]
-        vowel_closed_2 = [key for key, value in self.vowel_closed.items() if value == "back"]
-
-        # create two dictionaries with all kinds of syllables
-        syll_dict_1 = {key: None for key in ["V", "VC", "CV", "CVC"]}
-        syll_dict_1["V"] = [v for v in vowel_open_1]
-        syll_dict_1["VC"] = [v + c for v, c in itertools.product(vowel_closed_1, self.coda)]
-        syll_dict_1["CV"] = [o + v for o, v in itertools.product(self.onset, vowel_open_1)]
-        syll_dict_1["CVC"] = [o + v + c for o, v, c in itertools.product(self.onset, vowel_closed_1, self.coda)]
-        syll_dict_2 = {key: None for key in ["V", "VC", "CV", "CVC"]}
-        syll_dict_2["V"] = [v for v in vowel_open_2]
-        syll_dict_2["VC"] = [v + c for v, c in itertools.product(vowel_closed_2, self.coda)]
-        syll_dict_2["CV"] = [o + v for o, v in itertools.product(self.onset, vowel_open_2)]
-        syll_dict_2["CVC"] = [o + v + c for o, v, c in itertools.product(self.onset, vowel_closed_2, self.coda)]
-
-        # for each syllable structure
         for struct in self.syll_struct:
             # separate stem and suffix
+            # assume monosyllabic stem
             stem_struct = struct.split("-")[0]
             suffix_struct = struct.split("-")[1]
 
-            # get all possible stems
-            if "." in stem_struct:  # if stem is disyllabic
-                # stem_1 has vowel_1 in second syllable
-                stem_1 = [s_1 + s_2 for s_1, s_2 in
-                          itertools.product(syll_dict_1[stem_struct.split(".")[0]] + syll_dict_2[stem_struct.split(".")[0]],
-                                            syll_dict_1[stem_struct.split(".")[1]])]
-                # stem_2 has vowel_2 in second syllable
-                stem_2 = [s_1 + s_2 for s_1, s_2 in
-                          itertools.product(syll_dict_1[stem_struct.split(".")[0]] + syll_dict_2[stem_struct.split(".")[0]],
-                                            syll_dict_2[stem_struct.split(".")[1]])]
-            else:  # if stem is monosyllabic
-                stem_1 = syll_dict_1[stem_struct]
-                stem_2 = syll_dict_2[stem_struct]
+            for [stem_v, ur_suffix_v, sr_suffix_v] in h_v_combinations:
+                # if the syllable structure exist for the current vowel
+                if (syll_dict[stem_v][stem_struct]
+                    and syll_dict[ur_suffix_v][suffix_struct]):
 
-            # get all possible suffixes
-            suffix_1 = syll_dict_1[suffix_struct]
-            suffix_2 = syll_dict_2[suffix_struct]
+                    # combine stem and suffixes
+                    stems = syll_dict[stem_v][stem_struct]
+                    ur_suffixes = syll_dict[ur_suffix_v][suffix_struct]
+                    sr_suffixes = syll_dict[sr_suffix_v][suffix_struct]
 
-            # combine stem and suffixes
-            harmony_list.extend([stem, stem + suffix_ur, stem + suffix_sr] for stem, (suffix_ur, suffix_sr) in
-                                itertools.product(stem_1, zip(suffix_1, suffix_1)))
-            harmony_list.extend([stem, stem + suffix_ur, stem + suffix_sr] for stem, (suffix_ur, suffix_sr) in
-                                itertools.product(stem_1, zip(suffix_2, suffix_1)))
-            harmony_list.extend([stem, stem + suffix_ur, stem + suffix_sr] for stem, (suffix_ur, suffix_sr) in
-                                itertools.product(stem_2, zip(suffix_1, suffix_2)))
-            harmony_list.extend([stem, stem + suffix_ur, stem + suffix_sr] for stem, (suffix_ur, suffix_sr) in
-                                itertools.product(stem_2, zip(suffix_2, suffix_2)))
-            disharmony_list.extend([stem, stem + suffix_ur, stem + suffix_sr] for stem, (suffix_ur, suffix_sr) in
-                                   itertools.product(stem_1, zip(suffix_1, suffix_2)))
-            disharmony_list.extend([stem, stem + suffix_ur, stem + suffix_sr] for stem, (suffix_ur, suffix_sr) in
-                                   itertools.product(stem_1, zip(suffix_2, suffix_2)))
-            disharmony_list.extend([stem, stem + suffix_ur, stem + suffix_sr] for stem, (suffix_ur, suffix_sr) in
-                                   itertools.product(stem_2, zip(suffix_1, suffix_1)))
-            disharmony_list.extend([stem, stem + suffix_ur, stem + suffix_sr] for stem, (suffix_ur, suffix_sr) in
-                                   itertools.product(stem_2, zip(suffix_2, suffix_1)))
+                    harmony_list.extend([stem, stem + ur_suffix, stem + sr_suffix]
+                                        for stem, (ur_suffix, sr_suffix) in
+                                        itertools.product(stems, zip(ur_suffixes, sr_suffixes)))
+
+            for [stem_v, ur_suffix_v, sr_suffix_v] in dh_v_combinations:
+                # if the syllable structure exist for the current vowel
+                if (syll_dict[stem_v][stem_struct]
+                        and syll_dict[ur_suffix_v][suffix_struct]):
+                    # combine stem and suffixes
+                    stems = syll_dict[stem_v][stem_struct]
+                    ur_suffixes = syll_dict[ur_suffix_v][suffix_struct]
+                    sr_suffixes = syll_dict[sr_suffix_v][suffix_struct]
+
+                    disharmony_list.extend([stem, stem + ur_suffix, stem + sr_suffix]
+                                           for stem, (ur_suffix, sr_suffix) in
+                                           itertools.product(stems, zip(ur_suffixes, sr_suffixes)))
+
             print(f"Now generating syllable structure {struct}, accumulating to {len(harmony_list)} pairs")
-            print(f"Example {struct} harmony pair: {harmony_list[len(harmony_list)-1]}")
+            print(f"Example {struct} harmony pair: {harmony_list[len(harmony_list) - 1]}")
             print(f"Example {struct} disharmony pair: {disharmony_list[len(disharmony_list) - 1]}")
 
         print(" - Writing to file:")
@@ -122,9 +131,9 @@ class BacknessHarmony(LanguagePattern):
     # function to decompose vowel harmony stimuli with specified phoneme inventory
     def decompose_stimuli(self, word_list):
 
-        # separate vowels that can occur in open/closed syllables
-        vowel_open = list(self.vowel_open.keys())
-        vowel_closed = list(self.vowel_closed.keys())
+        # separate tense and lax vowels
+        vowel_tense = [v for v in self.vowel if self.vowel[v][2] == "tense"]
+        vowel_lax = [v for v in self.vowel if self.vowel[v][2] == "lax"]
 
         word_copy = word_list.copy()  # copy of word for token removal
         syll1 = [None, None, None]  # C, V, C
@@ -150,7 +159,7 @@ class BacknessHarmony(LanguagePattern):
         for char in word_copy:
             if char in self.onset or char in self.coda:
                 word_struct = word_struct + "C"
-            elif char in self.vowel_open or char in self.vowel_closed:
+            elif char in self.vowel:
                 word_struct = word_struct + "V"
             else:
                 word_struct = "False"
@@ -165,7 +174,7 @@ class BacknessHarmony(LanguagePattern):
             word_copy.pop(0)
 
         # if first syllable has close vowel
-        if word_copy and word_copy[0] in vowel_closed:
+        if word_copy and word_copy[0] in vowel_lax:
             syll1[1] = word_copy[0]
             word_copy.pop(0)
             # the following consonant should be coda
@@ -178,7 +187,7 @@ class BacknessHarmony(LanguagePattern):
             else:
                 raise RuntimeError(f"Problem with output recording {word_list}")
         # if first syllable has open vowel
-        elif word_copy and word_copy[0] in vowel_open:
+        elif word_copy and word_copy[0] in vowel_tense:
             syll1[1] = word_copy[0]
             word_copy.pop(0)
             # the following consonant should be onset
@@ -194,7 +203,7 @@ class BacknessHarmony(LanguagePattern):
             raise RuntimeError(f"Problem with output recording {word_list}")
 
         # the second syllable should have vowel
-        if word_copy and (word_copy[0] in vowel_closed or word_copy[0] in vowel_open):
+        if word_copy and (word_copy[0] in self.vowel):
             syll2[1] = word_copy[0]
             word_copy.pop(0)
         else:
