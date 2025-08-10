@@ -196,7 +196,7 @@ class TextRun:
                 # plot attention
                 att_plot = os.path.join(self.recorder.att_plot_dir,
                                         self.recorder.lang_name + "_" + self.recorder.condition +
-                                        "_run" + str(self.recorder.run_num) + "_" +
+                                        "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
                                         ur_string + "_" + pred_sr_string + ".png")
                 utils.plot_att(ur_list, pred_sr_list, word_att, att_plot)
             print(f"Run {self.recorder.run_num} attention plots are saved for investigation")

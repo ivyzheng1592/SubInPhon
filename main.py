@@ -16,7 +16,7 @@ import hyper_params as hp
 
 
 # a function that loads text dataset, initializes text model for each run of each condition
-def text(trial_num, lang_name, conditions, runs, check_epoch, device):
+def text(trial_num, lang_name, conditions, runs, run_mode, check_epoch, device):
 
     os.makedirs(os.path.join("Results", trial_num + "_" + lang_name), exist_ok=True)
 
@@ -60,14 +60,18 @@ def text(trial_num, lang_name, conditions, runs, check_epoch, device):
 
             print(" - Training and evaluating model:")
             rep = TextRun(seq2seq, recorder)
-            rep.train(train_dataloader, valid_dataloader)
-            rep.test(test_dataloader)
-            rep.evaluate_attention(test_dataloader, check_epoch)
-            rep.evaluate_embedding(check_epoch)
+            if run_mode == "train and evaluate":
+                rep.train(train_dataloader, valid_dataloader)
+                rep.test(test_dataloader)
+                rep.evaluate_attention(test_dataloader, check_epoch)
+                rep.evaluate_embedding(check_epoch)
+            else: # evaluate only
+                rep.evaluate_attention(test_dataloader, check_epoch)
+                rep.evaluate_embedding(check_epoch)
 
 
 # a function that loads text dataset, initializes text model for each run of each condition
-def feature(trial_num, lang_name, conditions, runs, check_epoch, freeze, device):
+def feature(trial_num, lang_name, conditions, runs, run_mode, check_epoch, freeze, device):
 
     os.makedirs(os.path.join("Results", trial_num + "_" + lang_name), exist_ok=True)
 
@@ -110,10 +114,14 @@ def feature(trial_num, lang_name, conditions, runs, check_epoch, freeze, device)
 
             print(" - Training and evaluating model:")
             rep = TextRun(seq2seq, recorder)
-            rep.train(train_dataloader, valid_dataloader)
-            rep.test(test_dataloader)
-            rep.evaluate_attention(test_dataloader, check_epoch)
-            rep.evaluate_embedding(check_epoch)
+            if run_mode == "train and evaluation":
+                rep.train(train_dataloader, valid_dataloader)
+                rep.test(test_dataloader)
+                rep.evaluate_attention(test_dataloader, check_epoch)
+                rep.evaluate_embedding(check_epoch)
+            else: # evaluate only
+                rep.evaluate_attention(test_dataloader, check_epoch)
+                rep.evaluate_embedding(check_epoch)
 
 
 """
@@ -165,21 +173,16 @@ if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using {device} device")
 
-    #trial_num = "2506232020_freeze_new"  # time stamp
-    #lang_name = "EnglishBH_fea"
-    #conditions = ["harmony", "disharmony"]
-    #runs = range(3)
-    #feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, freeze=True, device=device)
-
-    trial_num = "2506281720_unfreeze"  # time stamp
-    lang_name = "EnglishBH_nonidentical_fea"
+    trial_num = "2507012250_consonant"  # time stamp
+    lang_name = "EnglishBH_fea"
     conditions = ["harmony", "disharmony"]
-    runs = range(5)
-    feature(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, freeze=False, device=device)
+    runs = range(10)
+    feature(trial_num, lang_name, conditions, runs, run_mode="evaluate",
+            check_epoch=e, freeze=False, device=device)
 
-    trial_num = "2506281720"  # time stamp
-    lang_name = "EnglishBH_nonidentical_txt"
+    trial_num = "2507012250_consonant"  # time stamp
+    lang_name = "EnglishBH_txt"
     conditions = ["harmony", "disharmony"]
-    runs = range(5)
-    text(trial_num, lang_name, conditions, runs, check_epoch=hp.n_epochs - 1, device=device)
-
+    runs = range(10)
+    text(trial_num, lang_name, conditions, runs, run_mode="evaluate",
+         check_epoch=e, device=device)

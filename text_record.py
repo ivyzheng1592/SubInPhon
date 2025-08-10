@@ -33,7 +33,7 @@ class TextRecorder:
             #'sr_o1': [], 'sr_o2': [], 'pred_sr_o1': [], 'pred_sr_o2': [],
             #'c1_error': [], 'c2_error': [],
             #'sr_c1': [], 'sr_c2': [], 'pred_sr_c1': [], 'pred_sr_c2': [],
-            'v1_error': [], 'v2_error': [], 'ur_v1': [], 'ur_v2': [],
+            'v1_error': [], 'v2_error': [], #'ur_v1': [], 'ur_v2': [],
             'sr_v1': [], 'sr_v2': [], 'pred_sr_v1': [], 'pred_sr_v2': []
         }
 
@@ -157,8 +157,8 @@ class TextRecorder:
             v1_error = 0
             v2_error = 0
 
-            ur_v1 = ur_sylls[0][1]
-            ur_v2 = ur_sylls[1][1]
+            #ur_v1 = ur_sylls[0][1]
+            #ur_v2 = ur_sylls[1][1]
 
             sr_o1 = sr_sylls[0][0]
             sr_o2 = sr_sylls[1][0]
@@ -216,8 +216,8 @@ class TextRecorder:
             #self.pred_store['pred_sr_c2'].append(pred_sr_c2)
             self.pred_store['v1_error'].append(v1_error)
             self.pred_store['v2_error'].append(v2_error)
-            self.pred_store['ur_v1'].append(ur_v1)
-            self.pred_store['ur_v2'].append(ur_v2)
+            #self.pred_store['ur_v1'].append(ur_v1)
+            #self.pred_store['ur_v2'].append(ur_v2)
             self.pred_store['sr_v1'].append(sr_v1)
             self.pred_store['sr_v2'].append(sr_v2)
             self.pred_store['pred_sr_v1'].append(pred_sr_v1)

@@ -2,6 +2,7 @@ import os
 import torch
 import numpy as np
 import pandas as pd
+import matplotlib.ticker as ticker
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from nooverlap import push_text_free
@@ -88,6 +89,13 @@ def plot_embed(embed_store, focus_embed_store, embed_plot):
     embed_df = pd.DataFrame.from_dict(embed_store, orient='index')
     focus_embed_df = pd.DataFrame.from_dict(focus_embed_store, orient='index')
 
+    # reorder indices
+    embed_new_idx = ['m', 'n', 'ŋ', 'p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'θ', 'ʃ', 'v', 'z', 'ð', 'ʒ', 'h',
+                     'i', 'e', 'u', 'o', 'ɪ', 'ɛ', 'ʊ', 'ɔ']
+    focus_embed_new_idx = ['i', 'e', 'u', 'o', 'ɪ', 'ɛ', 'ʊ', 'ɔ']
+    embed_df = embed_df.reindex(embed_new_idx)
+    focus_embed_df = focus_embed_df.reindex(focus_embed_new_idx)
+
     # use PCA to project the data from embedding_dim to 3D
     pca = PCA(n_components=3)
     reduced_data = pca.fit_transform(embed_df)
@@ -101,30 +109,16 @@ def plot_embed(embed_store, focus_embed_store, embed_plot):
                                     columns=['pc1', 'pc2', 'pc3'])
     focus_reduced_df['phoneme'] = focus_embed_df.index
 
-    fig = plt.figure(figsize=(9,12))
-    ax1 = fig.add_subplot(211, projection='3d')
-    for i in reduced_df.index:
-        ax1.scatter(xs=reduced_df.loc[i, 'pc1'],
-                   ys=reduced_df.loc[i, 'pc2'],
-                   zs=reduced_df.loc[i, 'pc3'],
-                   #color=colormaps.get_cmap('tab20')(i%20), # if there are more than 20 categories, reuse from top
-                   label=reduced_df.loc[i, 'phoneme'])
-        ax1.text(x=reduced_df.loc[i, 'pc1'],
-                 y=reduced_df.loc[i, 'pc2'],
-                 z=reduced_df.loc[i, 'pc3'],
-                 s=reduced_df.loc[i, 'phoneme'])
-    ax1.set_xlabel("pc1")
-    ax1.set_ylabel("pc2")
-    ax1.set_zlabel("pc3")
-    ax1.set_title("Phoneme embedding")
-    ax1.legend(ncols=2, loc='center left', bbox_to_anchor=(1.1, 0.5))
-    push_text_free(fig, ax1)
+    plt.rcParams.update({'font.size': 5})
+    fig = plt.figure(figsize=(8,3))
 
-    ax2 = fig.add_subplot(212, projection='3d')
+    ax2 = fig.add_subplot(131, projection='3d')
     for i in focus_reduced_df.index:
         ax2.scatter(xs=focus_reduced_df.loc[i, 'pc1'],
                     ys=focus_reduced_df.loc[i, 'pc2'],
                     zs=focus_reduced_df.loc[i, 'pc3'],
+                    s=5,
+                    c=plt.colormaps.get_cmap('tab20')(i % 18),
                     label=focus_reduced_df.loc[i, 'phoneme'])
         ax2.text(x=focus_reduced_df.loc[i, 'pc1'],
                  y=focus_reduced_df.loc[i, 'pc2'],
@@ -134,8 +128,28 @@ def plot_embed(embed_store, focus_embed_store, embed_plot):
     ax2.set_ylabel("pc2")
     ax2.set_zlabel("pc3")
     ax2.set_title("Vowel embedding")
-    ax2.legend(loc='center left', bbox_to_anchor=(1.1, 0.5))
+    ax2.legend(loc='center left', bbox_to_anchor=(1.1, 0.5)).remove()
     push_text_free(fig, ax2)
-    plt.savefig(embed_plot)
+
+    ax1 = fig.add_subplot(132, projection='3d')
+    for i in reduced_df.index:
+        ax1.scatter(xs=reduced_df.loc[i, 'pc1'],
+                   ys=reduced_df.loc[i, 'pc2'],
+                   zs=reduced_df.loc[i, 'pc3'],
+                    s=5,
+                   c=plt.colormaps.get_cmap('tab20')(i%18), # if there are more than 18 categories, reuse from top
+                   label=reduced_df.loc[i, 'phoneme'])
+        ax1.text(x=reduced_df.loc[i, 'pc1'],
+                 y=reduced_df.loc[i, 'pc2'],
+                 z=reduced_df.loc[i, 'pc3'],
+                 s=reduced_df.loc[i, 'phoneme'])
+    ax1.set_xlabel("pc1")
+    ax1.set_ylabel("pc2")
+    ax1.set_zlabel("pc3")
+    ax1.set_title("Phoneme embedding")
+    ax1.legend(ncols=2, loc='center left', bbox_to_anchor=(1.3, 0.5))
+    push_text_free(fig, ax1)
+
+    plt.savefig(embed_plot, dpi=300)
     plt.close()
     #plt.show()
