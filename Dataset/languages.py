@@ -4,8 +4,9 @@
 
 from Dataset.language_generator import *
 
-
-# Language: English
+"""
+Language: English Backness Harmony
+"""
 # Phoneme inventory:
 onset_ae = {
     onset: None for onset in ['m', 'n', 'p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'v', 'z', 'ʃ', 'ʒ', 'θ', 'ð', 'h']
@@ -13,7 +14,7 @@ onset_ae = {
 coda_ae = {
     coda: None for coda in ['m', 'n', 'ŋ', 'p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'v', 'z', 'ʃ', 'ʒ', 'θ', 'ð']
 }
-# vowel for text input (control for number of symbols in a phoneme) -> abandoned
+# vowel for text input (control for number of symbols in a phoneme)
 vowel_ae_txt = {'i': ["front", "high", "tense"],
                 'e': ["front", "mid", "tense"],
                 'u': ["back", "high", "tense"],
@@ -56,7 +57,42 @@ EnglishBH_aud = BacknessHarmony(onset_ae, coda_ae, vowel_ae_aud, syll_struct_ae,
 #EnglishBH_aud.generate_stimuli()
 
 
-# Language: Cantonese
+"""
+Language: English Final Devoicing
+"""
+# Phoneme inventory:
+onset_ae = {
+    onset: None for onset in ['p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'v', 'z', 'ʃ', 'ʒ', 'θ', 'ð']
+}
+coda_ae = {
+    voiceless: "voiceless" for voiceless in ['p', 't', 'k', 'f', 's', 'ʃ', 'θ']
+}
+coda_ae.update({
+    voiced: "voiced" for voiced in ['b', 'd', 'g', 'v', 'z', 'ʒ', 'ð']
+})
+# vowel for text input (control for number of symbols in a phoneme)
+vowel_ae_txt = {
+    vowel: None for vowel in ['i', 'e', 'u', 'o', 'ɪ', 'ɛ', 'ʊ', 'ɔ']
+}
+# vowel for audio input (actual realization of phoneme)
+vowel_ae_aud = {
+    vowel: None for vowel in ['i', 'eɪ', 'u', 'oʊ', 'ɪ', 'ɛ', 'ʊ', 'ɔ']
+}
+# Syllable structure:
+syll_struct_ae = ["VC", "CVC", "VCVC", "CVCVC"]
+# Stimuli
+EnglishFD_txt = FinalDevoicing(onset_ae, coda_ae, vowel_ae_txt, syll_struct_ae,
+                               "EnglishFD_txt")
+EnglishFD_txt.generate_stimuli()
+EnglishFD_fea = FinalDevoicing(onset_ae, coda_ae, vowel_ae_txt, syll_struct_ae,
+                               "EnglishFD_fea")
+EnglishFD_fea.generate_stimuli()
+EnglishFD_aud = FinalDevoicing(onset_ae, coda_ae, vowel_ae_aud, syll_struct_ae,
+                               "EnglishFD_aud")
+EnglishFD_aud.generate_stimuli()
+
+
+# Language: Cantonese Backness Harmony
 # Phoneme inventory:
 onset_c = {
     onset: None for onset in ['m', 'n', 'ng', 'p', 't', 'k', 'b', 'd', 'g', 'z', 'c', 's', 'f', 'h']
@@ -86,4 +122,7 @@ languages = {
     "EnglishBH_fea": EnglishBH_fea,
     "EnglishBH_nonidentical_fea": EnglishBH_nonidentical_fea,
     "EnglishBH_aud": EnglishBH_aud,
+    "EnglishFD_txt": EnglishFD_txt,
+    "EnglishFD_fea": EnglishFD_fea,
+    "EnglishFD_aud": EnglishFD_aud
 }
