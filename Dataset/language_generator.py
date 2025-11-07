@@ -18,6 +18,12 @@ class LanguagePattern:
         self.vowel = vowel
         self.focus = {}  # different focus for different language pattern
 
+    def generate_stimuli(self):
+        pass
+
+    def decompose_stimuli(self, word_list):
+        pass
+
 
 class BacknessHarmony(LanguagePattern):
     def __init__(self, onset, coda, vowel, syll_struct, lang_name):
@@ -34,6 +40,7 @@ class BacknessHarmony(LanguagePattern):
         for stem_v in self.vowel:
             for ur_suffix_v in self.vowel:
                 # disallowing identical vowels, i.e. vowels w/ identical height and tenseness
+                # comment out the if statement when generating full stimuli list
                 if not (self.vowel[ur_suffix_v][1] == self.vowel[stem_v][1]
                         and self.vowel[ur_suffix_v][2] == self.vowel[stem_v][2]):
                     for sr_suffix_v in self.vowel:
@@ -127,7 +134,6 @@ class BacknessHarmony(LanguagePattern):
 
         return harmony_list, disharmony_list
 
-
     # function to decompose vowel harmony stimuli with specified phoneme inventory
     def decompose_stimuli(self, word_list):
 
@@ -217,3 +223,102 @@ class BacknessHarmony(LanguagePattern):
             raise RuntimeError(f"Problem with output recording {word_list}")
 
         return sylls
+
+
+class FinalDevoicing(LanguagePattern):
+    def __init__(self, onset, coda, vowel, syll_struct, lang_name):
+        super().__init__(onset, coda, vowel, syll_struct, lang_name)
+        self.focus = self.coda
+
+    # function to generate final devoicing stimuli with specified phoneme inventory and syllable structure
+    def generate_stimuli(self):
+        print(" - Generating stimuli:")
+
+        # separate voiceless and voiced codas
+        coda_voiceless = [c for c in self.coda if self.coda[c] == "voiceless"]
+        coda_voiced = [c for c in self.coda if self.coda[c] == "voiced"]
+
+        devoice_list = []
+        voice_list = []
+        previous_devoice = []
+        previous_voice = []
+
+        # generate all possible syllables for current syllable structure
+        # based on the list of syllables from previous syllable structure
+        # VC -> CVC -> VCVC -> CVCVC
+        for struct in self.syll_struct:
+
+            if len(struct) == 2:  # VC
+                devoice_list.extend([v + c1, v + c2] for v, (c1, c2) in
+                                    itertools.product(self.vowel, zip(coda_voiceless, coda_voiceless)))
+                devoice_list.extend([v + c1, v + c2] for v, (c1, c2) in
+                                    itertools.product(self.vowel, zip(coda_voiced, coda_voiceless)))
+                voice_list.extend([v + c1, v + c2] for v, (c1, c2) in
+                                  itertools.product(self.vowel, zip(coda_voiceless, coda_voiced)))
+                voice_list.extend([v + c1, v + c2] for v, (c1, c2) in
+                                  itertools.product(self.vowel, zip(coda_voiced, coda_voiced)))
+
+                previous_devoice.extend([v + c1, v + c2] for v, (c1, c2) in
+                                        itertools.product(self.vowel, zip(coda_voiceless, coda_voiceless)))
+                previous_devoice.extend([v + c1, v + c2] for v, (c1, c2) in
+                                        itertools.product(self.vowel, zip(coda_voiced, coda_voiceless)))
+                previous_voice.extend([v + c1, v + c2] for v, (c1, c2) in
+                                      itertools.product(self.vowel, zip(coda_voiceless, coda_voiced)))
+                previous_voice.extend([v + c1, v + c2] for v, (c1, c2) in
+                                      itertools.product(self.vowel, zip(coda_voiced, coda_voiced)))
+
+            elif struct[0] == 'V':  # VCVC
+                current_devoice = [[v + ur, v + sr] for v, [ur, sr] in
+                                   itertools.product(self.vowel, previous_devoice)]
+                current_voice = [[v + ur, v + sr] for v, [ur, sr] in
+                                 itertools.product(self.vowel, previous_voice)]
+
+                devoice_list.extend(current_devoice)
+                voice_list.extend(current_voice)
+
+                previous_devoice = current_devoice
+                previous_voice = current_voice
+
+            else:  # CVC, CVCVC
+                current_devoice = [[c + ur, c + sr] for c, [ur, sr] in
+                                   itertools.product(self.onset, previous_devoice)]
+                current_voice = [[c + ur, c + sr] for c, [ur, sr] in
+                                 itertools.product(self.onset, previous_voice)]
+
+                devoice_list.extend(current_devoice)
+                voice_list.extend(current_voice)
+
+                previous_devoice = current_devoice
+                previous_voice = current_voice
+
+            print(f"Now generating syllable structure {struct}, accumulating to {len(devoice_list)} pairs")
+            print(f"Example {struct} devoicing pair: {devoice_list[len(devoice_list) - 1]}")
+            print(f"Example {struct} voicing pair: {voice_list[len(voice_list) - 1]}")
+
+        print(" - Writing to file:")
+        devoice_file = self.lang_name + "_devoicing.csv"
+        voice_file = self.lang_name + "_voicing.csv"
+
+        with open(devoice_file, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            # write header
+            header = ['ur', 'sr']
+            writer.writerow(header)
+            # write stimuli list
+            writer.writerows(devoice_list)
+        print("Devoicing file ready.")
+
+        with open(voice_file, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            # write header
+            header = ['ur', 'sr']
+            writer.writerow(header)
+            # write stimuli list
+            writer.writerows(voice_list)
+        print("Voicing file ready.")
+
+        return devoice_list, voice_list
+
+    # function to decompose final devoicing stimuli with specified phoneme inventory
+    def decompose_stimuli(self, word_list):
+        pass
