@@ -2,8 +2,8 @@ import os
 import torch
 import numpy as np
 import pandas as pd
-import matplotlib.ticker as ticker
 import matplotlib.pyplot as plt
+import plotly.express as px
 from sklearn.decomposition import PCA
 from nooverlap import push_text_free
 
@@ -123,7 +123,9 @@ def plot_embed(embed_store, focus_embed_store, embed_plot):
         ax2.text(x=focus_reduced_df.loc[i, 'pc1'],
                  y=focus_reduced_df.loc[i, 'pc2'],
                  z=focus_reduced_df.loc[i, 'pc3'],
-                 s=focus_reduced_df.loc[i, 'phoneme'])
+                 s=focus_reduced_df.loc[i, 'phoneme'],
+                 ha='left',
+                 va='bottom')
     ax2.set_xlabel("pc1")
     ax2.set_ylabel("pc2")
     ax2.set_zlabel("pc3")
@@ -142,7 +144,9 @@ def plot_embed(embed_store, focus_embed_store, embed_plot):
         ax1.text(x=reduced_df.loc[i, 'pc1'],
                  y=reduced_df.loc[i, 'pc2'],
                  z=reduced_df.loc[i, 'pc3'],
-                 s=reduced_df.loc[i, 'phoneme'])
+                 s=reduced_df.loc[i, 'phoneme'],
+                 ha='left',
+                 va='bottom')
     ax1.set_xlabel("pc1")
     ax1.set_ylabel("pc2")
     ax1.set_zlabel("pc3")
@@ -153,3 +157,56 @@ def plot_embed(embed_store, focus_embed_store, embed_plot):
     plt.savefig(embed_plot, dpi=300)
     plt.close()
     #plt.show()
+
+def plot_embed_updated(embed_files, embed_plots):
+
+    # iterate through all files in the directory and read into dataframes
+    dfs = []
+    focus_dfs = []
+    for file_name in os.listdir(embed_files):
+        if file_name.endswith(".csv"):
+            file_path = os.path.join(embed_files, file_name)
+            # read columns from csv files as rows in tibble, with phonemes as a new column not index
+            df = pd.read_csv(file_path).transpose().reset_index(names='phoneme')
+            # add a new column with the file name
+            df.insert(0, 'file_name', file_name)
+            # analyze file name
+            df[['language', 'model', 'condition', 'run_num', 'epoch', 'ur/sr', 'none']] = \
+                df['file_name'].str.split("_", expand=True)
+            # select only focus phonemes
+            focus_df = df[df['phoneme'].isin(['i', 'e', 'u', 'o', 'ɪ', 'ɛ', 'ʊ', 'ɔ'])]
+            # append to list of dataframes
+            dfs.append(df)
+            focus_dfs.append(focus_df)
+
+    # combine lists of dataframes
+    combined_df = pd.concat(dfs, ignore_index=True)
+    focus_combined_df = pd.concat(focus_dfs, ignore_index=True)
+
+    # use PCA to project the data from embedding_dim to 3D
+    pca = PCA(n_components=3)
+    reduced_data = pca.fit_transform(combined_df.loc[:, 0:10])
+    reduced_df = pd.DataFrame(data=reduced_data,
+                              columns=['pc1', 'pc2', 'pc3'])
+
+    focus_pca = PCA(n_components=3)
+    focus_reduced_data = focus_pca.fit_transform(focus_combined_df.loc[:, 0:10])
+    focus_reduced_df = pd.DataFrame(data=focus_reduced_data,
+                                    columns=['pc1', 'pc2', 'pc3'])
+
+    # combine metalinguistic information
+    combined_df = pd.concat([combined_df, reduced_df], axis=1)
+    focus_combined_df = pd.concat([focus_combined_df, focus_reduced_df], axis=1)
+
+    # create 3d scatter plot with plotly
+    selected_df = combined_df[(combined_df['condition'] == "disharmony") & (combined_df['run_num' == 'run1'])]
+    fig = px.scatter_3d(selected_df,
+                        x='pc1',
+                        y='pc2',
+                        z='pc3',
+                        color='phoneme',
+                        animation_frame='epoch')
+    fig.show()
+
+plot_embed_updated("/home/ldlmdl/Documents/subinphon/Results/2506271050_0.01_init_EnglishBH_txt/EnglishBH_txt_embed_files",
+                   "/home/ldlmdl/Documents/subinphon/Results/EnglishBH_all_embed_files/hi")
