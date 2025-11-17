@@ -3,7 +3,6 @@
 # A script to load custom dataset with self-defined class inherited from torch Dataset
 
 import os
-import re
 import pandas as pd
 import random
 import torch
@@ -22,22 +21,20 @@ class AudioDataset(Dataset):
         self.device = device
         self.audio_dir = audio_dir
         self.annotations = pd.read_csv(annotations_file)
-        self.ur = self.annotations["ur"]
-        self.sr = self.annotations["sr"]
+        self.ur_words = self.annotations["ur"]
+        self.sr_words = self.annotations["sr"]
 
         # define special characters
         self.specials = special_tokens
         self.pad_idx = self.specials.index("<PAD>")
 
         # build ur alphabet
-        self.ur_name = re.split('[/_.]', annotations_file)[2] + "_ur"
-        self.ur_alphabet = Alphabet(self.ur_name, self.specials)
-        self.ur_alphabet.build_alphabet(self.ur)
+        self.ur_alphabet = Alphabet(self.specials)
+        self.ur_alphabet.build_alphabet(self.ur_words)
 
         # build sr alphabet
-        self.sr_name = re.split('[/_.]', annotations_file)[2] + "_sr"
-        self.sr_alphabet = Alphabet(self.sr_name, self.specials)
-        self.sr_alphabet.build_alphabet(self.sr)
+        self.sr_alphabet = Alphabet(self.specials)
+        self.sr_alphabet.build_alphabet(self.sr_words)
 
         # audio attributes
         self.sample_rate = sample_rate
@@ -57,13 +54,13 @@ class AudioDataset(Dataset):
     def __getitem__(self, index):
         # audio: [n_channels, n_samples]
         # retrieve source audio
-        src_label = self.ur[index]
+        src_label = self.ur_words[index]
         src_path = os.path.join(self.audio_dir, (src_label + ".wav"))
         src_audio, src_sr = torchaudio.load(src_path, format="wav")
         src_audio = src_audio.to(self.device)
 
         # retrieve target audio
-        trg_label = self.sr[index]
+        trg_label = self.sr_words[index]
         trg_path = os.path.join(self.audio_dir, (trg_label + ".wav"))
         trg_audio, trg_sr = torchaudio.load(trg_path, format="wav")
         trg_audio = trg_audio.to(self.device)
@@ -83,12 +80,12 @@ class AudioDataset(Dataset):
             trg_audio = self._power_to_db(trg_audio)
 
         # get source text
-        src = self.ur[index]
+        src = self.ur_words[index]
         src_vector = self.ur_alphabet.word2vec(src)
         src_tensor = torch.tensor(src_vector).to(self.device)
 
         # get target text
-        trg = self.sr[index]
+        trg = self.sr_words[index]
         trg_vector = self.sr_alphabet.word2vec(trg)
         trg_tensor = torch.tensor(trg_vector).to(self.device)
 

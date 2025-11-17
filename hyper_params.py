@@ -45,12 +45,16 @@ n_mels = 128
 data_split_ratio = [0.6, 0.2, 0.2]
 
 # Model hyperparameters
-encoder_embedding_dim = 11  # original=300
-decoder_embedding_dim = 11  # original=300
-hidden_dim = 4  # original=256
-n_layers = 1
-encoder_dropout = 0.2  # 0.0 is equivalent to Identity function
-decoder_dropout = 0.2  # 0.0 is equivalent to Identity function
+text_embedding_dim = 11  # original=300
+audio_embedding_dim = 32
+text_hidden_dim = 4  # original=256
+audio_hidden_dim = 8
+text_n_layers = 1
+audio_n_layers = 2
+aux_n_layers = 1  # auxiliary duration prediction networks
+num_heads = 2  # number of multihead attention
+text_dropout = 0.2  # 0.0 is equivalent to Identity function
+audio_dropout = 0.2  # 0.0 is equivalent to Identity function
 teacher_forcing_ratio = 0.5  # original=0.5
 
 # Training hyperparameters

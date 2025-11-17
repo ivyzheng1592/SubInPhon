@@ -55,6 +55,9 @@ EnglishBH_nonidentical_fea = BacknessHarmony(onset_ae, coda_ae, vowel_ae_txt, sy
 EnglishBH_aud = BacknessHarmony(onset_ae, coda_ae, vowel_ae_aud, syll_struct_ae,
                                 "EnglishBH_aud")
 #EnglishBH_aud.generate_stimuli()
+EnglishBH_nonidentical_aud = BacknessHarmony(onset_ae, coda_ae, vowel_ae_aud, syll_struct_ae,
+                                             "EnglishBH_nonidentical_aud")
+#EnglishBH_nonidentical_aud.generate_stimuli()
 
 
 """
@@ -83,13 +86,13 @@ syll_struct_ae = ["VC", "CVC", "VCVC", "CVCVC"]
 # Stimuli
 EnglishFD_txt = FinalDevoicing(onset_ae, coda_ae, vowel_ae_txt, syll_struct_ae,
                                "EnglishFD_txt")
-EnglishFD_txt.generate_stimuli()
+#EnglishFD_txt.generate_stimuli()
 EnglishFD_fea = FinalDevoicing(onset_ae, coda_ae, vowel_ae_txt, syll_struct_ae,
                                "EnglishFD_fea")
-EnglishFD_fea.generate_stimuli()
+#EnglishFD_fea.generate_stimuli()
 EnglishFD_aud = FinalDevoicing(onset_ae, coda_ae, vowel_ae_aud, syll_struct_ae,
                                "EnglishFD_aud")
-EnglishFD_aud.generate_stimuli()
+#EnglishFD_aud.generate_stimuli()
 
 
 # Language: Cantonese Backness Harmony

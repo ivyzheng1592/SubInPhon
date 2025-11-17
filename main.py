@@ -9,9 +9,10 @@ from text_run import TextRun
 from text_record import TextRecorder
 from feature_dataset import FeatureDataset
 from feature_network import FeatureSeq2Seq
-from audio_dataset_loader import AudioDataset
-from audio_network_1 import AudioSeq2Seq
-from audio_run import AudioRun
+from audio_dataset import AudioDataset
+from audio_network import AudioSeq2Seq
+from audio_run_1 import AudioRun
+from audio_record import AudioRecorder
 import hyper_params as hp
 
 
@@ -45,10 +46,7 @@ def text(trial_num, lang_name, conditions, runs, run_mode, device):
             output_dim = len(dataset.sr_alphabet)
 
             # model initialization
-            seq2seq = TextSeq2Seq(encoder_input_dim, decoder_input_dim,
-                                  hp.encoder_embedding_dim, hp.decoder_embedding_dim,
-                                  hp.n_layers, hp.hidden_dim, output_dim,
-                                  hp.encoder_dropout, hp.decoder_dropout, device=device)
+            seq2seq = TextSeq2Seq(encoder_input_dim, decoder_input_dim, output_dim, device=device)
 
             # embedding weight initialization
             for name, param in seq2seq.named_parameters():
@@ -101,11 +99,8 @@ def feature(trial_num, lang_name, conditions, runs, run_mode, freeze, device):
             decoder_embedding_weight = dataset.sr_embedding
 
             # model initialization
-            seq2seq = FeatureSeq2Seq(encoder_input_dim, decoder_input_dim,
-                                     hp.encoder_embedding_dim, hp.decoder_embedding_dim,
+            seq2seq = FeatureSeq2Seq(encoder_input_dim, decoder_input_dim, output_dim,
                                      encoder_embedding_weight, decoder_embedding_weight,
-                                     hp.n_layers, hp.hidden_dim, output_dim,
-                                     hp.encoder_dropout, hp.decoder_dropout,
                                      freeze=freeze, device=device)
 
             print(" - Preparing data recorder:")
@@ -122,48 +117,61 @@ def feature(trial_num, lang_name, conditions, runs, run_mode, freeze, device):
                 rep.evaluate_embedding()
 
 
-"""
-# a function that loads audio dataset, initializes audio model
-# and completes multiple runs of training and evaluation of one condition
-def audio_condition(trial_num, datatype, language, condition, n_run, n_check, device):
+# a function that loads audio dataset, initializes audio model for each run of each condition
+def audio(trial_num, lang_name, conditions, runs, run_mode, device):
 
-    print(" - Loading dataset:")
-    annotations_file = os.path.join("Dataset", language + "_" + condition + ".csv")
-    audio_dir = os.path.join("Dataset", "audio", language)
-    dataset = AudioDataset(annotations_file, audio_dir, hp.special_tokens,
-                           hp.sample_rate, hp.n_samples, hp.n_fft, hp.hop_length, hp.n_mels,
-                           wav2mel=True, power2db=True, device=device)
+    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name), exist_ok=True)
 
-    print(" - Splitting dataset:")
-    train_data, valid_data, test_data = dataset.split_dataset(hp.data_split_ratio)
+    for condition in conditions:
+        print(" - Instantiating language pattern:")
+        language = languages[lang_name]
 
-    print(" - Creating dataloader:")
-    train_dataloader = train_data.dataset.get_dataloader(hp.batch_size)
-    valid_dataloader = valid_data.dataset.get_dataloader(hp.batch_size)
-    test_dataloader = test_data.dataset.get_dataloader(hp.batch_size)
+        print(" - Loading dataset:")
+        annotations_file = os.path.join("Dataset", language + "_" + condition + ".csv")
+        audio_dir = os.path.join("Dataset", "audio", language)
+        dataset = AudioDataset(annotations_file, audio_dir, hp.special_tokens,
+                               hp.sample_rate, hp.n_samples, hp.n_fft, hp.hop_length, hp.n_mels,
+                               wav2mel=True, power2db=True, device=device)
 
-    print(" - Initializing model:")
-    # model hyperparameters
-    encoder_input_dim = hp.n_mels
-    decoder_input_dim = hp.n_mels
-    output_dim = hp.n_mels
+        for run_num in runs:
 
-    # model initialization
-    seq2seq = AudioSeq2Seq(encoder_input_dim, decoder_input_dim,
-                           hp.encoder_embedding_dim, hp.decoder_embedding_dim,
-                           hp.n_layers, hp.hidden_dim, output_dim,
-                           hp.encoder_dropout, hp.decoder_dropout, device=device)
+            print(" - Splitting dataset:")
+            train_data, valid_data, test_data = dataset.split_dataset(hp.data_split_ratio)
 
-    print(" - Training and evaluating model:")
-    for run in n_run:
-        rep = AudioRun(seq2seq, trial_num, datatype, language, condition, run)
-        rep.train(train_dataloader, valid_dataloader)
-        rep.test(test_dataloader)
+            print(" - Creating dataloader:")
+            train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
+            valid_dataloader = dataset.get_dataloader(valid_data, hp.batch_size)
+            test_dataloader = dataset.get_dataloader(test_data, hp.batch_size)
 
-    #print(" - Inspecting model outputs:")
-    #for check in n_check:
-        #reps[check].evaluate_one_batch(test_dataloader, dataset)
-"""
+            print(" - Initializing model:")
+            # model hyperparameters
+            encoder_input_dim = hp.n_mels
+            decoder_input_dim = hp.n_mels
+            output_dim = hp.n_mels
+
+            # model initialization
+            seq2seq = AudioSeq2Seq(encoder_input_dim, decoder_input_dim, output_dim, device=device)
+
+            # embedding weight initialization
+            for name, param in seq2seq.named_parameters():
+                if "embedding.weight" in name:
+                    nn.init.uniform_(param.data, a=0, b=0.01)
+
+            """
+            the rest are not ready
+            """
+            print(" - Preparing data recorder:")
+            recorder = AudioRecorder(dataset, trial_num, language, condition, run_num)
+
+            print(" - Training and evaluating model:")
+            rep = AudioRun(seq2seq, recorder)
+            if run_mode == "train and evaluate":
+                rep.train(train_dataloader, valid_dataloader)
+                rep.test(test_dataloader)
+                rep.evaluate_attention(test_dataloader)
+                rep.evaluate_embedding()
+            else: # evaluate embedding only
+                rep.evaluate_embedding()
 
 
 if __name__ == "__main__":

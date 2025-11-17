@@ -5,22 +5,29 @@
 import torch
 import torch.nn as nn
 import random
+import hyper_params as hp
 
 
 class TextEncoder(nn.Module):
-    def __init__(self, input_dim, embedding_dim, hidden_dim, n_layers, dropout):
+    def __init__(self, input_dim):
         super(TextEncoder, self).__init__()
 
         self.input_dim = input_dim
-        self.embedding_dim = embedding_dim
-        self.hidden_dim = hidden_dim
-        self.n_layers = n_layers
+        self.embedding_dim = hp.text_embedding_dim
+        self.hidden_dim = hp.text_hidden_dim
+        self.n_layers = hp.text_n_layers
+        self.dropout = hp.text_dropout
 
-        self.embedding = nn.Embedding(input_dim, embedding_dim)  # map the input vocabulary to a d-dimensional space
-        self.rnn = nn.LSTM(embedding_dim, hidden_dim, n_layers, bidirectional=True)  # input embedding space, output hidden space
-        self.fc_hidden = nn.Linear(hidden_dim * 2, hidden_dim)  # select the better hidden from forward and backward
-        self.fc_cell = nn.Linear(hidden_dim * 2, hidden_dim)  # select the better cell from forward and backward
-        self.dropout = nn.Dropout(dropout)  # dropout probability, see https://arxiv.org/abs/1207.0580
+        self.embedding = nn.Embedding(input_dim, self.embedding_dim)
+        # map the input vocabulary to a d-dimensional space
+        self.rnn = nn.LSTM(self.embedding_dim, self.hidden_dim, self.n_layers, bidirectional=True)
+        # input embedding space, output hidden space
+        self.fc_hidden = nn.Linear(self.hidden_dim * 2, self.hidden_dim)
+        # select the better hidden from forward and backward
+        self.fc_cell = nn.Linear(self.hidden_dim * 2, self.hidden_dim)
+        # select the better cell from forward and backward
+        self.dropout = nn.Dropout(self.dropout)
+        # dropout probability, see https://arxiv.org/abs/1207.0580
 
     def forward(self, input):
         # input = [input_len, batch_size]
@@ -47,11 +54,17 @@ class TextEncoder(nn.Module):
 
 
 class BahdanauAttention(nn.Module):
-    def __init__(self, hidden_dim):
+    def __init__(self):
         super(BahdanauAttention, self).__init__()
-        self.fc_W1 = nn.Linear(hidden_dim * 2, hidden_dim)  # update weight of forward and backward encoder states
-        self.fc_W2 = nn.Linear(hidden_dim, hidden_dim)  # update weight of decoder hidden
-        self.fc_V = nn.Linear(hidden_dim, 1)  # output a score for each alignment
+
+        self.hidden_dim = hp.text_hidden_dim
+
+        self.W1 = nn.Linear(self.hidden_dim * 2, self.hidden_dim)
+        # update weight of forward and backward encoder states
+        self.W2 = nn.Linear(self.hidden_dim, self.hidden_dim)
+        # update weight of decoder hidden
+        self.V = nn.Linear(self.hidden_dim, 1)
+        # output a score for each alignment
         # ignoring bias=False in Ben Trevett tutorial
 
     def forward(self, encoder_states, hidden):
@@ -68,57 +81,55 @@ class BahdanauAttention(nn.Module):
         # construct a soft alignment between target decoder hidden (query) and encoder hidden of each input token (key)
         # calculate the score of each src input token
         # run the score through softmax to get the weight of each src input token
-        score = self.fc_V(torch.tanh(self.fc_W1(encoder_states) + self.fc_W2(hidden)))
+        # compute the context vector by multiplying the attention weight to all encoder hidden (value)
+        score = self.V(torch.tanh(self.W1(encoder_states) + self.W2(hidden)))
         # score = [batch_size, src_len, hidden_dim] -> score = [batch_size, src_len, 1]
         weight = torch.softmax(score.squeeze(2), dim=1)
         # weight = [batch_size, src_len]
+        context_vector = torch.bmm(weight.unsqueeze(1), encoder_states).permute(1, 0, 2)
+        # weight = [batch_size, 1, src_len]
+        # encoder_states = [batch_size, src_len, hidden_dim * 2]
+        # context_vector = [batch_size, 1, hidden_dim *2] -> context_vector = [1, batch_size, hidden_dim * 2]
 
-        return weight
+        return context_vector, weight
 
 
 class TextDecoder(nn.Module):
-    def __init__(self, input_dim, embedding_dim, hidden_dim, output_dim, n_layers, dropout, attention):
+    def __init__(self, input_dim, output_dim):
         super(TextDecoder, self).__init__()
 
         self.input_dim = input_dim
-        self.embedding_dim = embedding_dim
-        self.hidden_dim = hidden_dim
+        self.embedding_dim = hp.text_embedding_dim
+        self.hidden_dim = hp.text_hidden_dim
         self.output_dim = output_dim
-        self.n_layers = n_layers
+        self.n_layers = hp.text_n_layers
+        self.dropout = hp.text_dropout
         assert (
             self.input_dim == self.output_dim
         ), "Decoder input dimension and output dimension must be the same!"
 
-        self.embedding = nn.Embedding(input_dim, embedding_dim)
-        self.rnn = nn.LSTM(hidden_dim * 2 + embedding_dim, hidden_dim, n_layers)  # input forward and backward encoder hidden states and embedding
-        self.fc_out = nn.Linear(hidden_dim * 3 + embedding_dim, output_dim)  # take into account context vector, decoder hidden, and embedding for the prediction
-        self.dropout = nn.Dropout(dropout)
-        self.attention = attention
+        self.embedding = nn.Embedding(input_dim, self.embedding_dim)
+        # map the input vocabulary to a d-dimensional space
+        self.rnn = nn.LSTM(self.hidden_dim * 2 + self.embedding_dim, self.hidden_dim, self.n_layers)
+        # input context vector and embedding, output hidden space
+        self.fc_out = nn.Linear(self.hidden_dim * 3 + self.embedding_dim, output_dim)
+        # take into account context vector, decoder hidden, and embedding for the prediction
+        self.dropout = nn.Dropout(self.dropout)
 
-    def forward(self, input, encoder_states, hidden, cell):
+    def forward(self, input, context_vector, hidden, cell):
         # input = [batch_size]
-        # encoder_states = [src_len, batch_size, hidden_dim * 2]
+        # context_vector = [1, batch_size, hidden_dim * 2]
         # hidden = [batch_size, hidden_dim]
         # cell = [batch_size, hidden_dim]
 
         input = input.unsqueeze(0)
         # input = [input_len=1, batch_size]
-
         embedding = self.dropout(self.embedding(input))
         # embedding = [1, batch_size, embedding_dim]
 
-        # calculate the attention weight with target decoder hidden (query) and all encoder hidden (key)
-        # compute the context vector by multiplying the attention weight to each target embedding (value)
         # concatenate the target embedding and the context vector as the rnn input
-        weight = self.attention(encoder_states, hidden)
-        # weight = [batch_size, src_len]
-        context_vector = torch.bmm(weight.unsqueeze(1), encoder_states.permute(1, 0, 2)).permute(1, 0, 2)
-        # weight = [batch_size, 1, src_len]
-        # encoder_states = [batch_size, src_len, hidden_dim * 2]
-        # context_vector = [batch_size, 1, hidden_dim *2] -> context_vector = [1, batch_size, hidden_dim * 2]
         rnn_input = torch.cat((embedding, context_vector), dim=2)
         # rnn_input = [1, batch_size, hidden_dim * 2 + embedding_dim]
-
         decoder_state, (hidden, cell) = self.rnn(rnn_input, (hidden.unsqueeze(0), cell.unsqueeze(0)))
         # decoder_state = [1, batch_size, hidden_dim]
         # hidden = [1, batch_size, hidden_dim]
@@ -135,33 +146,24 @@ class TextDecoder(nn.Module):
         output = self.fc_out(torch.cat((embedding, decoder_state, context_vector), dim=1))
         # output = [batch_size, output_dim]
 
-        return output, hidden, cell, weight
+        return output, hidden, cell
 
 
 class TextSeq2Seq(nn.Module):
-    def __init__(self, encoder_input_dim, decoder_input_dim, encoder_embedding_dim, decoder_embedding_dim,
-                 n_layers, hidden_dim, output_dim, encoder_dropout, decoder_dropout, device='cuda'):
+    def __init__(self, encoder_input_dim, decoder_input_dim, output_dim, device='cuda'):
         super(TextSeq2Seq, self).__init__()
 
         self.device = device
         self.encoder_input_dim = encoder_input_dim
         self.decoder_input_dim = decoder_input_dim
-        self.encoder_embedding_dim = encoder_embedding_dim
-        self.decoder_embedding_dim = decoder_embedding_dim
-        self.n_layers = n_layers
-        self.hidden_dim = hidden_dim
         self.output_dim = output_dim
-        self.encoder_dropout = encoder_dropout
-        self.decoder_dropout = decoder_dropout
 
         # model components
-        self.attention = BahdanauAttention(hidden_dim)
-        self.encoder = TextEncoder(encoder_input_dim, encoder_embedding_dim, hidden_dim,
-                                   n_layers, encoder_dropout).to(self.device)
-        self.decoder = TextDecoder(decoder_input_dim, decoder_embedding_dim, hidden_dim, output_dim,
-                                   n_layers, decoder_dropout, self.attention).to(self.device)
+        self.attention = BahdanauAttention()
+        self.encoder = TextEncoder(encoder_input_dim).to(self.device)
+        self.decoder = TextDecoder(decoder_input_dim, output_dim).to(self.device)
 
-    def forward(self, src, trg, teacher_forcing_ratio=0.5):
+    def forward(self, src, trg, teacher_forcing_ratio=hp.teacher_forcing_ratio):
         # src = [src_len, batch_size]
         # trg = [trg_len, batch_size]
 
@@ -187,14 +189,18 @@ class TextSeq2Seq(nn.Module):
 
         input = trg[0]  # first input to the decoder is the <SOS> token
         for t in range(1, trg_len):
-            # at every time step, insert trg input token, encoder_states, and previous hidden and cell
+            # at every time step, calculate the attention weight with target decoder hidden (query) and all encoder hidden (key, value)
+            context_vector, weight = self.attention(encoder_states, hidden)
+            # context_vector = [1, batch_size, hidden_dim * 2]
+            # weight = [batch_size, src_len]
+
+            # insert trg input token, context_vector, and previous hidden and cell
             # receive output and new hidden and cell
             # and get the best word predicted by the decoder
-            output, hidden, cell, weight = self.decoder(input, encoder_states, hidden, cell)
+            output, hidden, cell = self.decoder(input, context_vector, hidden, cell)
             # output = [batch_size, output_dim]
             # hidden = [batch_size, decoder_hidden_dim]
             # cell = [batch_size, decoder_hidden_dim]
-            # weight = [batch_size, src_len]
             best_guess = output.argmax(1)
             # best_guess = [batch_size]
 
@@ -214,17 +220,13 @@ class TextSeq2Seq(nn.Module):
 
 if __name__ == "__main__":
     import torchinfo
-    import hyper_params as hp
 
     print(" - Initializing model:")
     encoder_input_dim = 30
     decoder_input_dim = 30
     output_dim = 30
 
-    seq2seq = TextSeq2Seq(encoder_input_dim, decoder_input_dim,
-                          hp.encoder_embedding_dim, hp.decoder_embedding_dim,
-                          hp.n_layers, hp.hidden_dim, output_dim,
-                          hp.encoder_dropout, hp.decoder_dropout, device='cpu').to('cpu')
+    seq2seq = TextSeq2Seq(encoder_input_dim, decoder_input_dim, output_dim, device='cpu').to('cpu')
 
     # inspect model structure
     torchinfo.summary(seq2seq, input_size = [(8, 32), (8, 32)], dtypes=[torch.long, torch.long],
