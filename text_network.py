@@ -13,7 +13,7 @@ class TextEncoder(nn.Module):
         super(TextEncoder, self).__init__()
 
         self.input_dim = input_dim
-        self.embedding_dim = hp.text_embedding_dim
+        self.embedding_dim = hp.embedding_dim
         self.hidden_dim = hp.text_hidden_dim
         self.n_layers = hp.text_n_layers
         self.dropout = hp.text_dropout
@@ -99,7 +99,7 @@ class TextDecoder(nn.Module):
         super(TextDecoder, self).__init__()
 
         self.input_dim = input_dim
-        self.embedding_dim = hp.text_embedding_dim
+        self.embedding_dim = hp.embedding_dim
         self.hidden_dim = hp.text_hidden_dim
         self.output_dim = output_dim
         self.n_layers = hp.text_n_layers
@@ -159,7 +159,7 @@ class TextSeq2Seq(nn.Module):
         self.output_dim = output_dim
 
         # model components
-        self.attention = BahdanauAttention()
+        self.attention = BahdanauAttention().to(self.device)
         self.encoder = TextEncoder(encoder_input_dim).to(self.device)
         self.decoder = TextDecoder(decoder_input_dim, output_dim).to(self.device)
 

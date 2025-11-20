@@ -45,8 +45,8 @@ n_mels = 128
 data_split_ratio = [0.6, 0.2, 0.2]
 
 # Model hyperparameters
-text_embedding_dim = 11  # original=300
-audio_embedding_dim = 32
+embedding_dim = 11  # original=300
+prenet_dim = 32
 text_hidden_dim = 4  # original=256
 audio_hidden_dim = 8
 text_n_layers = 1

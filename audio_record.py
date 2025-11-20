@@ -22,7 +22,7 @@ class AudioRecorder:
         # result storages
         self.acc_store = {
             'trial_num': [], 'language': [], 'condition': [], 'run_num': [], 'epoch': [],
-            'record_type': [], 'loss': [], 'acc': []
+            'record_type': [], 'rec_loss': [], 'pred_acc': []
         }
 
         self.pred_store = {

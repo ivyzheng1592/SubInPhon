@@ -10,8 +10,8 @@ from text_record import TextRecorder
 from feature_dataset import FeatureDataset
 from feature_network import FeatureSeq2Seq
 from audio_dataset import AudioDataset
-from audio_network import AudioSeq2Seq
-from audio_run_1 import AudioRun
+from audio_network_t2 import AudioSeq2Seq
+from audio_run import AudioRun
 from audio_record import AudioRecorder
 import hyper_params as hp
 
@@ -146,20 +146,15 @@ def audio(trial_num, lang_name, conditions, runs, run_mode, device):
             print(" - Initializing model:")
             # model hyperparameters
             encoder_input_dim = hp.n_mels
-            decoder_input_dim = hp.n_mels
-            output_dim = hp.n_mels
+            decoder_input_dim = len(dataset.sr_alphabet)
+            synthsizer_input_dim = hp.n_mels
+            text_output_dim = len(dataset.sr_alphabet)
+            audio_output_dim = hp.n_mels
 
             # model initialization
-            seq2seq = AudioSeq2Seq(encoder_input_dim, decoder_input_dim, output_dim, device=device)
+            seq2seq = AudioSeq2Seq(encoder_input_dim, decoder_input_dim, synthsizer_input_dim,
+                                   text_output_dim, audio_output_dim, device=device)
 
-            # embedding weight initialization
-            for name, param in seq2seq.named_parameters():
-                if "embedding.weight" in name:
-                    nn.init.uniform_(param.data, a=0, b=0.01)
-
-            """
-            the rest are not ready
-            """
             print(" - Preparing data recorder:")
             recorder = AudioRecorder(dataset, trial_num, language, condition, run_num)
 

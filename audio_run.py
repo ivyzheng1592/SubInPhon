@@ -20,7 +20,8 @@ class AudioRun:
 
         # optimizer and loss function
         self.optimizer = torch.optim.Adam(self.seq2seq.parameters(), lr=hp.learning_rate)
-        self.criterion = nn.MSELoss(reduction='mean')
+        self.RecLoss = nn.MSELoss(reduction='mean')
+        self.PredLoss = nn.CrossEntropyLoss(ignore_index=hp.special_tokens.index(hp.pad_token))
 
     # a function that completes one repetition of training
     def train(self, train_dataloader, valid_dataloader):
@@ -84,13 +85,14 @@ class AudioRun:
 
         # training in one batch
         for i, (src, trg) in enumerate(data_loader):
-            # src = [src_len, batch_size]
-            # trg = [trg_len, batch_size]
+            # src = ([txt_src_len, batch_size], [batch_size, n_channels, freq, aud_src_len])
+            # trg = ([txt_trg_len, batch_size], [batch_size, n_channels, freq, aud_trg_len])
 
             self.optimizer.zero_grad()  # reset gradient at each iteration to 0
-            output, pred, _ = self.seq2seq(src, trg, teacher_forcing_ratio)
-            # output = [trg_len, batch_size, output_dim]
-            # pred = [trg_len, batch_size]
+            output, pred, spec = self.seq2seq(src, trg, teacher_forcing_ratio)
+            # output = [txt_trg_len, batch_size, output_dim]
+            # pred = [txt_trg_len, batch_size]
+            # spec = []
 
             # record predictions and prediction correctness
             batch_correct = self.recorder.record_pred(epoch, record_type, src, trg, pred)
@@ -104,7 +106,8 @@ class AudioRun:
             trg = trg[1:].view(-1)
             # trg = [(trg_len - 1) * batch_size]
 
-            batch_loss = self.criterion(output, trg)  # calculate batch loss
+            pred_loss = self.PredLoss(output, trg)  # calculate prediction loss
+            rec_loss = self.RecLoss(spec, trg)
             epoch_loss += batch_loss.item()  # add to epoch loss
             batch_loss.backward()  # backpropagate loss
             # nn.utils.clip_grad_norm_(model.parameters(), clip)

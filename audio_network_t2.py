@@ -13,14 +13,14 @@ class AudioEncoder(nn.Module):
         super(AudioEncoder, self).__init__()
 
         self.input_dim = input_dim
-        self.embedding_dim = hp.audio_embedding_dim
+        self.prenet_dim = hp.prenet_dim
         self.hidden_dim = hp.audio_hidden_dim
         self.n_layers = hp.audio_n_layers
         self.dropout = hp.audio_dropout
 
-        self.prenet = nn.Linear(input_dim, self.embedding_dim)
-        # reduce the dimensionality of the input image on the frequency domain
-        self.rnn = nn.LSTM(self.embedding_dim, self.hidden_dim, self.n_layers, bidirectional=True)
+        self.prenet = nn.Linear(input_dim, self.prenet_dim)
+        # reduce the dimensionality of the input spectrogram on the frequency domain
+        self.rnn = nn.LSTM(self.prenet_dim, self.hidden_dim, self.n_layers, bidirectional=True)
         # input embedding space, output hidden space
         self.fc_hidden = nn.Linear(self.hidden_dim * 2, self.hidden_dim)
         # select the better hidden from forward and backward
@@ -34,13 +34,13 @@ class AudioEncoder(nn.Module):
 
         input = input.squeeze(1).permute(2, 0, 1)
         # input = [batch_size, n_freq, input_len] -> input = [input_len, batch_size, n_freq]
-        embedding = self.dropout(torch.relu(self.prenet(input)))
-        # embedding = [input_len, batch_size, embedding_dim]
+        prenet = self.dropout(torch.relu(self.prenet(input)))
+        # prenet = [input_len, batch_size, prenet_dim]
 
-        encoder_states, (hidden, cell) = self.rnn(embedding)
-        # encoder_states = [input_len, batch_size, hidden_dim * n_direction=2]
-        # hidden = [n_layers=1 * n_direction=2, batch_size, hidden_dim]
-        # cell = [n_layers=1 * n_direction=2, batch_size, hidden_dim]
+        encoder_states, (hidden, cell) = self.rnn(prenet)
+        # encoder_states = [input_len, batch_size, hidden_dim * 2]
+        # hidden = [2, batch_size, hidden_dim]
+        # cell = [2, batch_size, hidden_dim]
 
         # hidden[-2, :, : ] is the last of the forwards RNN
         # hidden[-1, :, : ] is the last of the backwards RNN
@@ -62,9 +62,8 @@ class TextDecoder(nn.Module):
         super(TextDecoder, self).__init__()
 
         self.input_dim = input_dim
-        self.embedding_dim = hp.text_embedding_dim
-        self.hidden_dim = hp.text_hidden_dim
-        self.context_hidden_dim = hp.audio_hidden_dim * 2
+        self.embedding_dim = hp.embedding_dim
+        self.hidden_dim = hp.audio_hidden_dim
         self.output_dim = output_dim
         self.n_layers = hp.text_n_layers
         self.dropout = hp.text_dropout
@@ -74,17 +73,17 @@ class TextDecoder(nn.Module):
 
         self.embedding = nn.Embedding(input_dim, self.embedding_dim)
         # map the input vocabulary to a d-dimensional space
-        self.rnn = nn.LSTM(self.context_hidden_dim + self.embedding_dim, self.hidden_dim, self.n_layers)
+        self.rnn = nn.LSTM(self.hidden_dim * 2 + self.embedding_dim, self.hidden_dim, self.n_layers)
         # input context vector and embedding, output hidden space
-        self.fc_out = nn.Linear(self.context_hidden_dim + self.hidden_dim + self.embedding_dim, output_dim)
+        self.fc_out = nn.Linear(self.hidden_dim * 3 + self.embedding_dim, output_dim)
         # take into account context vector, decoder hidden, and embedding for the prediction
         self.dropout = nn.Dropout(self.dropout)
 
     def forward(self, input, context_vector, hidden, cell):
         # input = [batch_size]
-        # context_vector = [1, batch_size, audio_hidden_dim * 2]
-        # hidden = [1, batch_size, text_hidden_dim]
-        # cell = [1, batch_size, text_hidden_dim]
+        # context_vector = [1, batch_size, hidden_dim * 2]
+        # hidden = [1, batch_size, hidden_dim]
+        # cell = [1, batch_size, hidden_dim]
 
         input = input.unsqueeze(0)
         # input = [input_len=1, batch_size]
@@ -93,11 +92,11 @@ class TextDecoder(nn.Module):
 
         # concatenate the target embedding and the context vector as the rnn input
         rnn_input = torch.cat((embedding, context_vector), dim=2)
-        # rnn_input = [1, batch_size, audio_hidden_dim * 2 + embedding_dim]
+        # rnn_input = [1, batch_size, hidden_dim * 2 + embedding_dim]
         decoder_state, (hidden, cell) = self.rnn(rnn_input, (hidden.unsqueeze(0), cell.unsqueeze(0)))
-        # decoder_state = [1, batch_size, text_hidden_dim]
-        # hidden = [1, batch_size, text_hidden_dim]
-        # cell = [1, batch_size, text_hidden_dim]
+        # decoder_state = [1, batch_size, hidden_dim]
+        # hidden = [1, batch_size, hidden_dim]
+        # cell = [1, batch_size, hidden_dim]
         assert (decoder_state == hidden).all()
 
         embedding = embedding.squeeze(0)
@@ -115,20 +114,21 @@ class DurationPredictor(nn.Module):
     def __init__(self):
         super(DurationPredictor, self).__init__()
 
-        self.input_dim = hp.audio_hidden_dim * 2 + hp.text_hidden_dim
         self.hidden_dim = hp.audio_hidden_dim
         self.n_layers = hp.aux_n_layers
 
-        self.lstm = nn.LSTM(self.input_dim, self.hidden_dim, self.n_layers, bidirectional=True)
+        self.lstm = nn.LSTM(self.hidden_dim * 3, self.hidden_dim, self.n_layers, bidirectional=True)
+        # input context vector and decoder hidden, output hidden
         self.proj = nn.Linear(self.hidden_dim * 2, 1)
+        # project to single-dimension duration vector
 
     def forward(self, input):
-        # input = [txt_input_len, batch_size, aud_hidden_dim * 2 + txt_hidden_dim]
+        # input = [input_len, batch_size, hidden_dim * 3]
 
         durations, _ = self.lstm(input)
-        # durations = [txt_input_len, batch_size, aud_hidden_dim * 2]
+        # durations = [input_len, batch_size, hidden_dim * 2]
         durations = self.proj(durations)
-        # durations = [txt_input_len, batch_size, 1]
+        # durations = [input_len, batch_size, 1]
 
         return durations
 
@@ -137,24 +137,25 @@ class RangePredictor(nn.Module):
     def __init__(self):
         super(RangePredictor, self).__init__()
 
-        self.input_dim = hp.audio_hidden_dim * 2 + 1
         self.hidden_dim = hp.audio_hidden_dim
         self.n_layers = hp.aux_n_layers
 
-        self.lstm = nn.LSTM(self.input_dim, self.hidden_dim, self.n_layers, bidirectional=True)
+        self.lstm = nn.LSTM(self.hidden_dim * 3 + 1, self.hidden_dim, self.n_layers, bidirectional=True)
+        # input context vector, decoder hidden and durations, output hidden
         self.proj = nn.Linear(self.hidden_dim * 2, 1)
+        # project to single-dimension range vector
         self.softplus = nn.Softplus()
 
     def forward(self, input, durations):
-        # input = [txt_input_len, batch_size, aud_hidden_dim * 2]
-        # durations = [txt_input_len, batch_size, 1]
+        # input = [input_len, batch_size, hidden_dim * 3]
+        # durations = [input_len, batch_size, 1]
 
         lstm_input = torch.cat((input, durations), dim=2)
-        # lstm_input = [txt_input_len, batch_size, aud_hidden_dim * 2 + 1]
+        # lstm_input = [input_len, batch_size, hidden_dim * 3 + 1]
         ranges, _ = self.lstm(lstm_input)
-        # ranges = [txt_input_len, batch_size, aud_hidden_dim * 2]
+        # ranges = [input_len, batch_size, hidden_dim * 2]
         ranges = self.softplus(self.proj(ranges))
-        # ranges = [txt_input_len, batch_size, 1]
+        # ranges = [input_len, batch_size, 1]
 
         return ranges
 
@@ -165,17 +166,15 @@ class GaussianUpsampling(nn.Module):
 
         self.device = device
 
-    def forward(self, input, durations, ranges):
-        # input = [txt_input_len, batch_size, aud_hidden_dim * 2]
+    def forward(self, input, output_len, durations, ranges):
+        # input = [txt_input_len, batch_size, hidden_dim * 3]
         # durations = [txt_input_len, batch_size, 1]
         # ranges = [txt_input_len, batch_size, 1]
 
-        input_len = input.size(0)
-        batch_size = input.size(1)
-        output_len = int(torch.sum(durations, dim=0).max().item())
-        # the maximum total duration of tokens
+        input_len = input.shape[0]
+        batch_size = input.shape[1]
 
-        # at each token, summarize duration until that token
+        # get the center of each output token
         c = torch.cumsum(durations, dim=0).float() - 0.5 * durations
         # c = [txt_input_len, batch_size, 1]
 
@@ -187,41 +186,70 @@ class GaussianUpsampling(nn.Module):
         w = w_1 / w_2
         # w = [txt_input_len, batch_size, aud_output_len]
 
-        upsamples = torch.bmm(w.transpose(1, 2), input)
-        # upsamples = [batch_size, output_len, aud_hidden_dim * 2]
+        upsamples = torch.bmm(w.permute(1, 2, 0), input.permute(1, 0, 2))
+        # upsamples = [batch_size, aud_output_len, hidden_dim * 3]
 
         return upsamples
 
 
 class AudioSynthesizer(nn.Module):
-    def __init__(self, input_dim, embedding_dim, hidden_dim, output_dim, n_layers, dropout,
-                 gaussian_upsample, attention):
+    def __init__(self, input_dim, output_dim, device):
         super(AudioSynthesizer, self).__init__()
 
+        self.device = device
         self.input_dim = input_dim
-        self.embedding_dim = embedding_dim
-        self.hidden_dim = hidden_dim
-        self.output_dim = 1  # n_channels=1 * n_frames_per_step=1
-        self.n_layers = n_layers
+        self.prenet_dim = hp.prenet_dim
+        self.hidden_dim = hp.audio_hidden_dim
+        self.output_dim = output_dim
+        self.n_layers = hp.audio_n_layers
+        self.dropout = hp.audio_dropout
 
-        self.embedding = nn.Linear(input_dim, embedding_dim)
-        self.rnn_1 = nn.LSTM(hidden_dim * 2 + embedding_dim, hidden_dim)  # input embedding and encoder states, output attention input
-        self.rnn_2 = nn.LSTM(hidden_dim * 3, hidden_dim)  # input encoder states and attention output
-        self.linear_projection = nn.Linear(hidden_dim * 3, 1)
-        self.gate = nn.Linear(hidden_dim * 2, 1)
-        self.sigmoid = nn.Sigmoid()
-        self.attention = attention
+        self.prenet = nn.Linear(self.input_dim, self.prenet_dim)
+        # reduce the dimensionality of the input spectrogram on the frequency domain
+        self.rnn = nn.LSTM(self.hidden_dim * 3 + self.prenet_dim, self.output_dim)
+        # input upsamples and prenet, output spectrogram
+        self.conv = nn.Conv2d(1, self.output_dim, (3, 3), padding='same')
+        #
+        self.dropout = nn.Dropout(self.dropout)
 
-    def forward(self, input, encoder_states, decoder_states, hidden, cell):
-        # input = [batch_size]
-        # encoder_states = [input_len, batch_size, hidden_dim * 2]
-        # hidden = [batch_size, hidden_dim]
-        # cell = [batch_size, hidden_dim]
+    def forward(self, input, upsamples, durations, aud_teacher_forcing):
+        # upsamples = [batch_size, aud_output_len, hidden_dim * 3]
+        # durations = [txt_input_len, batch_size, 1]
 
-        input = input.squeeze(1).permute(2, 0, 1)
-        # input = [batch_size, n_freq, input_len] -> input = [input_len, batch_size, n_freq]
-        embedding = self.dropout(torch.relu(self.embedding(input)))
-        # embedding = [input_len, batch_size, embedding_dim]
+        batch_size = upsamples.shape[0]
+
+        # total mel length to generate
+        output_len = durations.long().sum(dim=1).max()
+
+        # first mel_spec input, synthesizer hidden and cell are zeros
+        pred_spectrogram = torch.zeros(1, batch_size, self.n_channels, device=self.device)
+        # [1, batch_size, n_channel]
+        hidden = torch.zeros(self.decoder_lstm_n, batch_size, self.decoder_lstm_dim, device=self.device)
+        cell = torch.zeros(self.decoder_lstm_n, batch_size, self.decoder_lstm_dim, device=self.device)
+
+        pred_spectrograms = []
+        for idx in range(output_len):
+
+            prenet_output = self.prenet(pred_spectrogram)
+            # [1, batch_size, prenet_dim]
+            upsample = upsamples[:, idx, :].unsqueeze(1)
+            rnn_input = torch.cat((prenet_output, upsample),dim=2)
+            # [batch_size, 1, hidden_dim * 3 + prenet_dim]
+
+            output, (hidden, cell) = self.rnn(rnn_input, (hidden, cell))
+            # output = [batch_size, 1, hidden_dim]
+
+            # concated_decoder_lstm_output : [B, 1, decoder_lstm_dim + encoder_lstm_dim + positional_embedding_dim]
+            concated_decoder_lstm_output = torch.cat([decoder_lstm_output, encoder_concated_output], dim=2)
+
+            predicted_mel_spec = self.linear_projection(concated_decoder_lstm_output)  # [B, 1, n_mel_channels]
+            predicted_mel_specs.append(predicted_mel_spec)
+
+        # predicted_mel_specs : [B, T, n_mel_channels]
+        predicted_mel_specs = torch.cat(predicted_mel_specs, dim=1)
+        predicted_mel_specs = predicted_mel_specs.transpose(1, 2)  # [B, n_mel_channels, T]
+
+        return pred_spectrograms
 
 
 class AudioSeq2Seq(nn.Module):
@@ -233,45 +261,53 @@ class AudioSeq2Seq(nn.Module):
         self.encoder_input_dim = encoder_input_dim
         self.decoder_input_dim = decoder_input_dim
         self.synthesizer_input_dim = synthesizer_input_dim
+        self.hidden_dim = hp.audio_hidden_dim
         self.text_output_dim = text_output_dim
         self.audio_output_dim = audio_output_dim
 
-        self.attention = nn.MultiheadAttention(hp.audio_hidden_dim, hp.num_heads)
-        self.duration_predictor = DurationPredictor()
-        self.range_predictor = RangePredictor()
-        self.gaussian_upsample = GaussianUpsampling()
+        self.attention = nn.MultiheadAttention(self.hidden_dim, hp.num_heads)
+        self.duration_predictor = DurationPredictor().to(self.device)
+        self.range_predictor = RangePredictor().to(self.device)
+        self.gaussian_upsample = GaussianUpsampling(device).to(self.device)
         self.encoder = AudioEncoder(encoder_input_dim).to(self.device)
         self.decoder = TextDecoder(decoder_input_dim, text_output_dim).to(self.device)
-        self.synthesizer = AudioSynthesizer(synthesizer_input_dim, audio_output_dim).to(self.device)
+        self.synthesizer = AudioSynthesizer(synthesizer_input_dim, audio_output_dim, device).to(self.device)
 
-    def forward(self, src, trg, teacher_forcing_ratio=0.5):
+    def forward(self, src, trg, txt_teacher_forcing=0.5, aud_teacher_forcing=1.0):
         # src = ([txt_src_len, batch_size], [batch_size, n_channels, freq, aud_src_len])
         # trg = ([txt_trg_len, batch_size], [batch_size, n_channels, freq, aud_trg_len])
 
         encoder_states, hidden, cell = self.encoder(src[1])
-        # encoder_states = [src_len, batch_size, encoder_hidden_dim * 2]
-        # hidden = [1, batch_size, encoder_hidden_dim]
-        # cell = [1, batch_size, encoder_hidden_dim]
+        # encoder_states = [src_len, batch_size, hidden_dim * 2]
+        # hidden = [1, batch_size, hidden_dim]
+        # cell = [1, batch_size, hidden_dim]
 
         # text decoder
         txt_trg_len = trg[0].shape[0]
         batch_size = trg[0].shape[1]
-        context_vectors = torch.zeros(txt_trg_len, batch_size, self.audio_hidden_dim * 2).to(self.device)
+        aud_src_len = src[1].shape[3]
+        context_vectors = torch.zeros(txt_trg_len, batch_size, self.hidden_dim * 2).to(self.device)
+        attentions = torch.zeros(txt_trg_len, batch_size, aud_src_len).to(self.device)
+        # context_vectors = [txt_trg_len, batch_size, hidden_dim * 2]
+        # attentions = [txt_trg_len, batch_size, aud_src_len]
         decoder_outputs = torch.zeros(txt_trg_len, batch_size, self.text_output_dim).to(self.device)
-        decoder_states = torch.zeros(txt_trg_len, batch_size, self.text_hidden_dim).to(self.device)
+        decoder_states = torch.zeros(txt_trg_len, batch_size, self.hidden_dim).to(self.device)
         predictions = torch.zeros(txt_trg_len, batch_size).to(self.device)
-        # context_vectors = [txt_trg_len, batch_size, encoder_hidden_dim * 2]
         # decoder_outputs = [txt_trg_len, batch_size, output_dim]
-        # decoder_states = [txt_trg_len, batch_size, decoder_hidden_dim]
+        # decoder_states = [txt_trg_len, batch_size, hidden_dim]
         # predictions = [txt_trg_len, batch_size]
 
         txt_input = trg[0][0]  # first input text to the decoder is the <SOS> token
         for t in range(1, txt_trg_len):
 
-            # calculate the attention weight with target decoder hidden (query) and all encoder hidden (key, value)
+            # calculate the attention weight with the current decoder hidden (query) and all encoder hidden (key, value)
             context_vector, weight = self.attention(hidden, encoder_states, encoder_states)
-            # context_vector = [1, batch_size, encoder_hidden_dim * 2]
-            # weight = [batch_size, 1, src_len]
+            # context_vector = [1, batch_size, hidden_dim * 2]
+            # weight = [batch_size, 1, aud_src_len]
+
+            # store context vector and attention weight for the current time step
+            context_vectors[t] = context_vector.squeeze(0)
+            attentions[t] = weight.squeeze(1)
 
             # at every time step, insert input token, context vector, and previous hidden and cell
             # receive output, decoder state and new hidden and cell
@@ -279,13 +315,12 @@ class AudioSeq2Seq(nn.Module):
             txt_output, decoder_state, hidden, cell = self.decoder(txt_input, context_vector, hidden, cell)
             # output = [batch_size, output_dim]
             # decoder_state = [batch_size, hidden_dim]
-            # hidden = [1, batch_size, decoder_hidden_dim]
-            # cell = [1, batch_size, decoder_hidden_dim]
+            # hidden = [1, batch_size, hidden_dim]
+            # cell = [1, batch_size, hidden_dim]
             best_guess = txt_output.argmax(1)
             # best_guess = [batch_size]
 
-            # store context vector, decoder output, decoder states and best guess for current time step
-            context_vectors[t] = context_vector.squeeze(0)
+            # store decoder output, decoder states and best guess for current time step
             decoder_outputs[t] = txt_output
             decoder_states[t] = decoder_state
             predictions[t] = best_guess
@@ -293,50 +328,34 @@ class AudioSeq2Seq(nn.Module):
             # with probability of teacher_force_ratio we take the actual next word
             # otherwise we take the word that the decoder predicted it to be
             # Teacher Forcing is used so that the model gets used to seeing similar inputs at training and testing time
-            txt_input = trg[t] if random.random() < teacher_forcing_ratio else best_guess
+            txt_input = trg[t] if random.random() < txt_teacher_forcing else best_guess
             # input = [batch_size]
 
         # audio synthesizer
         upsample_input = torch.cat((decoder_states, context_vectors), dim=2)
-        # syn_input = [txt_trg_len, batch_size, encoder_hidden_dim * 2 + decoder_hidden_dim]
-        durations = self.duration_predictor(upsample_input)
+        # decoder_states = [txt_trg_len, batch_size, hidden_dim]
+        # context_vectors = [txt_trg_len, batch_size, hidden_dim * 2]
+        # upsample_input = [txt_trg_len, batch_size, hidden_dim * 3]
+        pred_durations = self.duration_predictor(upsample_input)
         # durations = [txt_input_len, batch_size, 1]
-        ranges = self.range_predictor(upsample_input, durations)
+        pred_ranges = self.range_predictor(upsample_input, pred_durations)
         # ranges = [txt_input_len, batch_size, 1]
-        upsamples = self.gaussian_upsample(upsample_input, durations, ranges)
-        # upsamples = [batch_size, aud_output_len, aud_hidden_dim * 2]
 
-        txt_input = trg[0][0]  # first input text to the decoder is the <SOS> token
-        for t in range(1, txt_trg_len):
-            # calculate the attention weight with target decoder hidden (query) and all encoder hidden (key, value)
-            context_vector, weight = self.attention(hidden, encoder_states, encoder_states)
-            # context_vector = [1, batch_size, encoder_hidden_dim * 2]
-            # weight = [batch_size, 1, src_len]
+        output_len = int(torch.sum(durations, dim=0).max().item())
+        # the maximum total duration of tokens
 
-            # at every time step, insert input token, context vector, and previous hidden and cell
-            # receive output, decoder state and new hidden and cell
-            # and get the best word predicted by the decoder
-            txt_output, decoder_state, hidden, cell = self.decoder(txt_input, context_vector, hidden, cell)
-            # output = [batch_size, output_dim]
-            # decoder_state = [batch_size, hidden_dim]
-            # hidden = [1, batch_size, decoder_hidden_dim]
-            # cell = [1, batch_size, decoder_hidden_dim]
-            best_guess = txt_output.argmax(1)
-            # best_guess = [batch_size]
+        upsamples = self.gaussian_upsample(upsample_input, pred_durations, pred_ranges)
+        # upsamples = [batch_size, aud_output_len, hidden_dim * 3]
 
-            # store context vector, decoder output, decoder states and best guess for current time step
-            context_vectors[t] = context_vector.squeeze(0)
-            decoder_outputs[t] = txt_output
-            decoder_states[t] = decoder_state
-            predictions[t] = best_guess
+        # with probability of teacher_force_ratio we take the actual spectrogram duration
+        # otherwise we take the predicted spectrogram duration
+        act_durations = trg[2][4]
+        syn_dur = act_durations if random.random() < aud_teacher_forcing else pred_durations
+        syn_input = trg[2] if random.random() < aud_teacher_forcing else pred_spectrogram
+        # [batch_size, n_channels, freq, aud_trg_len]
+        spectrograms = self.synthesizer(upsamples, syn_dur)
 
-            # with probability of teacher_force_ratio we take the actual next word
-            # otherwise we take the word that the decoder predicted it to be
-            # Teacher Forcing is used so that the model gets used to seeing similar inputs at training and testing time
-            txt_input = trg[t] if random.random() < teacher_forcing_ratio else best_guess
-            # input = [batch_size]
-
-        return decoder_outputs, predictions, spectrogram
+        return decoder_outputs, predictions, spectrograms
 
 
 if __name__ == "__main__":
@@ -346,11 +365,11 @@ if __name__ == "__main__":
     print(f"Using {device} device")
 
     print(" - Initializing model:")
-    encoder_input_dim = 94
+    encoder_input_dim = 128
     decoder_input_dim = 30
-    synthesizer_input_dim = 94
+    synthesizer_input_dim = 128
     text_output_dim = 30
-    audio_output_dim = 94
+    audio_output_dim = 128
 
     seq2seq = AudioSeq2Seq(encoder_input_dim, decoder_input_dim, synthesizer_input_dim,
                            text_output_dim, audio_output_dim, device).to(device)
