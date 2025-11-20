@@ -40,8 +40,8 @@ class AudioEncoder(nn.Module):
 
         encoder_states, (hidden, cell) = self.rnn(prenet)
         # encoder_states = [input_len, batch_size, hidden_dim * 2]
-        # hidden = [2, batch_size, hidden_dim]
-        # cell = [2, batch_size, hidden_dim]
+        # hidden = [n_layers * 2, batch_size, hidden_dim]
+        # cell = [n_layers * 2, batch_size, hidden_dim]
 
         # hidden[-2, :, : ] is the last of the forwards RNN
         # hidden[-1, :, : ] is the last of the backwards RNN
@@ -78,8 +78,8 @@ class TextDecoder(nn.Module):
     def forward(self, input, context_vector, hidden, cell):
         # input = [batch_size]
         # context_vector = [1, batch_size, hidden_dim * 2]
-        # hidden = [1, batch_size, hidden_dim]
-        # cell = [1, batch_size, hidden_dim]
+        # hidden = [n_layers, batch_size, hidden_dim]
+        # cell = [n_layers, batch_size, hidden_dim]
 
         input = input.unsqueeze(0)
         # input = [input_len=1, batch_size]
@@ -89,36 +89,42 @@ class TextDecoder(nn.Module):
         # concatenate the target embedding and the context vector as the rnn input
         rnn_input = torch.cat((embedding, context_vector), dim=2)
         # rnn_input = [1, batch_size, hidden_dim * 2 + embedding_dim]
-        decoder_state, (hidden, cell) = self.rnn(rnn_input, (hidden.unsqueeze(0), cell.unsqueeze(0)))
-        # decoder_state = [1, batch_size, hidden_dim]
-        # hidden = [1, batch_size, hidden_dim]
-        # cell = [1, batch_size, hidden_dim]
-        assert (decoder_state == hidden).all()
-
-        embedding = embedding.squeeze(0)
-        context_vector = context_vector.squeeze(0)
-        decoder_state = decoder_state.squeeze(0)
+        decoder_state, (hidden, cell) = self.rnn(rnn_input, (hidden, cell))
+        # decoder_state = [1, batch_size, hidden_dim * n_layers]
+        # hidden = [n_layers, batch_size, hidden_dim]
+        # cell = [n_layers, batch_size, hidden_dim]
 
         # the original manuscript uses all of embedding, decoder state, and context vector for the prediction
-        output = self.fc_out(torch.cat((embedding, decoder_state, context_vector), dim=1))
+        output = self.fc_out(torch.cat((embedding, decoder_state, context_vector), dim=2))
+        # output = [1, batch_size, output_dim]
+        output = output.squeeze(0)
         # output = [batch_size, output_dim]
 
         return output, hidden, cell
 
 
 class MultiheadAttention(nn.Module):
-    def __init__(self):
+    def __init__(self, qdim, kdim, vdim):
         super(MultiheadAttention, self).__init__()
 
-        self.hidden_dim = hp.audio_hidden_dim
+        self.qdim = qdim # hidden_dim * n_layers
+        self.kdim = kdim # hidden_dim * 2
+        self.vdim = kdim # hidden_dim * 2
         self.num_heads = hp.num_heads
 
-        self.mha = nn.MultiheadAttention(self.hidden_dim, self.num_heads)
+        self.mha = nn.MultiheadAttention(embed_dim=qdim, num_heads=self.num_heads,
+                                         kdim=kdim, vdim=vdim)
 
     def forward(self, encoder_states, hidden):
+        # encoder_states = [src_len, batch_size, hidden_dim * 2]
+        # hidden = [n_layers, batch_size, hidden_dim]
+
+        batch_size = hidden.shape[1]
+        hidden = hidden.view(1, batch_size, -1)
+        # hidden = [1, batch_size, hidden_dim * n_layers]
 
         context_vector, weight = self.mha(hidden, encoder_states, encoder_states)
-        # context_vector = [1, batch_size, hidden_dim * 2]
+        # context_vector = [1, batch_size, hidden_dim * n_layers]
         # weight = [batch_size, 1, src_len]
         weight = weight.squeeze(1)
         # weight = [batch_size, src_len]
@@ -139,38 +145,35 @@ class AudioSynthesizer(nn.Module):
 
         self.prenet = nn.Linear(input_dim, self.prenet_dim)
         # reduce the dimensionality of the input spectrogram on the frequency domain
-        self.rnn = nn.LSTM(self.hidden_dim * 2 + self.prenet_dim, self.hidden_dim, self.n_layers)
+        self.rnn = nn.LSTM(self.hidden_dim * self.n_layers + self.prenet_dim, self.hidden_dim, self.n_layers)
         # input context vector and prenet, output hidden space
-        self.fc_out = nn.Linear(self.hidden_dim * 3 + self.prenet_dim, output_dim)
+        self.fc_out = nn.Linear(self.hidden_dim * self.n_layers + self.hidden_dim + self.prenet_dim, output_dim)
         # take into account context vector, decoder hidden, and prenet for the prediction
         self.dropout = nn.Dropout(self.dropout)
 
     def forward(self, input, context_vector, hidden, cell):
         # input = [batch_size, n_freq]
-        # context_vector = [1, batch_size, hidden_dim * 2]
-        # hidden = [1, batch_size, hidden_dim]
-        # cell = [1, batch_size, hidden_dim]
+        # context_vector = [1, batch_size, hidden_dim * n_layers]
+        # hidden = [n_layers, batch_size, hidden_dim]
+        # cell = [n_layers, batch_size, hidden_dim]
 
         input = input.unsqueeze(0)
         # input = [1, batch_size, n_freq]
         prenet = self.dropout(torch.relu(self.prenet(input)))
         # prenet = [1, batch_size, prenet_dim]
 
-        # concatenate the target embedding and the context vector as the rnn input
+        # concatenate the prenet and the context vector as the rnn input
         rnn_input = torch.cat((prenet, context_vector), dim=2)
-        # rnn_input = [1, batch_size, hidden_dim * 2 + prenet_dim]
-        synthesizer_state, (hidden, cell) = self.rnn(rnn_input, (hidden.unsqueeze(0), cell.unsqueeze(0)))
+        # rnn_input = [1, batch_size, hidden_dim * n_layers + prenet_dim]
+        synthesizer_state, (hidden, cell) = self.rnn(rnn_input, (hidden, cell))
         # synthesizer_state = [1, batch_size, hidden_dim]
-        # hidden = [1, batch_size, hidden_dim]
-        # cell = [1, batch_size, hidden_dim]
-        assert (synthesizer_state == hidden).all()
-
-        prenet = prenet.squeeze(0)
-        context_vector = context_vector.squeeze(0)
-        synthesizer_state = synthesizer_state.squeeze(0)
+        # hidden = [n_layers, batch_size, hidden_dim]
+        # cell = [n_layers, batch_size, hidden_dim]
 
         # the original manuscript uses all of embedding, decoder state, and context vector for the prediction
-        output = self.fc_out(torch.cat((prenet, synthesizer_state, context_vector), dim=1))
+        output = self.fc_out(torch.cat((prenet, synthesizer_state, context_vector), dim=2))
+        # output = [1, batch_size, output_dim]
+        output = output.squeeze(0)
         # output = [batch_size, output_dim]
 
         return output, hidden, cell
@@ -188,50 +191,53 @@ class AudioSeq2Seq(nn.Module):
         self.hidden_dim = hp.audio_hidden_dim
         self.text_output_dim = text_output_dim
         self.audio_output_dim = audio_output_dim
+        self.text_n_layers = hp.text_n_layers
+        self.audio_n_layers = hp.audio_n_layers
 
-        self.single_attention = BahdanauAttention().to(self.device)
-        self.multi_attention = MultiheadAttention().to(self.device)
+        self.single_attention = BahdanauAttention(self.hidden_dim).to(self.device)
+        self.multi_attention = MultiheadAttention(self.hidden_dim * self.audio_n_layers, self.hidden_dim * 2, self.hidden_dim * 2).to(self.device)
         self.encoder = AudioEncoder(encoder_input_dim).to(self.device)
         self.decoder = TextDecoder(decoder_input_dim, text_output_dim).to(self.device)
         self.synthesizer = AudioSynthesizer(synthesizer_input_dim, audio_output_dim).to(self.device)
 
-    def forward(self, src, trg, txt_teacher_forcing=0.5, aud_teacher_forcing=1.0):
-        # src = ([txt_src_len, batch_size], [batch_size, n_channels, freq, aud_src_len])
-        # trg = ([txt_trg_len, batch_size], [batch_size, n_channels, freq, aud_trg_len])
+    def forward(self, src_txt, src_aud, trg_txt, trg_aud, txt_teacher_forcing=0.5, aud_teacher_forcing=1.0):
+        # src_txt = [txt_src_len, batch_size]
+        # src_aud = [batch_size, n_channels, freq, aud_src_len]
+        # trg_txt = [txt_trg_len, batch_size]
+        # trg_aud = [batch_size, n_channels, freq, aud_trg_len]
 
-        encoder_states, hidden, cell = self.encoder(src[1])
-        # encoder_states = [src_len, batch_size, hidden_dim * 2]
-        # hidden = [1, batch_size, hidden_dim]
-        # cell = [1, batch_size, hidden_dim]
+        encoder_states, _, _ = self.encoder(src_aud)
+        # encoder_states = [aud_src_len, batch_size, hidden_dim * 2]
 
         # text decoder
-        txt_trg_len = trg[0].shape[0]
-        batch_size = trg[0].shape[1]
+        txt_trg_len = trg_txt.shape[0]
+        batch_size = trg_txt.shape[1]
         decoder_outputs = torch.zeros(txt_trg_len, batch_size, self.text_output_dim).to(self.device)
         decoder_predictions = torch.zeros(txt_trg_len, batch_size).to(self.device)
         # decoder_outputs = [txt_trg_len, batch_size, output_dim]
         # decoder_predictions = [txt_trg_len, batch_size]
-        aud_src_len = src[1].shape[3]
+        aud_src_len = src_aud.shape[3]
         decoder_attentions = torch.zeros(txt_trg_len, batch_size, aud_src_len).to(self.device)
         # decoder_attentions = [txt_trg_len, batch_size, aud_src_len]
 
-        decoder_input = trg[0][0]  # first input text to the decoder is the <SOS> token
-        hidden = torch.zeros(1, batch_size, self.hidden_dim, device=self.device)
-        cell = torch.zeros(1, batch_size, self.hidden_dim, device=self.device)
+        decoder_input = trg_txt[0]  # first input text to the decoder is the <SOS> token
+        hidden = torch.zeros(self.text_n_layers, batch_size, self.hidden_dim).to(self.device)
+        cell = torch.zeros(self.text_n_layers, batch_size, self.hidden_dim).to(self.device)
         for t in range(1, txt_trg_len):
 
+            # at every time step,
             # calculate the attention weight with the current decoder hidden (query) and all encoder hidden (key, value)
             context_vector, weight = self.single_attention(encoder_states, hidden)
             # context_vector = [1, batch_size, hidden_dim * 2]
             # weight = [batch_size, aud_src_len]
 
-            # at every time step, insert input token, context vector, and previous hidden and cell
+            # insert input token, context vector, and previous hidden and cell
             # receive output, decoder state and new hidden and cell
             # and get the best word predicted by the decoder
             decoder_output, hidden, cell = self.decoder(decoder_input, context_vector, hidden, cell)
             # output = [batch_size, output_dim]
-            # hidden = [1, batch_size, hidden_dim]
-            # cell = [1, batch_size, hidden_dim]
+            # hidden = [n_layers, batch_size, hidden_dim]
+            # cell = [n_layers, batch_size, hidden_dim]
             best_guess = decoder_output.argmax(1)
             # best_guess = [batch_size]
 
@@ -243,41 +249,41 @@ class AudioSeq2Seq(nn.Module):
             # with probability of teacher_force_ratio we take the actual next word
             # otherwise we take the word that the decoder predicted it to be
             # Teacher Forcing is used so that the model gets used to seeing similar inputs at training and testing time
-            decoder_input = trg[t] if random.random() < txt_teacher_forcing else best_guess
+            decoder_input = trg_txt[t] if random.random() < txt_teacher_forcing else best_guess
             # input = [batch_size]
 
         # audio synthesizer
-        aud_trg_len = trg[1].shape[3]
+        aud_trg_len = trg_aud.shape[3]
         synthesizer_outputs = torch.zeros(aud_trg_len, batch_size, self.audio_output_dim).to(self.device)
         # synthesizer_outputs = [aud_trg_len, batch_size, output_dim]
         synthesizer_attentions = torch.zeros(aud_trg_len, batch_size, aud_src_len).to(self.device)
         # attentions = [aud_trg_len, batch_size, aud_src_len]
 
         # first input spectrogram frame are zeros
-        synthesizer_input = torch.zeros(batch_size, self.audio_output_dim, device=self.device)
-        hidden = torch.zeros(1, batch_size, self.hidden_dim, device=self.device)
-        cell = torch.zeros(1, batch_size, self.hidden_dim, device=self.device)
-        for t in range(0, aud_trg_len):
+        synthesizer_input = torch.zeros(batch_size, self.audio_output_dim).to(self.device)
+        hidden = torch.zeros(self.audio_n_layers, batch_size, self.hidden_dim).to(self.device)
+        cell = torch.zeros(self.audio_n_layers, batch_size, self.hidden_dim).to(self.device)
+        for t in range(1, aud_trg_len):
+            # at every time step,
             # calculate the attention weight with the current decoder hidden (query) and all encoder hidden (key, value)
-            context_vector, weight = self.multi_attention(hidden, encoder_states, encoder_states)
+            context_vector, weight = self.multi_attention(encoder_states, hidden)
             # context_vector = [1, batch_size, hidden_dim * 2]
             # weight = [batch_size, aud_src_len]
 
-            # at every time step, insert input frame, context vector, and previous hidden and cell
-            # receive output, decoder state and new hidden and cell
-            # and get the best word predicted by the decoder
-            synthesizer_output, hidden, cell = self.decoder(synthesizer_input, context_vector, hidden, cell)
+            # insert input frame, context vector, and previous hidden and cell
+            # receive output and new hidden and cell
+            synthesizer_output, hidden, cell = self.synthesizer(synthesizer_input, context_vector, hidden, cell)
             # output = [batch_size, output_dim]
-            # hidden = [1, batch_size, hidden_dim]
-            # cell = [1, batch_size, hidden_dim]
+            # hidden = [n_layers, batch_size, hidden_dim]
+            # cell = [n_layers, batch_size, hidden_dim]
 
-            # store decoder output, best guess and attention weight for current time step
+            # store decoder output and attention weight for current time step
             synthesizer_outputs[t] = synthesizer_output
-            synthesizer_attentions[t] = weight.squeeze(1)
+            synthesizer_attentions[t] = weight
 
             # with probability of teacher_force_ratio we take the actual next frame
             # otherwise we take the frame that the decoder predicted it to be
-            curr_frame = trg[1][:, :, :, t].squeeze(2)
+            curr_frame = trg_aud[:, :, :, t].squeeze(1)
             synthesizer_input = curr_frame if random.random() < aud_teacher_forcing else synthesizer_output
             # input = [batch_size, n_freq]
 
@@ -287,9 +293,6 @@ class AudioSeq2Seq(nn.Module):
 if __name__ == "__main__":
     import torchinfo
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using {device} device")
-
     print(" - Initializing model:")
     encoder_input_dim = 128
     decoder_input_dim = 30
@@ -298,12 +301,12 @@ if __name__ == "__main__":
     audio_output_dim = 128
 
     seq2seq = AudioSeq2Seq(encoder_input_dim, decoder_input_dim, synthesizer_input_dim,
-                           text_output_dim, audio_output_dim, device).to(device)
+                           text_output_dim, audio_output_dim, 'cpu').to('cpu')
 
     # inspect model structure
-    torchinfo.summary(seq2seq, input_size = [((7, 32), (32, 1, 128, 94)), ((7, 32), (32, 1, 128, 94))],
-                      dtypes=[torch.long, torch.long],
-                      device=device)
+    torchinfo.summary(seq2seq, input_size = [(8, 32), (32, 1, 128, 94), (8, 32), (32, 1, 128, 94)],
+                      dtypes=[torch.long, torch.float32, torch.long, torch.float32],
+                      device='cpu')
 
     # inspect model parameters
     for name, param in seq2seq.named_parameters():

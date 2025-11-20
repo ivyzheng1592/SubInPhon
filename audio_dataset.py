@@ -89,7 +89,7 @@ class AudioDataset(Dataset):
         trg_vector = self.sr_alphabet.word2vec(trg)
         trg_tensor = torch.tensor(trg_vector).to(self.device)
 
-        return (src_tensor, src_audio), (trg_tensor, trg_audio)
+        return src_tensor, src_audio, trg_tensor, trg_audio
 
     def _resampling(self, signal, sr):
         # in this project, we expect all sr == self.sample_rate
@@ -154,16 +154,16 @@ class AudioDataset(Dataset):
     # a closure of customized collate_fn
     def get_collate_fn(self):
         def collate_fn(batch):
-            src_labels = [src_txt for (src_txt, _), trg in batch]
+            src_labels = [src_txt for src_txt, _, _, _ in batch]
             src_labels = pad_sequence(src_labels, batch_first=False, padding_value=self.pad_idx)
-            src_audios = [src_aud for (_, src_aud), trg in batch]
+            src_audios = [src_aud for _, src_aud, _, _ in batch]
             src_audios = pad_sequence(src_audios, batch_first=True, padding_value=self.pad_idx)
 
-            trg_labels = [trg_txt for src, (trg_txt, _) in batch]
+            trg_labels = [trg_txt for _, _, trg_txt, _ in batch]
             trg_labels = pad_sequence(trg_labels, batch_first=False, padding_value=self.pad_idx)
-            trg_audios = [trg_aud for src, (_, trg_aud) in batch]
+            trg_audios = [trg_aud for _, _, _, trg_aud in batch]
             trg_audios = pad_sequence(trg_audios, batch_first=True, padding_value=self.pad_idx)
-            return (src_labels, src_audios), (trg_labels, trg_audios)
+            return src_labels, src_audios, trg_labels, trg_audios
         return collate_fn
 
     def get_dataloader(self, batch_size, shuffle=True):
@@ -183,7 +183,7 @@ if __name__ == "__main__":
     import utils
 
     print(" - Loading dataset:")
-    audio_dir = "Dataset/audio/EnglishBH"
+    audio_dir = "/mnt/data/Projects/subinphon/audio/EnglishBH"
     annotations_file = "Dataset/EnglishBH_aud_harmony.csv"
     annotations = pd.read_csv(annotations_file)
     print(f"Dataset size: {len(annotations)}")
@@ -193,7 +193,7 @@ if __name__ == "__main__":
     audio_dataset = AudioDataset(annotations_file, audio_dir, hp.special_tokens,
                                  hp.sample_rate, hp.n_samples, hp.n_fft, hp.hop_length, hp.n_mels,
                                  wav2mel=True, power2db=True, device='cpu')
-    (src_txt, src_aud), (trg_txt, trg_aud) = audio_dataset[0]
+    src_txt, src_aud, trg_txt, trg_aud = audio_dataset[0]
     print(f"Sample source text: {src_txt.shape}")
     print(f"Sample target text: {trg_txt.shape}")
     print(f"Sample source audio: {src_aud.shape}")
@@ -204,7 +204,7 @@ if __name__ == "__main__":
     print(" - Creating dataloader:")
     audio_dataloader = audio_dataset.get_dataloader(hp.batch_size)
     dataiter = iter(audio_dataloader)
-    (source_text, source_audio), (target_text, target_audio) = next(dataiter)
+    source_text, source_audio, target_text, target_audio = next(dataiter)
     print(f"Sample source text: {source_text.shape}")
     print(f"Sample target text: {target_text.shape}")
     print(f"Sample source audio: {source_audio.shape}")

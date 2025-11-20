@@ -49,33 +49,36 @@ class TextEncoder(nn.Module):
         # hidden = [batch_size, hidden_dim]
         # cell = [batch_size, hidden_dim]
         # ignoring hidden = torch.tanh(hidden) in Ben Trevett tutorial because we are using LSTM
+        hidden = hidden.unsqueeze(0)
+        cell = cell.unsqueeze(0)
+        # hidden = [1, batch_size, hidden_dim]
+        # cell = [1, batch_size, hidden_dim]
 
         return encoder_states, hidden, cell
 
 
 class BahdanauAttention(nn.Module):
-    def __init__(self):
+    def __init__(self, hidden_dim):
         super(BahdanauAttention, self).__init__()
 
-        self.hidden_dim = hp.text_hidden_dim
+        self.hidden_dim = hidden_dim
 
-        self.W1 = nn.Linear(self.hidden_dim * 2, self.hidden_dim)
+        self.W1 = nn.Linear(hidden_dim * 2, hidden_dim)
         # update weight of forward and backward encoder states
-        self.W2 = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.W2 = nn.Linear(hidden_dim, hidden_dim)
         # update weight of decoder hidden
-        self.V = nn.Linear(self.hidden_dim, 1)
+        self.V = nn.Linear(hidden_dim, 1)
         # output a score for each alignment
         # ignoring bias=False in Ben Trevett tutorial
 
     def forward(self, encoder_states, hidden):
         # encoder_states = [src_len, batch_size, hidden_dim * 2]
-        # hidden = [batch_size, hidden_dim]
-        # cell = [batch_size, hidden_dim]
+        # hidden = [1, batch_size, hidden_dim]
 
         encoder_states = encoder_states.permute(1, 0, 2)
         # encoder_states = [batch_size, src_len, hidden_dim * 2]
         src_len = encoder_states.shape[1]
-        hidden = hidden.unsqueeze(1).repeat(1, src_len, 1)
+        hidden = hidden.permute(1, 0, 2).repeat(1, src_len, 1)
         # hidden = [batch_size, src_len, hidden_dim]
 
         # construct a soft alignment between target decoder hidden (query) and encoder hidden of each input token (key)
@@ -84,12 +87,12 @@ class BahdanauAttention(nn.Module):
         # compute the context vector by multiplying the attention weight to all encoder hidden (value)
         score = self.V(torch.tanh(self.W1(encoder_states) + self.W2(hidden)))
         # score = [batch_size, src_len, hidden_dim] -> score = [batch_size, src_len, 1]
-        weight = torch.softmax(score.squeeze(2), dim=1)
-        # weight = [batch_size, src_len]
-        context_vector = torch.bmm(weight.unsqueeze(1), encoder_states).permute(1, 0, 2)
-        # weight = [batch_size, 1, src_len]
-        # encoder_states = [batch_size, src_len, hidden_dim * 2]
+        weight = torch.softmax(score, dim=1).permute(0, 2, 1)
+        # weight = [batch_size, src_len, 1] -> weight = [batch_size, 1, src_len]
+        context_vector = torch.bmm(weight, encoder_states).permute(1, 0, 2)
         # context_vector = [batch_size, 1, hidden_dim *2] -> context_vector = [1, batch_size, hidden_dim * 2]
+        weight = weight.squeeze(1)
+        # weight = [batch_size, src_len]
 
         return context_vector, weight
 
@@ -119,8 +122,8 @@ class TextDecoder(nn.Module):
     def forward(self, input, context_vector, hidden, cell):
         # input = [batch_size]
         # context_vector = [1, batch_size, hidden_dim * 2]
-        # hidden = [batch_size, hidden_dim]
-        # cell = [batch_size, hidden_dim]
+        # hidden = [1, batch_size, hidden_dim]
+        # cell = [1, batch_size, hidden_dim]
 
         input = input.unsqueeze(0)
         # input = [input_len=1, batch_size]
@@ -130,20 +133,16 @@ class TextDecoder(nn.Module):
         # concatenate the target embedding and the context vector as the rnn input
         rnn_input = torch.cat((embedding, context_vector), dim=2)
         # rnn_input = [1, batch_size, hidden_dim * 2 + embedding_dim]
-        decoder_state, (hidden, cell) = self.rnn(rnn_input, (hidden.unsqueeze(0), cell.unsqueeze(0)))
+        decoder_state, (hidden, cell) = self.rnn(rnn_input, (hidden, cell))
         # decoder_state = [1, batch_size, hidden_dim]
         # hidden = [1, batch_size, hidden_dim]
         # cell = [1, batch_size, hidden_dim]
         assert (decoder_state == hidden).all()
 
-        embedding = embedding.squeeze(0)
-        decoder_state = decoder_state.squeeze(0)
-        hidden = hidden.squeeze(0)
-        cell = cell.squeeze(0)
-        context_vector = context_vector.squeeze(0)
-
         # the original manuscript uses all of embedding, decoder state, and context vector for the prediction
-        output = self.fc_out(torch.cat((embedding, decoder_state, context_vector), dim=1))
+        output = self.fc_out(torch.cat((embedding, decoder_state, context_vector), dim=2))
+        # output = [1, batch_size, output_dim]
+        output = output.squeeze(0)
         # output = [batch_size, output_dim]
 
         return output, hidden, cell
@@ -156,10 +155,11 @@ class TextSeq2Seq(nn.Module):
         self.device = device
         self.encoder_input_dim = encoder_input_dim
         self.decoder_input_dim = decoder_input_dim
+        self.hidden_dim = hp.text_hidden_dim
         self.output_dim = output_dim
 
         # model components
-        self.attention = BahdanauAttention().to(self.device)
+        self.attention = BahdanauAttention(self.hidden_dim).to(self.device)
         self.encoder = TextEncoder(encoder_input_dim).to(self.device)
         self.decoder = TextDecoder(decoder_input_dim, output_dim).to(self.device)
 
@@ -171,8 +171,8 @@ class TextSeq2Seq(nn.Module):
         # encoder_states are all hidden states of the src input sequence
         # hidden and cell are the final forward and backward hidden and cell concatenated
         # encoder_states = [src_len, batch_size, encoder_hidden_dim * 2]
-        # hidden = [batch_size, encoder_hidden_dim]
-        # cell = [batch_size, encoder_hidden_dim]
+        # hidden = [1, batch_size, encoder_hidden_dim]
+        # cell = [1, batch_size, encoder_hidden_dim]
 
         trg_len = trg.shape[0]
         batch_size = trg.shape[1]
@@ -189,7 +189,8 @@ class TextSeq2Seq(nn.Module):
 
         input = trg[0]  # first input to the decoder is the <SOS> token
         for t in range(1, trg_len):
-            # at every time step, calculate the attention weight with target decoder hidden (query) and all encoder hidden (key, value)
+            # at every time step,
+            # calculate the attention weight with target decoder hidden (query) and all encoder hidden (key, value)
             context_vector, weight = self.attention(encoder_states, hidden)
             # context_vector = [1, batch_size, hidden_dim * 2]
             # weight = [batch_size, src_len]
@@ -199,8 +200,8 @@ class TextSeq2Seq(nn.Module):
             # and get the best word predicted by the decoder
             output, hidden, cell = self.decoder(input, context_vector, hidden, cell)
             # output = [batch_size, output_dim]
-            # hidden = [batch_size, decoder_hidden_dim]
-            # cell = [batch_size, decoder_hidden_dim]
+            # hidden = [1, batch_size, decoder_hidden_dim]
+            # cell = [1, batch_size, decoder_hidden_dim]
             best_guess = output.argmax(1)
             # best_guess = [batch_size]
 

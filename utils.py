@@ -208,5 +208,5 @@ def plot_embed_updated(embed_files, embed_plots):
                         animation_frame='epoch')
     fig.show()
 
-plot_embed_updated("/home/ldlmdl/Documents/subinphon/Results/2506271050_0.01_init_EnglishBH_txt/EnglishBH_txt_embed_files",
-                   "/home/ldlmdl/Documents/subinphon/Results/EnglishBH_all_embed_files/hi")
+#plot_embed_updated("/home/ldlmdl/Documents/subinphon/Results/2506271050_0.01_init_EnglishBH_txt/EnglishBH_txt_embed_files",
+                   #"/home/ldlmdl/Documents/subinphon/Results/EnglishBH_all_embed_files/hi")
