@@ -111,17 +111,12 @@ class AudioDataset(Dataset):
             length_signal1 < self.n_samples and length_signal2 < self.n_samples
         ), f"All audio data should have less than {self.n_samples} samples!"
 
-        # in this project, src and trg signals require the same start of padding
-        # length of padding at the beginning and end of the signal
-        pad_max = max(self.n_samples - length_signal1, self.n_samples - length_signal2)
-        pad_begin_len = random.randint(0, pad_max)
-        pad_end_len1 = self.n_samples - length_signal1 - pad_begin_len
-        pad_end_len2 = self.n_samples - length_signal2 - pad_begin_len
+        # in this project, src and trg signals require padding at the end of the signal
         # Padding with 0s
-        signal1 = torch.nn.functional.pad(signal1, (pad_begin_len, pad_end_len1))
-        signal2 = torch.nn.functional.pad(signal2, (pad_begin_len, pad_end_len2))
-        # [1, [1, 1, 1]] -> [1, [0, 1, 1, 1, 0, 0]]
-        # [1, [1, 1]] -> [1, [0, 1, 1, 0, 0, 0]]
+        signal1 = torch.nn.functional.pad(signal1, (0, self.n_samples - length_signal1))
+        signal2 = torch.nn.functional.pad(signal2, (0, self.n_samples - length_signal2))
+        # [1, [1, 1, 1]] -> [1, [1, 1, 1, 0, 0, 0]]
+        # [1, [1, 1]] -> [1, [1, 1, 0, 0, 0, 0]]
         return signal1, signal2
 
     # converting waveform to mel spectrogram
@@ -166,14 +161,16 @@ class AudioDataset(Dataset):
             return src_labels, src_audios, trg_labels, trg_audios
         return collate_fn
 
-    def get_dataloader(self, batch_size, shuffle=True):
+    def get_dataloader(self, dataset, batch_size, shuffle=True):
+
         collate_fn = self.get_collate_fn()
 
         data_loader = DataLoader(
-            dataset=self,
+            dataset=dataset,
             batch_size=batch_size,
             shuffle=shuffle,
-            collate_fn=collate_fn
+            collate_fn=collate_fn,
+            drop_last=True  # drop incomplete batch
         )
         return data_loader
 

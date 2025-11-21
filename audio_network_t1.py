@@ -179,6 +179,34 @@ class AudioSynthesizer(nn.Module):
         return output, hidden, cell
 
 
+class Postnet(nn.Module):
+    def __init__(self):
+        super(Postnet, self).__init__()
+
+        self.cnn_depth = hp.cnn_depth
+        self.dropout = hp.audio_dropout
+
+        self.conv = nn.ModuleList()
+        self.norm = nn.ModuleList()
+        for i in range(self.cnn_depth):
+            self.conv.append(nn.Conv2d(1, 1, (3, 3), padding='same'))
+            self.norm.append(nn.BatchNorm2d(1))
+        self.dropout = nn.Dropout(self.dropout)
+
+    def forward(self, input):
+
+        for i in range(self.cnn_depth-1):
+            output = self.conv[i](input)  # [batch_size, 1, aud_output_dim, aud_trg_len]
+            output = self.norm[i](output)
+            output = torch.tanh(output)
+
+        output = self.conv[-1](output)  # [batch_size, 1, aud_output_dim, aud_trg_len]
+        output = self.norm[-1](output)
+        output = self.dropout(output)
+
+        return output
+
+
 class AudioSeq2Seq(nn.Module):
     def __init__(self, encoder_input_dim, decoder_input_dim, synthesizer_input_dim,
                  text_output_dim, audio_output_dim, device):
@@ -199,8 +227,10 @@ class AudioSeq2Seq(nn.Module):
         self.encoder = AudioEncoder(encoder_input_dim).to(self.device)
         self.decoder = TextDecoder(decoder_input_dim, text_output_dim).to(self.device)
         self.synthesizer = AudioSynthesizer(synthesizer_input_dim, audio_output_dim).to(self.device)
+        self.postnet = Postnet().to(self.device)
 
-    def forward(self, src_txt, src_aud, trg_txt, trg_aud, txt_teacher_forcing=0.5, aud_teacher_forcing=1.0):
+    def forward(self, input, txt_teacher_forcing=hp.text_teacher_forcing, aud_teacher_forcing=hp.audio_teacher_forcing):
+        src_txt, src_aud, trg_txt, trg_aud = input
         # src_txt = [txt_src_len, batch_size]
         # src_aud = [batch_size, n_channels, freq, aud_src_len]
         # trg_txt = [txt_trg_len, batch_size]
@@ -214,7 +244,7 @@ class AudioSeq2Seq(nn.Module):
         batch_size = trg_txt.shape[1]
         decoder_outputs = torch.zeros(txt_trg_len, batch_size, self.text_output_dim).to(self.device)
         decoder_predictions = torch.zeros(txt_trg_len, batch_size).to(self.device)
-        # decoder_outputs = [txt_trg_len, batch_size, output_dim]
+        # decoder_outputs = [txt_trg_len, batch_size, txt_output_dim]
         # decoder_predictions = [txt_trg_len, batch_size]
         aud_src_len = src_aud.shape[3]
         decoder_attentions = torch.zeros(txt_trg_len, batch_size, aud_src_len).to(self.device)
@@ -255,7 +285,7 @@ class AudioSeq2Seq(nn.Module):
         # audio synthesizer
         aud_trg_len = trg_aud.shape[3]
         synthesizer_outputs = torch.zeros(aud_trg_len, batch_size, self.audio_output_dim).to(self.device)
-        # synthesizer_outputs = [aud_trg_len, batch_size, output_dim]
+        # synthesizer_outputs = [aud_trg_len, batch_size, aud_output_dim]
         synthesizer_attentions = torch.zeros(aud_trg_len, batch_size, aud_src_len).to(self.device)
         # attentions = [aud_trg_len, batch_size, aud_src_len]
 
@@ -287,7 +317,15 @@ class AudioSeq2Seq(nn.Module):
             synthesizer_input = curr_frame if random.random() < aud_teacher_forcing else synthesizer_output
             # input = [batch_size, n_freq]
 
-        return decoder_outputs, decoder_predictions, synthesizer_outputs, decoder_attentions, synthesizer_attentions
+        synthesizer_outputs = synthesizer_outputs.unsqueeze(1).permute(2, 1, 3, 0)
+        # synthesizer_outputs = [aud_trg_len, 1, batch_size, aud_output_dim] ->
+        # synthesizer_outputs = [batch_size, 1, aud_output_dim, aud_trg_len]
+
+        # postnet
+        postnet_outputs = self.postnet(synthesizer_outputs)
+        postnet_outputs = postnet_outputs + synthesizer_outputs
+
+        return decoder_outputs, decoder_predictions, postnet_outputs, decoder_attentions, synthesizer_attentions
 
 
 if __name__ == "__main__":

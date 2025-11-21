@@ -163,7 +163,7 @@ class TextSeq2Seq(nn.Module):
         self.encoder = TextEncoder(encoder_input_dim).to(self.device)
         self.decoder = TextDecoder(decoder_input_dim, output_dim).to(self.device)
 
-    def forward(self, src, trg, teacher_forcing_ratio=hp.teacher_forcing_ratio):
+    def forward(self, src, trg, teacher_forcing_ratio=hp.text_teacher_forcing):
         # src = [src_len, batch_size]
         # trg = [trg_len, batch_size]
 

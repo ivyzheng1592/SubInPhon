@@ -37,7 +37,6 @@ class TextRecorder:
             'sr_v1': [], 'sr_v2': [], 'pred_sr_v1': [], 'pred_sr_v2': []
         }
 
-
         # results files and directories
         self.acc_file = os.path.join("Results", trial_num + "_" + self.lang_name,
                                      self.lang_name + "_acc.csv")

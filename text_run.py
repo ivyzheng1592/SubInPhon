@@ -51,7 +51,7 @@ class TextRun:
                 print(f"Epoch {epoch} model trained and stored at {model_file}")
 
         # plot accuracy at the end of training
-        utils.plot_acc(self.recorder.acc_store, self.recorder.acc_plot)
+        utils.plot_txt_acc(self.recorder.acc_store, self.recorder.acc_plot)
         print(f"Run {self.recorder.run_num} training loss, accuracy, and predicted results are saved")
 
     # a function that completes one repetition of evaluation at the end of training
@@ -198,7 +198,7 @@ class TextRun:
                                         self.recorder.lang_name + "_" + self.recorder.condition +
                                         "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
                                         ur_string + "_" + pred_sr_string + ".png")
-                utils.plot_att(ur_list, pred_sr_list, word_att, att_plot)
+                utils.plot_txt_att(ur_list, pred_sr_list, word_att, att_plot)
             print(f"Run {self.recorder.run_num} attention plots are saved for investigation")
 
     def evaluate_embedding(self, eval_epoch=hp.n_epochs-1):

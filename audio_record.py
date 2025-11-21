@@ -22,7 +22,7 @@ class AudioRecorder:
         # result storages
         self.acc_store = {
             'trial_num': [], 'language': [], 'condition': [], 'run_num': [], 'epoch': [],
-            'record_type': [], 'rec_loss': [], 'pred_acc': []
+            'record_type': [], 'rec_loss': [], 'pred_loss': [], 'pred_acc': []
         }
 
         self.pred_store = {
@@ -36,7 +36,6 @@ class AudioRecorder:
             'v1_error': [], 'v2_error': [], #'ur_v1': [], 'ur_v2': [],
             'sr_v1': [], 'sr_v2': [], 'pred_sr_v1': [], 'pred_sr_v2': []
         }
-
 
         # results files and directories
         self.acc_file = os.path.join("Results", trial_num + "_" + self.lang_name,
@@ -66,6 +65,12 @@ class AudioRecorder:
         self.embed_plot_dir = os.path.join("Results", trial_num + "_" + self.lang_name,
                                            self.lang_name + "_embed_plots")
         os.makedirs(self.embed_plot_dir, exist_ok=True)
+        self.embed_plot = os.path.join(self.embed_plot_dir,
+                                       self.lang_name + "_" + self.condition +
+                                       "_run" + str(self.run_num) + "_embedding.png")
+        self.embed_file = os.path.join(self.embed_plot_dir,
+                                       self.lang_name + "_" + self.condition +
+                                       "_run" + str(self.run_num) + "_embedding.csv")
 
     # a function that converts one pair of ur, sr, and pred_sr tensor to list
     def tensor2list(self, ur, sr, pred_sr):
@@ -109,7 +114,7 @@ class AudioRecorder:
 
     # a function that records accuracy rates into a dictionary
     # the function is called at each training/evaluation epoch
-    def record_acc(self, epoch, record_type, loss, acc):
+    def record_acc(self, epoch, record_type, rec_loss, pred_loss, acc):
         # add current accuracy data to the accuracy data storage
         self.acc_store['trial_num'].append(self.trial_num)
         self.acc_store['language'].append(self.lang_name)
@@ -117,8 +122,9 @@ class AudioRecorder:
         self.acc_store['run_num'].append(self.run_num)
         self.acc_store['epoch'].append(epoch)
         self.acc_store['record_type'].append(record_type)
-        self.acc_store['loss'].append(loss)
-        self.acc_store['acc'].append(acc)
+        self.acc_store['rec_loss'].append(rec_loss)
+        self.acc_store['pred_loss'].append(pred_loss)
+        self.acc_store['pred_acc'].append(acc)
 
     # a function that records the prediction information line into a dictionary and the prediction correctness in a list
     # the function is called at each training/evaluation batch

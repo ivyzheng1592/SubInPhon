@@ -49,7 +49,7 @@ def plot_spectrogram(spectrogram1, spectrogram2, spectrogram1_name, spectrogram2
     plt.close()
     #plt.show()
 
-def plot_acc(acc_store, acc_plot):
+def plot_txt_acc(acc_store, acc_plot):
     # convert dictionary to pandas dataframe
     acc_data = pd.DataFrame(acc_store)
 
@@ -71,7 +71,33 @@ def plot_acc(acc_store, acc_plot):
     plt.close()
     #plt.show()
 
-def plot_att(ur, sr, attention, att_plot):
+def plot_aud_acc(acc_store, acc_plot):
+    # convert dictionary to pandas dataframe
+    acc_data = pd.DataFrame(acc_store)
+
+    # separate into training and validation
+    train_data = acc_data[acc_data["record_type"] == "train"]
+    valid_data = acc_data[acc_data["record_type"] == "valid"]
+
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex='all')  # create a 3 * 1 plot
+    ax1.plot(train_data["epoch"], train_data["rec_loss"], label="train")
+    ax1.plot(valid_data["epoch"], valid_data["rec_loss"], label="valid")
+    ax1.legend()
+    ax1.set_title("Reconstruction Loss")
+    ax2.plot(train_data["epoch"], train_data["pred_loss"], label="train")
+    ax2.plot(valid_data["epoch"], valid_data["pred_loss"], label="valid")
+    ax2.legend()
+    ax2.set_title("Prediction Loss")
+    ax3.plot(train_data["epoch"], train_data["pred_acc"], label="train")
+    ax3.plot(valid_data["epoch"], valid_data["pred_acc"], label="valid")
+    ax3.legend()
+    ax3.set_title("Prediction Acc")
+
+    plt.savefig(acc_plot)
+    plt.close()
+    #plt.show()
+
+def plot_txt_att(ur, sr, attention, att_plot):
     # convert attention data to numpy array
     attention = attention.cpu().numpy()
 
@@ -80,6 +106,25 @@ def plot_att(ur, sr, attention, att_plot):
     ax.set_xticks(ticks=np.arange(len(ur)), labels=ur)
     ax.set_yticks(ticks=np.arange(len(sr)), labels=sr)
     fig.colorbar(im)
+    plt.savefig(att_plot)
+    plt.close()
+    #plt.show()
+
+def plot_aud_att(ur_aud, sr_txt, sr_aud, txt_attention, aud_attention, att_plot):
+    # extract spectrogram
+    ur_aud = ur_aud[0]  # [1, n_freq, n_samples]
+    sr_aud = sr_aud[0]  # [1, n_freq, n_samples]
+    # convert attention data to numpy array
+    txt_attention = txt_attention.cpu().numpy()
+    aud_attention = aud_attention.cpu().numpy()
+
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, sharex="all")
+    ax1.imshow(ur_aud, origin='lower', aspect='auto')
+    ax2.matshow(txt_attention, cmap="bone")
+    ax3.matshow(aud_attention, cmap="bone")
+    ax4.imshow(sr_aud, origin='lower', aspect='auto')
+    ax2.set_yticks(ticks=np.arange(len(sr_txt)), labels=sr_txt)
+    #fig.colorbar(ax2)
     plt.savefig(att_plot)
     plt.close()
     #plt.show()
@@ -158,7 +203,7 @@ def plot_embed(embed_store, focus_embed_store, embed_plot):
     plt.close()
     #plt.show()
 
-def plot_embed_updated(embed_files, embed_plots):
+def plot_embed_updated(embed_store, focus_embed_store, embed_plots):
 
     # iterate through all files in the directory and read into dataframes
     dfs = []
@@ -207,6 +252,3 @@ def plot_embed_updated(embed_files, embed_plots):
                         color='phoneme',
                         animation_frame='epoch')
     fig.show()
-
-#plot_embed_updated("/home/ldlmdl/Documents/subinphon/Results/2506271050_0.01_init_EnglishBH_txt/EnglishBH_txt_embed_files",
-                   #"/home/ldlmdl/Documents/subinphon/Results/EnglishBH_all_embed_files/hi")

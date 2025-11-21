@@ -42,24 +42,28 @@ hop_length = 256
 n_mels = 128
 
 # Dataset hyperparameters
-data_split_ratio = [0.6, 0.2, 0.2]
+#data_split_ratio = [0.6, 0.2, 0.2]
+data_split_ratio = [0.1, 0.1, 0.8]
 
 # Model hyperparameters
 embedding_dim = 11  # original=300
-prenet_dim = 32
+prenet_dim = 64
 text_hidden_dim = 4  # original=256
-audio_hidden_dim = 8
+audio_hidden_dim = 16
 text_n_layers = 1
 audio_n_layers = 2
 aux_n_layers = 1  # auxiliary duration prediction networks
 num_heads = 2  # number of multihead attention
+cnn_depth = 2
 text_dropout = 0.2  # 0.0 is equivalent to Identity function
 audio_dropout = 0.2  # 0.0 is equivalent to Identity function
-teacher_forcing_ratio = 0.5  # original=0.5
+text_teacher_forcing = 0.5  # original=0.5
+audio_teacher_forcing = 0.5
 
 # Training hyperparameters
-n_epochs = 100  # original=50. Note: must be >1 !!!
+n_epochs = 10  # original=50. Note: must be >1 !!!
 save_epochs = 10
-learning_rate = 1e-4
+#learning_rate = 1e-4
+learning_rate = 1e-3
 batch_size = 32  # original=32
 #clip = 1.0
