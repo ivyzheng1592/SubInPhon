@@ -201,47 +201,37 @@ class TextRun:
                 utils.plot_txt_att(ur_list, pred_sr_list, word_att, att_plot)
             print(f"Run {self.recorder.run_num} attention plots are saved for investigation")
 
-    def evaluate_embedding(self, eval_epoch=hp.n_epochs-1):
+    def evaluate_embedding(self):
 
-        # load model
-        model_file = os.path.join(self.recorder.model_dir,
-                                  self.recorder.lang_name + "_" + self.recorder.condition +
-                                  "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
-                                  "_seq2seq.pth")
-        self.seq2seq.load_state_dict(torch.load(model_file))
+        # a dictionary of dictionaries to store all embeddings
+        phone_spaces = {}
+        focus_spaces = {}
 
-        # retrieve source and target embedding
-        src_embed = self.seq2seq.encoder.embedding.weight
-        trg_embed = self.seq2seq.decoder.embedding.weight
+        for file_name in os.listdir(self.recorder.model_dir):
+            # load model
+            model_file = os.path.join(self.recorder.model_dir, file_name)
+            self.seq2seq.load_state_dict(torch.load(model_file))
 
-        # define focus group (different for different patterns)
-        focus_group = self.recorder.language.focus
+            # retrieve target embedding
+            embed = self.seq2seq.decoder.embedding.weight
 
-        # retrieve embedding of all phonemes and focus group
-        ur_phone_space, ur_focus_space = self.recorder.dataset.ur_alphabet.embed2fea(src_embed, focus_group)
-        sr_phone_space, sr_focus_space = self.recorder.dataset.sr_alphabet.embed2fea(trg_embed, focus_group)
+            # define focus group (different for different patterns)
+            focus_group = self.recorder.language.focus
 
-        ur_embed_plot = os.path.join(self.recorder.embed_plot_dir,
-                                     self.recorder.lang_name + "_" + self.recorder.condition +
-                                     "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
-                                     "_ur_embedding.png")
-        ur_embed_file = os.path.join(self.recorder.embed_plot_dir,
-                                     self.recorder.lang_name + "_" + self.recorder.condition +
-                                     "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
-                                     "_ur_embedding.csv")
-        sr_embed_plot = os.path.join(self.recorder.embed_plot_dir,
-                                     self.recorder.lang_name + "_" + self.recorder.condition +
-                                     "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
-                                     "_sr_embedding.png")
-        sr_embed_file = os.path.join(self.recorder.embed_plot_dir,
-                                     self.recorder.lang_name + "_" + self.recorder.condition +
-                                     "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
-                                     "_sr_embedding.csv")
+            # retrieve embedding of all phonemes and focus group
+            phone_space, focus_space = self.recorder.dataset.sr_alphabet.embed2fea(embed, focus_group)
+            phone_spaces[file_name] = phone_space
+            focus_spaces[file_name] = focus_space
+
+            embed_file = os.path.join(self.recorder.embed_plot_dir,
+                                      file_name.replace("_seq2seq.pth", "_embedding.csv"))
+            embed_plot = os.path.join(self.recorder.embed_plot_dir,
+                                      file_name.replace("_seq2seq.pth", "_embedding.png"))
+            # plot embedding
+            utils.plot_embed(phone_space, focus_space, embed_plot)
+            # save embedding recording to file
+            utils.save_to_file(phone_space, embed_file)
 
         # plot embedding
-        utils.plot_embed(ur_phone_space, ur_focus_space, ur_embed_plot)
-        utils.plot_embed(sr_phone_space, sr_focus_space, sr_embed_plot)
-        # save embedding recording to file
-        utils.save_to_file(ur_phone_space, ur_embed_file)
-        utils.save_to_file(sr_phone_space, sr_embed_file)
+        utils.plot_embed_updated(phone_spaces, focus_spaces, self.recorder.embed_plot, self.recorder.focus_embed_plot)
         print(f"Run {self.recorder.run_num} embedding plots and files are saved for investigation")

@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 from sklearn.decomposition import PCA
 from nooverlap import push_text_free
+import hyper_params as hp
 
 
 def save_to_file(data_store, save_file):
@@ -33,8 +34,8 @@ def plot_waveform(waveform, sample_rate, title="Waveform"):
 
 def plot_spectrogram(spectrogram1, spectrogram2, spectrogram1_name, spectrogram2_name,
                      title="Spectrogram"):
-    spectrogram1 = spectrogram1[0]  # [1, n_freq, n_samples]
-    spectrogram2 = spectrogram2[0]  # [1, n_freq, n_samples]
+    spectrogram1 = spectrogram1[0]  # [1, n_freq, dur]
+    spectrogram2 = spectrogram2[0]  # [1, n_freq, dur]
 
     fig, (axs1, axs2) = plt.subplots(1, 2, sharey='all')
     axs1.set_xlabel("frame")
@@ -111,23 +112,30 @@ def plot_txt_att(ur, sr, attention, att_plot):
     #plt.show()
 
 def plot_aud_att(ur_aud, sr_txt, sr_aud, txt_attention, aud_attention, att_plot):
-    # extract spectrogram
-    ur_aud = ur_aud[0]  # [1, n_freq, n_samples]
-    sr_aud = sr_aud[0]  # [1, n_freq, n_samples]
-    # convert attention data to numpy array
+    # convert data to numpy array
+    ur_aud = ur_aud.cpu().numpy()
+    sr_aud = sr_aud.cpu().numpy()
     txt_attention = txt_attention.cpu().numpy()
     aud_attention = aud_attention.cpu().numpy()
 
-    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, sharex="all")
-    ax1.imshow(ur_aud, origin='lower', aspect='auto')
-    ax2.matshow(txt_attention, cmap="bone")
-    ax3.matshow(aud_attention, cmap="bone")
-    ax4.imshow(sr_aud, origin='lower', aspect='auto')
+    fig = plt.figure(figsize=(12, 8))
+    ax1 = fig.add_subplot(231)
+    ax1.imshow(ur_aud, origin='lower', aspect='equal')
+    ax2 = fig.add_subplot(234, sharex=ax1)
+    ax2.matshow(txt_attention, cmap="bone", aspect='equal')
     ax2.set_yticks(ticks=np.arange(len(sr_txt)), labels=sr_txt)
-    #fig.colorbar(ax2)
+
+    ax3 = fig.add_subplot(233)
+    ax3.imshow(ur_aud, origin='lower', aspect='equal')
+    ax4 = fig.add_subplot(235)
+    ax4.imshow(sr_aud, origin='lower', aspect='equal')
+    ax5 = fig.add_subplot(236, sharex=ax1)
+    ax5.matshow(aud_attention, cmap="bone", aspect='equal')
+
+    plt.tight_layout()
     plt.savefig(att_plot)
-    plt.close()
-    #plt.show()
+    #plt.close()
+    plt.show()
 
 def plot_embed(embed_store, focus_embed_store, embed_plot):
     # convert dictionary to pandas dataframe
@@ -203,30 +211,44 @@ def plot_embed(embed_store, focus_embed_store, embed_plot):
     plt.close()
     #plt.show()
 
-def plot_embed_updated(embed_store, focus_embed_store, embed_plots):
+def plot_embed_updated(embed_store, focus_embed_store, embed_plot, focus_embed_plot):
 
-    # iterate through all files in the directory and read into dataframes
     dfs = []
+    # iterate through all dictionaries and read into dataframes
+    for key, value in embed_store.items():
+        # convert dictionary to pandas dataframe
+        df = pd.DataFrame.from_dict(value, orient='index')
+        # add new columns with phoneme and file name
+        df['phoneme'] = df.index
+        df['file_name'] = key
+        # append to list of dataframes
+        dfs.append(df)
+
     focus_dfs = []
-    for file_name in os.listdir(embed_files):
-        if file_name.endswith(".csv"):
-            file_path = os.path.join(embed_files, file_name)
-            # read columns from csv files as rows in tibble, with phonemes as a new column not index
-            df = pd.read_csv(file_path).transpose().reset_index(names='phoneme')
-            # add a new column with the file name
-            df.insert(0, 'file_name', file_name)
-            # analyze file name
-            df[['language', 'model', 'condition', 'run_num', 'epoch', 'ur/sr', 'none']] = \
-                df['file_name'].str.split("_", expand=True)
-            # select only focus phonemes
-            focus_df = df[df['phoneme'].isin(['i', 'e', 'u', 'o', 'ɪ', 'ɛ', 'ʊ', 'ɔ'])]
-            # append to list of dataframes
-            dfs.append(df)
-            focus_dfs.append(focus_df)
+    # iterate through all dictionaries and read into dataframes
+    for key, value in focus_embed_store.items():
+        # convert dictionary to pandas dataframe
+        focus_df = pd.DataFrame.from_dict(value, orient='index')
+        # add new columns with phoneme and file name
+        focus_df['phoneme'] = focus_df.index
+        focus_df['file_name'] = key
+        # append to list of dataframes
+        focus_dfs.append(focus_df)
 
     # combine lists of dataframes
     combined_df = pd.concat(dfs, ignore_index=True)
     focus_combined_df = pd.concat(focus_dfs, ignore_index=True)
+
+    # analyze file name
+    combined_df[['language', 'model', 'condition', 'run_num', 'epoch', 'none']] = \
+        combined_df['file_name'].str.split("_", expand=True)
+    combined_df['run_num'] = combined_df['run_num'].str.replace('run', '').astype(int)
+    combined_df['epoch'] = combined_df['epoch'].str.replace('epoch', '').astype(int)
+
+    focus_combined_df[['language', 'model', 'condition', 'run_num', 'epoch', 'none']] = \
+        focus_combined_df['file_name'].str.split("_", expand=True)
+    focus_combined_df['run_num'] = focus_combined_df['run_num'].str.replace('run', '').astype(int)
+    focus_combined_df['epoch'] = focus_combined_df['epoch'].str.replace('epoch', '').astype(int)
 
     # use PCA to project the data from embedding_dim to 3D
     pca = PCA(n_components=3)
@@ -244,11 +266,22 @@ def plot_embed_updated(embed_store, focus_embed_store, embed_plots):
     focus_combined_df = pd.concat([focus_combined_df, focus_reduced_df], axis=1)
 
     # create 3d scatter plot with plotly
-    selected_df = combined_df[(combined_df['condition'] == "disharmony") & (combined_df['run_num' == 'run1'])]
-    fig = px.scatter_3d(selected_df,
+    fig = px.scatter_3d(combined_df,
                         x='pc1',
                         y='pc2',
                         z='pc3',
                         color='phoneme',
                         animation_frame='epoch')
-    fig.show()
+    fig.write_html(embed_plot)
+    plt.close()
+    #plt.show()
+
+    fig = px.scatter_3d(focus_combined_df,
+                        x='pc1',
+                        y='pc2',
+                        z='pc3',
+                        color='phoneme',
+                        animation_frame='epoch')
+    fig.write_html(focus_embed_plot)
+    plt.close()
+    #plt.show()

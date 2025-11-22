@@ -120,9 +120,9 @@ class AudioRun:
             # spec = [aud_trg_len, batch_size, aud_output_dim]
 
             # record predictions and prediction correctness
-            #batch_correct = self.recorder.record_pred(epoch, record_type, src_txt, trg_txt, pred)
-            #batch_acc = sum(batch_correct) / len(batch_correct)  # calculate batch accuracy rate
-            #epoch_acc += batch_acc  # add to epoch accuracy rate
+            batch_correct = self.recorder.record_pred(epoch, record_type, src_txt, trg_txt, pred)
+            batch_acc = sum(batch_correct) / len(batch_correct)  # calculate batch accuracy rate
+            epoch_acc += batch_acc  # add to epoch accuracy rate
 
             rec_loss, pred_loss = self.get_loss(output, spec, trg_txt, trg_aud)
             batch_loss = rec_loss + pred_loss  # calculate batch loss
@@ -134,7 +134,7 @@ class AudioRun:
         # average loss and accuracy over all batches
         epoch_rec_loss = epoch_rec_loss / len(data_loader)
         epoch_pred_loss = epoch_pred_loss / len(data_loader)
-        #epoch_acc = epoch_acc / len(data_loader)
+        epoch_acc = epoch_acc / len(data_loader)
 
         return epoch_rec_loss, epoch_pred_loss, epoch_acc
 
@@ -160,9 +160,9 @@ class AudioRun:
                 # spec = [aud_trg_len, batch_size, aud_output_dim]
 
                 # record predictions and prediction correctness
-                #batch_correct = self.recorder.record_pred(epoch, record_type, src_txt, trg_txt, pred)
-                #batch_acc = sum(batch_correct) / len(batch_correct)  # calculate batch accuracy rate
-                #epoch_acc += batch_acc  # add to epoch accuracy rate
+                batch_correct = self.recorder.record_pred(epoch, record_type, src_txt, trg_txt, pred)
+                batch_acc = sum(batch_correct) / len(batch_correct)  # calculate batch accuracy rate
+                epoch_acc += batch_acc  # add to epoch accuracy rate
 
                 rec_loss, pred_loss = self.get_loss(output, spec, trg_txt, trg_aud)  # calculate batch loss
                 epoch_rec_loss += rec_loss.item()
@@ -171,7 +171,7 @@ class AudioRun:
         # average loss and accuracy over all batches
         epoch_rec_loss = epoch_rec_loss / len(data_loader)
         epoch_pred_loss = epoch_pred_loss / len(data_loader)
-        #epoch_acc = epoch_acc / len(data_loader)
+        epoch_acc = epoch_acc / len(data_loader)
 
         return epoch_rec_loss, epoch_pred_loss, epoch_acc
 
@@ -191,11 +191,11 @@ class AudioRun:
 
         with torch.no_grad():  # disable gradient tracking
             # get predicted sr and attention weights
-            _, pred, spec, txt_att, aud_att = self.seq2seq(input, 0, 0)  # turn off teacher forcing
+            _, pred, spec, txt_atts, aud_atts = self.seq2seq(input, 0, 0)  # turn off teacher forcing
             # pred = [txt_trg_len, batch_size]
             # spec = [batch_size, 1, aud_output_dim, aud_trg_len]
-            # txt_att = [txt_trg_len, batch_size, aud_src_len]
-            # aud_att = [aud_trg_len, batch_size, aud_src_len]
+            # txt_atts = [txt_trg_len, batch_size, aud_src_len]
+            # aud_atts = [aud_trg_len, batch_size, aud_src_len]
 
             src_txt, src_aud, trg_txt, trg_aud = input
             # src_txt = [txt_src_len, batch_size]
@@ -204,45 +204,63 @@ class AudioRun:
             # trg_aud = [batch_size, n_channels, freq, aud_trg_len]
 
             for i in range(hp.batch_size):
-                ur = src_txt[:, i]
-                sr = trg_txt[:, i]
-                pred_sr = pred[:, i]
+                ur_txt = src_txt[:, i]
+                sr_txt = trg_txt[:, i]
+                pred_sr_txt = pred[:, i]
 
                 # convert predictions
-                ur_string, _, pred_sr_string = self.recorder.tensor2string(ur, sr, pred_sr)
-                _, _, pred_sr_list = self.recorder.tensor2list(ur, sr, pred_sr)
+                ur_string, _, pred_sr_string = self.recorder.tensor2string(ur_txt, sr_txt, pred_sr_txt)
+                _, _, pred_sr_list = self.recorder.tensor2list(ur_txt, sr_txt, pred_sr_txt)
 
-                # retrieve attention weights
-                # notice that trg_len and src_len have changed because padding was removed
+                # retrieve spectrogram and attention weights
+                ur_spec = src_aud[i, :, :, :][0]
+                # ur_spec = [n_freq, dur]
+                pred_sr_spec = spec[i, :, :, :][0]
+                # pred_sr_spec = [n_freq, dur]
+                txt_att = txt_atts[:, i, :]
+                # txt_att = [txt_trg_len, aud_src_len]
+                aud_att = aud_atts[:, i, :]
+                # aud_att = [aud_trg_len, aud_src_len]
 
                 # plot attention
                 att_plot = os.path.join(self.recorder.att_plot_dir,
                                         self.recorder.lang_name + "_" + self.recorder.condition +
                                         "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
                                         ur_string + "_" + pred_sr_string + ".png")
-                utils.plot_aud_att(src_aud[i, :, :, :], pred_sr_list, spec[i, :, :, :],
-                                   txt_att[:, i, :], aud_att[:, i, :], att_plot)
+                utils.plot_aud_att(ur_spec, pred_sr_list, pred_sr_spec, txt_att, aud_att, att_plot)
             print(f"Run {self.recorder.run_num} attention plots are saved for investigation")
 
-    def evaluate_embedding(self, eval_epoch=hp.n_epochs-1):
+    def evaluate_embedding(self):
 
-        # load all models
-        for file_name in self.recorder.model_dir:
+        # a dictionary of dictionaries to store all embeddings
+        phone_spaces = {}
+        focus_spaces = {}
+
+        for file_name in os.listdir(self.recorder.model_dir):
+            # load model
             model_file = os.path.join(self.recorder.model_dir, file_name)
             self.seq2seq.load_state_dict(torch.load(model_file))
 
             # retrieve target embedding
-            trg_embed = self.seq2seq.decoder.embedding.weight
+            embed = self.seq2seq.decoder.embedding.weight
 
             # define focus group (different for different patterns)
             focus_group = self.recorder.language.focus
 
             # retrieve embedding of all phonemes and focus group
-            sr_phone_space, sr_focus_space = self.recorder.dataset.sr_alphabet.embed2fea(trg_embed, focus_group)
+            phone_space, focus_space = self.recorder.dataset.sr_alphabet.embed2fea(embed, focus_group)
+            phone_spaces[file_name] = phone_space
+            focus_spaces[file_name] = focus_space
 
+            embed_file = os.path.join(self.recorder.embed_plot_dir,
+                                      file_name.replace("_seq2seq.pth", "_embedding.csv"))
+            embed_plot = os.path.join(self.recorder.embed_plot_dir,
+                                      file_name.replace("_seq2seq.pth", "_embedding.png"))
+            # plot embedding
+            utils.plot_embed(phone_space, focus_space, embed_plot)
+            # save embedding recording to file
+            utils.save_to_file(phone_space, embed_file)
 
         # plot embedding
-        utils.plot_embed(sr_phone_space, sr_focus_space, self.recorder.sr_embed_plot)
-        # save embedding recording to file
-        utils.save_to_file(sr_phone_space, self.recorder.embed_file)
+        utils.plot_embed_updated(phone_spaces, focus_spaces, self.recorder.embed_plot, self.recorder.focus_embed_plot)
         print(f"Run {self.recorder.run_num} embedding plots and files are saved for investigation")

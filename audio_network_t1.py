@@ -324,6 +324,7 @@ class AudioSeq2Seq(nn.Module):
         # postnet
         postnet_outputs = self.postnet(synthesizer_outputs)
         postnet_outputs = postnet_outputs + synthesizer_outputs
+        # postnet_outputs = [batch_size, 1, aud_output_dim, aud_trg_len]
 
         return decoder_outputs, decoder_predictions, postnet_outputs, decoder_attentions, synthesizer_attentions
 

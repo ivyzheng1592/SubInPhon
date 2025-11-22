@@ -37,13 +37,11 @@ special_tokens = [sos_token, eos_token, unk_token, pad_token]
 # Audio preprocessing hyperparameters
 sample_rate = 24000
 n_samples = 24000
-n_fft = 1024
-hop_length = 256
 n_mels = 128
 
 # Dataset hyperparameters
-#data_split_ratio = [0.6, 0.2, 0.2]
-data_split_ratio = [0.1, 0.1, 0.8]
+data_split_ratio = [0.6, 0.2, 0.2]
+#data_split_ratio = [0.1, 0.1, 0.8]
 
 # Model hyperparameters
 embedding_dim = 11  # original=300
@@ -61,7 +59,7 @@ text_teacher_forcing = 0.5  # original=0.5
 audio_teacher_forcing = 0.5
 
 # Training hyperparameters
-n_epochs = 10  # original=50. Note: must be >1 !!!
+n_epochs = 50  # original=50. Note: must be >1 !!!
 save_epochs = 10
 #learning_rate = 1e-4
 learning_rate = 1e-3

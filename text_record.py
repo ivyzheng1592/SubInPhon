@@ -65,6 +65,12 @@ class TextRecorder:
         self.embed_plot_dir = os.path.join("Results", trial_num + "_" + self.lang_name,
                                            self.lang_name + "_embed_plots")
         os.makedirs(self.embed_plot_dir, exist_ok=True)
+        self.embed_plot = os.path.join(self.embed_plot_dir,
+                                       self.lang_name + "_" + self.condition +
+                                       "_run" + str(self.run_num) + "_embedding.html")
+        self.focus_embed_plot = os.path.join(self.embed_plot_dir,
+                                             self.lang_name + "_" + self.condition +
+                                             "_run" + str(self.run_num) + "_focus_embedding.html")
 
     # a function that converts one pair of ur, sr, and pred_sr tensor to list
     def tensor2list(self, ur, sr, pred_sr):
