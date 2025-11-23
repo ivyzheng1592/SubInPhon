@@ -125,6 +125,7 @@ languages = {
     "EnglishBH_fea": EnglishBH_fea,
     "EnglishBH_nonidentical_fea": EnglishBH_nonidentical_fea,
     "EnglishBH_aud": EnglishBH_aud,
+    "EnglishBH_nonidentical_aud": EnglishBH_nonidentical_aud,
     "EnglishFD_txt": EnglishFD_txt,
     "EnglishFD_fea": EnglishFD_fea,
     "EnglishFD_aud": EnglishFD_aud

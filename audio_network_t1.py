@@ -14,31 +14,24 @@ class AudioEncoder(nn.Module):
         super(AudioEncoder, self).__init__()
 
         self.input_dim = input_dim
-        self.prenet_dim = hp.prenet_dim
         self.hidden_dim = hp.audio_hidden_dim
         self.n_layers = hp.audio_n_layers
         self.dropout = hp.audio_dropout
 
-        self.prenet = nn.Linear(input_dim, self.prenet_dim)
-        # reduce the dimensionality of the input spectrogram on the frequency domain
-        self.rnn = nn.LSTM(self.prenet_dim, self.hidden_dim, self.n_layers, bidirectional=True)
-        # input prenet, output hidden space
+        self.rnn = nn.LSTM(self.input_dim, self.hidden_dim, self.n_layers, bidirectional=True, dropout=self.dropout)
+        # output hidden space with dropout
         self.fc_hidden = nn.Linear(self.hidden_dim * 2, self.hidden_dim)
         # select the better hidden from forward and backward
         self.fc_cell = nn.Linear(self.hidden_dim * 2, self.hidden_dim)
         # select the better cell from forward and backward
-        self.dropout = nn.Dropout(self.dropout)
-        # dropout probability, see https://arxiv.org/abs/1207.0580
 
     def forward(self, input):
         # input = [batch_size, n_channels=1, n_freq, input_len]
 
         input = input.squeeze(1).permute(2, 0, 1)
         # input = [batch_size, n_freq, input_len] -> input = [input_len, batch_size, n_freq]
-        prenet = self.dropout(torch.relu(self.prenet(input)))
-        # prenet = [input_len, batch_size, prenet_dim]
 
-        encoder_states, (hidden, cell) = self.rnn(prenet)
+        encoder_states, (hidden, cell) = self.rnn(input)
         # encoder_states = [input_len, batch_size, hidden_dim * 2]
         # hidden = [n_layers * 2, batch_size, hidden_dim]
         # cell = [n_layers * 2, batch_size, hidden_dim]
@@ -111,9 +104,10 @@ class MultiheadAttention(nn.Module):
         self.kdim = kdim # hidden_dim * 2
         self.vdim = kdim # hidden_dim * 2
         self.num_heads = hp.num_heads
+        self.dropout = hp.audio_dropout
 
         self.mha = nn.MultiheadAttention(embed_dim=qdim, num_heads=self.num_heads,
-                                         kdim=kdim, vdim=vdim)
+                                         kdim=kdim, vdim=vdim, dropout=self.dropout)
 
     def forward(self, encoder_states, hidden):
         # encoder_states = [src_len, batch_size, hidden_dim * 2]
@@ -145,7 +139,7 @@ class AudioSynthesizer(nn.Module):
 
         self.prenet = nn.Linear(input_dim, self.prenet_dim)
         # reduce the dimensionality of the input spectrogram on the frequency domain
-        self.rnn = nn.LSTM(self.hidden_dim * self.n_layers + self.prenet_dim, self.hidden_dim, self.n_layers)
+        self.rnn = nn.LSTM(self.hidden_dim * self.n_layers + self.prenet_dim, self.hidden_dim, self.n_layers, dropout=self.dropout)
         # input context vector and prenet, output hidden space
         self.fc_out = nn.Linear(self.hidden_dim * self.n_layers + self.hidden_dim + self.prenet_dim, output_dim)
         # take into account context vector, decoder hidden, and prenet for the prediction
@@ -196,13 +190,13 @@ class Postnet(nn.Module):
     def forward(self, input):
 
         for i in range(self.cnn_depth-1):
-            output = self.conv[i](input)  # [batch_size, 1, aud_output_dim, aud_trg_len]
-            output = self.norm[i](output)
-            output = torch.tanh(output)
+            input = self.conv[i](input)  # [batch_size, 1, aud_output_dim, aud_trg_len]
+            input = self.norm[i](input)
+            input = torch.tanh(input)
 
-        output = self.conv[-1](output)  # [batch_size, 1, aud_output_dim, aud_trg_len]
-        output = self.norm[-1](output)
-        output = self.dropout(output)
+        input = self.conv[-1](input)  # [batch_size, 1, aud_output_dim, aud_trg_len]
+        input = self.norm[-1](input)
+        output = self.dropout(input)
 
         return output
 

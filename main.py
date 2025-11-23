@@ -131,9 +131,9 @@ def audio(trial_num, lang_name, conditions, runs, run_mode, device):
         language = languages[lang_name]
 
         print(" - Loading dataset:")
-        annotations_file = os.path.join("Dataset",
-                                        lang_name.replace("aud", "txt") + "_" + condition + ".csv")
-        audio_dir = os.path.join("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon", lang_name)
+        annotations_file = os.path.join("Dataset", lang_name + "_" + condition + ".csv")
+        audio_dir = os.path.join("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon",
+                                 lang_name.split("_")[0])
         dataset = AudioDataset(annotations_file, audio_dir, hp.special_tokens,
                                wav2mel=True, power2db=True, device=device)
 
@@ -176,13 +176,12 @@ def audio(trial_num, lang_name, conditions, runs, run_mode, device):
 
 
 if __name__ == "__main__":
-    import hyper_params as hp
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using {device} device")
 
-    trial_num = "2511221215"  # time stamp
-    lang_name = "EnglishBH_aud"
+    trial_num = "2511231600"  # time stamp
+    lang_name = "EnglishBH_nonidentical_aud"
     conditions = ["harmony", "disharmony"]
     runs = range(1)
-    audio(trial_num, lang_name, conditions, runs, run_mode="evaluate embedding", device=device)
+    audio(trial_num, lang_name, conditions, runs, run_mode="train and evaluate", device=device)

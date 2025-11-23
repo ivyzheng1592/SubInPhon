@@ -134,8 +134,8 @@ def plot_aud_att(ur_aud, sr_txt, sr_aud, txt_attention, aud_attention, att_plot)
 
     plt.tight_layout()
     plt.savefig(att_plot)
-    #plt.close()
-    plt.show()
+    plt.close()
+    #plt.show()
 
 def plot_embed(embed_store, focus_embed_store, embed_plot):
     # convert dictionary to pandas dataframe

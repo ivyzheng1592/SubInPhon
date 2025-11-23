@@ -17,11 +17,14 @@ class AudioDataset(Dataset):
     def __init__(self, annotations_file, audio_dir, special_tokens,
                  wav2mel=True, power2db=True, device='cuda'):
         # get the list of ur and sr words
+        # note that word text are separate from word reference for audio extraction
         self.device = device
         self.audio_dir = audio_dir
         self.annotations = pd.read_csv(annotations_file)
         self.ur_words = self.annotations["ur"]
         self.sr_words = self.annotations["sr"]
+        self.ur_refs = self.annotations["ur_ref"]
+        self.sr_refs = self.annotations["sr_ref"]
 
         # define special characters
         self.specials = special_tokens
@@ -50,15 +53,15 @@ class AudioDataset(Dataset):
     def __getitem__(self, index):
         # audio: [n_channels, n_samples]
         # retrieve source audio
-        src_label = self.ur_words[index]
-        src_path = os.path.join(self.audio_dir, (src_label + ".wav"))
-        src_audio, src_sr = torchaudio.load(src_path, format="wav")
+        src_ref = self.ur_refs[index]
+        src_path = os.path.join(self.audio_dir, (src_ref + ".wav"))
+        src_audio, src_sr = torchaudio.load_with_torchcodec(src_path)
         src_audio = src_audio.to(self.device)
 
         # retrieve target audio
-        trg_label = self.sr_words[index]
-        trg_path = os.path.join(self.audio_dir, (trg_label + ".wav"))
-        trg_audio, trg_sr = torchaudio.load(trg_path, format="wav")
+        trg_ref = self.sr_refs[index]
+        trg_path = os.path.join(self.audio_dir, (trg_ref + ".wav"))
+        trg_audio, trg_sr = torchaudio.load_with_torchcodec(trg_path)
         trg_audio = trg_audio.to(self.device)
 
         # pre-process source and target audio
@@ -106,12 +109,12 @@ class AudioDataset(Dataset):
             length_signal1 < self.n_samples and length_signal2 < self.n_samples
         ), f"All audio data should have less than {self.n_samples} samples!"
 
-        # in this project, src and trg signals require padding at the end of the signal
-        # Padding with 0s
-        signal1 = torch.nn.functional.pad(signal1, (0, self.n_samples - length_signal1))
-        signal2 = torch.nn.functional.pad(signal2, (0, self.n_samples - length_signal2))
-        # [1, [1, 1, 1]] -> [1, [1, 1, 1, 0, 0, 0]]
-        # [1, [1, 1]] -> [1, [1, 1, 0, 0, 0, 0]]
+        # in this project, src and trg start with one frame of padded 0s
+        # and the rest of padding at the end of the signal
+        signal1 = torch.nn.functional.pad(signal1, (1, self.n_samples - length_signal1 - 1))
+        signal2 = torch.nn.functional.pad(signal2, (1, self.n_samples - length_signal2 - 1))
+        # [1, [1, 1, 1]] -> [1, [0, 1, 1, 1, 0, 0]]
+        # [1, [1, 1]] -> [1, [0, 1, 1, 0, 0, 0]]
         return signal1, signal2
 
     # converting waveform to mel spectrogram

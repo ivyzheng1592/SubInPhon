@@ -106,7 +106,7 @@ class AudioRun:
         epoch_acc = 0
 
         # training in one batch
-        for i, input in enumerate(data_loader):
+        for i, input in enumerate(tqdm.tqdm(data_loader)):
             src_txt, src_aud, trg_txt, trg_aud = input
             # src_txt = [txt_src_len, batch_size]
             # src_aud = [batch_size, n_channels, freq, aud_src_len]
@@ -147,7 +147,7 @@ class AudioRun:
 
         # evaluation in one batch
         with torch.no_grad():  # disable gradient tracking
-            for i, input in enumerate(data_loader):
+            for i, input in enumerate(tqdm.tqdm(data_loader)):
                 src_txt, src_aud, trg_txt, trg_aud = input
                 # src_txt = [txt_src_len, batch_size]
                 # src_aud = [batch_size, n_channels, freq, aud_src_len]
@@ -257,7 +257,7 @@ class AudioRun:
             embed_plot = os.path.join(self.recorder.embed_plot_dir,
                                       file_name.replace("_seq2seq.pth", "_embedding.png"))
             # plot embedding
-            utils.plot_embed(phone_space, focus_space, embed_plot)
+            #utils.plot_embed(phone_space, focus_space, embed_plot)
             # save embedding recording to file
             utils.save_to_file(phone_space, embed_file)
 
