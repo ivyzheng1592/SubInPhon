@@ -8,14 +8,14 @@ from Dataset.language_generator import *
 Language: English Backness Harmony
 """
 # Phoneme inventory:
-onset_ae = {
+onset = {
     onset: None for onset in ['m', 'n', 'p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'v', 'z', 'ʃ', 'ʒ', 'θ', 'ð', 'h']
 }
-coda_ae = {
+coda = {
     coda: None for coda in ['m', 'n', 'ŋ', 'p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'v', 'z', 'ʃ', 'ʒ', 'θ', 'ð']
 }
 # vowel for text input (control for number of symbols in a phoneme)
-vowel_ae_txt = {'i': ["front", "high", "tense"],
+vowel_txt = {'i': ["front", "high", "tense"],
                 'e': ["front", "mid", "tense"],
                 'u': ["back", "high", "tense"],
                 'o': ["back", "mid", "tense"],
@@ -24,7 +24,7 @@ vowel_ae_txt = {'i': ["front", "high", "tense"],
                 'ʊ': ["back", "high", "lax"],
                 'ɔ': ["back", "mid", "lax"]}
 # vowel for audio input (actual realization of phoneme)
-vowel_ae_aud = {'i': ["front", "high", "tense"],
+vowel_aud = {'i': ["front", "high", "tense"],
                 'eɪ': ["front", "mid", "tense"],
                 'u': ["back", "high", "tense"],
                 'oʊ': ["back", "mid", "tense"],
@@ -33,100 +33,93 @@ vowel_ae_aud = {'i': ["front", "high", "tense"],
                 'ʊ': ["back", "high", "lax"],
                 'ɔ': ["back", "mid", "lax"]}
 # Syllable structure:
-syll_struct_ae = ["V-CV", "V-CVC", "CV-CV", "CV-CVC",
-                  "VC-V", "VC-VC", "CVC-V", "CVC-VC"]
-                  #"V.CV-CV", "V.CV-CVC", "V.CVC-V", "V.CVC-VC",
-                  #"CV.CV-CV", "CV.CV-CVC", "CV.CVC-V", "CV.CVC-VC",
-                  #"VC.V-CV", "VC.V-CVC", "VC.VC-V", "VC.VC-VC",
-                  #"CVC.V-CV", "CVC.V-CVC","CVC.VC-V", "CVC.VC-VC"]
+syll_struct = ["V-CV", "V-CVC", "CV-CV", "CV-CVC",
+               "VC-V", "VC-VC", "CVC-V", "CVC-VC"]
+syll_struct_shortened = ["V-CV", "V-CVC", "CV-CV",
+                         "VC-V", "VC-VC", "CVC-V"]
 # Stimuli
-EnglishBH_txt = BacknessHarmony(onset_ae, coda_ae, vowel_ae_txt, syll_struct_ae,
-                                "EnglishBH_txt")
-#EnglishBH_txt.generate_stimuli()
-EnglishBH_nonidentical_txt = BacknessHarmony(onset_ae, coda_ae, vowel_ae_txt, syll_struct_ae,
+EnglishBH_full_txt = BacknessHarmony(onset, coda, vowel_txt, syll_struct,
+                                "EnglishBH_full_txt")
+#EnglishBH_full_txt.generate_stimuli()
+EnglishBH_nonidentical_txt = BacknessHarmony(onset, coda, vowel_txt, syll_struct,
                                              "EnglishBH_nonidentical_txt")
 #EnglishBH_nonidentical_txt.generate_stimuli()
-EnglishBH_fea = BacknessHarmony(onset_ae, coda_ae, vowel_ae_txt, syll_struct_ae,
-                                "EnglishBH_fea")
-#EnglishBH_fea.generate_stimuli()
-EnglishBH_nonidentical_fea = BacknessHarmony(onset_ae, coda_ae, vowel_ae_txt, syll_struct_ae,
+EnglishBH_full_fea = BacknessHarmony(onset, coda, vowel_txt, syll_struct,
+                                "EnglishBH_full_fea")
+#EnglishBH_full_fea.generate_stimuli()
+EnglishBH_nonidentical_fea = BacknessHarmony(onset, coda, vowel_txt, syll_struct,
                                              "EnglishBH_nonidentical_fea")
 #EnglishBH_nonidentical_fea.generate_stimuli()
-EnglishBH_aud = BacknessHarmony(onset_ae, coda_ae, vowel_ae_aud, syll_struct_ae,
-                                "EnglishBH_aud")
-#EnglishBH_aud.generate_stimuli()
-EnglishBH_nonidentical_aud = BacknessHarmony(onset_ae, coda_ae, vowel_ae_aud, syll_struct_ae,
-                                             "EnglishBH_nonidentical_aud")
-#EnglishBH_nonidentical_aud.generate_stimuli()
+EnglishBH_shortened_txt = BacknessHarmony(onset, coda, vowel_txt, syll_struct_shortened,
+                                          "EnglishBH_shortened_txt")
+#EnglishBH_shortened_txt.generate_stimuli()
+EnglishBH_shortened_aud = BacknessHarmony(onset, coda, vowel_txt, syll_struct_shortened,
+                                          "EnglishBH_shortened_aud")
+#EnglishBH_shortened_aud.generate_stimuli()
 
 
 """
 Language: English Final Devoicing
 """
 # Phoneme inventory:
-onset_ae = {
+onset = {
     onset: None for onset in ['p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'v', 'z', 'ʃ', 'ʒ', 'θ', 'ð']
 }
-coda_ae = {
+coda = {
     voiceless: "voiceless" for voiceless in ['p', 't', 'k', 'f', 's', 'ʃ', 'θ']
 }
-coda_ae.update({
+coda.update({
     voiced: "voiced" for voiced in ['b', 'd', 'g', 'v', 'z', 'ʒ', 'ð']
 })
 # vowel for text input (control for number of symbols in a phoneme)
-vowel_ae_txt = {
+vowel_txt = {
     vowel: None for vowel in ['i', 'e', 'u', 'o', 'ɪ', 'ɛ', 'ʊ', 'ɔ']
 }
 # vowel for audio input (actual realization of phoneme)
-vowel_ae_aud = {
+vowel_aud = {
     vowel: None for vowel in ['i', 'eɪ', 'u', 'oʊ', 'ɪ', 'ɛ', 'ʊ', 'ɔ']
 }
 # Syllable structure:
-syll_struct_ae = ["VC", "CVC", "VCVC", "CVCVC"]
+syll_struct = ["VC", "CVC", "VCVC", "CVCVC"]
 # Stimuli
-EnglishFD_txt = FinalDevoicing(onset_ae, coda_ae, vowel_ae_txt, syll_struct_ae,
-                               "EnglishFD_txt")
+#EnglishFD_txt = FinalDevoicing(onset, coda, vowel_txt, syll_struct,
+                               #"EnglishFD_txt")
 #EnglishFD_txt.generate_stimuli()
-EnglishFD_fea = FinalDevoicing(onset_ae, coda_ae, vowel_ae_txt, syll_struct_ae,
-                               "EnglishFD_fea")
+#EnglishFD_fea = FinalDevoicing(onset, coda, vowel_txt, syll_struct,
+                               #"EnglishFD_fea")
 #EnglishFD_fea.generate_stimuli()
-EnglishFD_aud = FinalDevoicing(onset_ae, coda_ae, vowel_ae_aud, syll_struct_ae,
-                               "EnglishFD_aud")
+#EnglishFD_aud = FinalDevoicing(onset, coda, vowel_aud, syll_struct,
+                               #"EnglishFD_aud")
 #EnglishFD_aud.generate_stimuli()
 
 
 # Language: Cantonese Backness Harmony
 # Phoneme inventory:
-onset_c = {
+onset = {
     onset: None for onset in ['m', 'n', 'ng', 'p', 't', 'k', 'b', 'd', 'g', 'z', 'c', 's', 'f', 'h']
 }
-coda_c = {
+coda = {
     coda: None for coda in ['m', 'n', 'ng', 'p', 't', 'k']
 }
-vowel_c = {'i': ["front", "high", "tense"],
-           'e': ["front", "mid", "tense"],
-           'u': ["back", "high", "tense"],
-           'o': ["back", "mid", "tense"]}
+vowel = {'i': ["front", "high", "tense"],
+         'e': ["front", "mid", "tense"],
+         'u': ["back", "high", "tense"],
+         'o': ["back", "mid", "tense"]}
 # Syllable structure:
-syll_struct_c = ["V-CV", "V-CVC", "CV-CV", "CV-CVC",
-                 #"VC-V", "VC-VC", "CVC-V", "CVC-VC",
-                 "V.CV-CV", "V.CV-CVC", "CV.CV-CV", "CV.CV-CVC"]
-                 #"VC.V-CV", "VC.V-CVC", "CVC.V-CV", "CVC.V-CVC"
-                 #"V.CVC-V", "CV.CVC-VC", "CV.CVC-V", "CV.CVC-VC"
-                 #"VC.VC-V", "VC.VC-VC", "CVC.VC-V", "CVC.VC-VC"]
+syll_struct = ["V-CV", "V-CVC", "CV-CV", "CV-CVC",
+               "V.CV-CV", "V.CV-CVC", "CV.CV-CV", "CV.CV-CVC"]
 # Stimuli
 #CantoneseBH = BacknessHarmony(onset_c, coda_c, vowel_c, syll_struct_c, "CantoneseBH")
 #CantoneseBH.generate_stimuli()
 
 
 languages = {
-    "EnglishBH_txt": EnglishBH_txt,
+    "EnglishBH_full_txt": EnglishBH_full_txt,
     "EnglishBH_nonidentical_txt": EnglishBH_nonidentical_txt,
-    "EnglishBH_fea": EnglishBH_fea,
+    "EnglishBH_full_fea": EnglishBH_full_fea,
     "EnglishBH_nonidentical_fea": EnglishBH_nonidentical_fea,
-    "EnglishBH_aud": EnglishBH_aud,
-    "EnglishBH_nonidentical_aud": EnglishBH_nonidentical_aud,
-    "EnglishFD_txt": EnglishFD_txt,
-    "EnglishFD_fea": EnglishFD_fea,
-    "EnglishFD_aud": EnglishFD_aud
+    "EnglishBH_shortened_aud": EnglishBH_shortened_aud,
+    #"EnglishFD_txt": EnglishFD_txt,
+    #"EnglishFD_fea": EnglishFD_fea,
+    #"EnglishFD_aud": EnglishFD_aud
 }

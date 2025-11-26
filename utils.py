@@ -120,27 +120,28 @@ def plot_aud_att(ur_aud, sr_txt, sr_aud, txt_attention, aud_attention, att_plot)
 
     fig = plt.figure(figsize=(12, 8))
     ax1 = fig.add_subplot(231)
-    ax1.imshow(ur_aud, origin='lower', aspect='equal')
-    ax2 = fig.add_subplot(234, sharex=ax1)
-    ax2.matshow(txt_attention, cmap="bone", aspect='equal')
+    ax1.imshow(ur_aud, origin='lower', aspect='auto')
+    ax2 = fig.add_subplot(234)
+    ax2.matshow(txt_attention, cmap="bone")
     ax2.set_yticks(ticks=np.arange(len(sr_txt)), labels=sr_txt)
 
     ax3 = fig.add_subplot(233)
-    ax3.imshow(ur_aud, origin='lower', aspect='equal')
+    ax3.imshow(ur_aud, origin='lower', aspect='auto')
     ax4 = fig.add_subplot(235)
-    ax4.imshow(sr_aud, origin='lower', aspect='equal')
+    ax4.imshow(sr_aud, origin='lower', aspect='auto')
     ax5 = fig.add_subplot(236, sharex=ax1)
-    ax5.matshow(aud_attention, cmap="bone", aspect='equal')
+    ax5.matshow(aud_attention, cmap="bone")
 
     plt.tight_layout()
     plt.savefig(att_plot)
     plt.close()
     #plt.show()
 
-def plot_embed(embed_store, focus_embed_store, embed_plot):
+def plot_embed(embed_store, focus_list, embed_plot):
     # convert dictionary to pandas dataframe
     embed_df = pd.DataFrame.from_dict(embed_store, orient='index')
-    focus_embed_df = pd.DataFrame.from_dict(focus_embed_store, orient='index')
+    # extract focus embeddings
+    focus_embed_df = embed_df[embed_df.index.isin(focus_list)]
 
     # reorder indices
     embed_new_idx = ['m', 'n', 'ŋ', 'p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'θ', 'ʃ', 'v', 'z', 'ð', 'ʒ', 'h',
@@ -211,7 +212,7 @@ def plot_embed(embed_store, focus_embed_store, embed_plot):
     plt.close()
     #plt.show()
 
-def plot_embed_updated(embed_store, focus_embed_store, embed_plot, focus_embed_plot):
+def plot_embed_updated(embed_store, focus_list, embed_plot, focus_embed_plot):
 
     dfs = []
     # iterate through all dictionaries and read into dataframes
@@ -223,32 +224,17 @@ def plot_embed_updated(embed_store, focus_embed_store, embed_plot, focus_embed_p
         df['file_name'] = key
         # append to list of dataframes
         dfs.append(df)
-
-    focus_dfs = []
-    # iterate through all dictionaries and read into dataframes
-    for key, value in focus_embed_store.items():
-        # convert dictionary to pandas dataframe
-        focus_df = pd.DataFrame.from_dict(value, orient='index')
-        # add new columns with phoneme and file name
-        focus_df['phoneme'] = focus_df.index
-        focus_df['file_name'] = key
-        # append to list of dataframes
-        focus_dfs.append(focus_df)
-
     # combine lists of dataframes
     combined_df = pd.concat(dfs, ignore_index=True)
-    focus_combined_df = pd.concat(focus_dfs, ignore_index=True)
 
     # analyze file name
-    combined_df[['language', 'model', 'condition', 'run_num', 'epoch', 'none']] = \
+    combined_df[['language', 'condition', 'run_num', 'epoch', 'none']] = \
         combined_df['file_name'].str.split("_", expand=True)
     combined_df['run_num'] = combined_df['run_num'].str.replace('run', '').astype(int)
     combined_df['epoch'] = combined_df['epoch'].str.replace('epoch', '').astype(int)
 
-    focus_combined_df[['language', 'model', 'condition', 'run_num', 'epoch', 'none']] = \
-        focus_combined_df['file_name'].str.split("_", expand=True)
-    focus_combined_df['run_num'] = focus_combined_df['run_num'].str.replace('run', '').astype(int)
-    focus_combined_df['epoch'] = focus_combined_df['epoch'].str.replace('epoch', '').astype(int)
+    # extract focus embeddings
+    focus_combined_df = combined_df[combined_df['phoneme'].isin(focus_list)]
 
     # use PCA to project the data from embedding_dim to 3D
     pca = PCA(n_components=3)
@@ -263,7 +249,9 @@ def plot_embed_updated(embed_store, focus_embed_store, embed_plot, focus_embed_p
 
     # combine metalinguistic information
     combined_df = pd.concat([combined_df, reduced_df], axis=1)
+    combined_df = combined_df.sort_values(by='epoch', ascending=True)
     focus_combined_df = pd.concat([focus_combined_df, focus_reduced_df], axis=1)
+    focus_combined_df = focus_combined_df.sort_values(by='epoch', ascending=True)
 
     # create 3d scatter plot with plotly
     fig = px.scatter_3d(combined_df,

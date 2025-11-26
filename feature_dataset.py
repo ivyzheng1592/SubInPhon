@@ -7,7 +7,6 @@ from text_dataset import *
 class FeatureDataset(TextDataset):
     def __init__(self, annotations_file, feature_file, special_tokens, device='cuda'):
         super().__init__(annotations_file, special_tokens, device)
-
         # get the dataframe of features
         self.feature_df = pd.read_excel(feature_file, sheet_name=0, index_col=0)
 

@@ -54,13 +54,13 @@ class AudioDataset(Dataset):
         # audio: [n_channels, n_samples]
         # retrieve source audio
         src_ref = self.ur_refs[index]
-        src_path = os.path.join(self.audio_dir, (src_ref + ".wav"))
+        src_path = os.path.join(self.audio_dir, src_ref + ".wav")
         src_audio, src_sr = torchaudio.load_with_torchcodec(src_path)
         src_audio = src_audio.to(self.device)
 
         # retrieve target audio
         trg_ref = self.sr_refs[index]
-        trg_path = os.path.join(self.audio_dir, (trg_ref + ".wav"))
+        trg_path = os.path.join(self.audio_dir, trg_ref + ".wav")
         trg_audio, trg_sr = torchaudio.load_with_torchcodec(trg_path)
         trg_audio = trg_audio.to(self.device)
 
@@ -142,7 +142,10 @@ class AudioDataset(Dataset):
         return signal
 
     def split_dataset(self, data_split_ratio):
-        return random_split(self, data_split_ratio)
+        # in this project, we train the model with the entire dataset
+        # and test the model with a randomly selected part of the dataset
+        _, valid_data, test_data = random_split(self, data_split_ratio)
+        return self, valid_data, test_data
 
     # a closure of customized collate_fn
     def get_collate_fn(self):
@@ -160,14 +163,11 @@ class AudioDataset(Dataset):
         return collate_fn
 
     def get_dataloader(self, dataset, batch_size, shuffle=True):
-
-        collate_fn = self.get_collate_fn()
-
         data_loader = DataLoader(
             dataset=dataset,
             batch_size=batch_size,
             shuffle=shuffle,
-            collate_fn=collate_fn,
+            collate_fn=self.get_collate_fn(),
             drop_last=True  # drop incomplete batch
         )
         return data_loader
@@ -177,8 +177,8 @@ if __name__ == "__main__":
     import utils
 
     print(" - Loading dataset:")
-    audio_dir = "/mnt/data/Projects/subinphon/audio/EnglishBH"
-    annotations_file = "Dataset/EnglishBH_aud_harmony.csv"
+    audio_dir = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/EnglishBH"
+    annotations_file = "Dataset/EnglishBH_shortened_aud_harmony.csv"
     annotations = pd.read_csv(annotations_file)
     print(f"Dataset size: {len(annotations)}")
     print(f"Sample data token: {annotations.iloc[0]}")

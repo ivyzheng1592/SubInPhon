@@ -6,6 +6,7 @@ import os
 import tqdm
 import torch
 import torch.nn.functional as F
+from torch.nn.utils import clip_grad_norm_
 import utils
 import hyper_params as hp
 
@@ -16,6 +17,13 @@ class AudioRun:
         # condition hyperparameters
         self.seq2seq = seq2seq
         self.recorder = recorder
+
+        # save untrained model
+        model_file = os.path.join(self.recorder.model_dir,
+                                  self.recorder.lang_name + "_" + self.recorder.condition +
+                                  "_run" + str(self.recorder.run_num) + "_epoch-1_seq2seq.pth")
+        torch.save(self.seq2seq.state_dict(), model_file)
+        print(f"Untrained model stored at {model_file}")
 
         # optimizer
         self.optimizer = torch.optim.Adam(self.seq2seq.parameters(), lr=hp.learning_rate)
@@ -43,22 +51,25 @@ class AudioRun:
 
         # at each epoch, display progress bar
         for epoch in tqdm.tqdm(range(hp.n_epochs)):
-            # update loss for each batch
-            train_rec_loss, train_pred_loss, train_acc = (
-                self.train_one_epoch(epoch, "train", train_dataloader,
-                                     hp.text_teacher_forcing, hp.audio_teacher_forcing))
-            valid_rec_loss, valid_pred_loss, valid_acc = (
-                self.evaluate_one_epoch(epoch, "valid", valid_dataloader))
+            # update loss
+            train_rec_loss, train_pred_loss, train_src, train_trg, train_pred = (
+                self.train_one_epoch(train_dataloader, hp.text_teacher_forcing, hp.audio_teacher_forcing))
+            valid_rec_loss, valid_pred_loss, valid_src, valid_trg, valid_pred = (
+                self.evaluate_one_epoch(valid_dataloader))
+
+            # record predictions and prediction correctness
+            train_acc = self.recorder.record_pred(epoch, "train", train_src, train_trg, train_pred)
+            valid_acc = self.recorder.record_pred(epoch, "valid", valid_src, valid_trg, valid_pred)
+            # record accuracy
+            self.recorder.record_acc(epoch, "train", train_rec_loss, train_pred_loss, train_acc)
+            self.recorder.record_acc(epoch, "valid", valid_rec_loss, valid_pred_loss, valid_acc)
+
             print(f"Epoch {epoch} Train Reconstruction Task Loss: {train_rec_loss:7.3f} "
                   f"| Train Prediction Task Loss: {train_pred_loss:7.3f} "
                   f"| Train Prediction Acc: {train_acc:7.3f}")
             print(f"Epoch {epoch} Valid Reconstruction Task Loss: {valid_rec_loss:7.3f} "
                   f"| Valid Prediction Task Loss: {valid_pred_loss:7.3f} "
                   f"| Valid Prediction Acc: {valid_acc:7.3f}")
-
-            # record accuracy
-            self.recorder.record_acc(epoch, "train", train_rec_loss, train_pred_loss, train_acc)
-            self.recorder.record_acc(epoch, "valid", valid_rec_loss, valid_pred_loss, valid_acc)
 
             # save model every other save_epochs
             if epoch % hp.save_epochs == 0 or epoch == hp.n_epochs-1:
@@ -75,6 +86,7 @@ class AudioRun:
 
     # a function that completes one repetition of evaluation at the end of training
     def test(self, test_dataloader):
+
         # load model
         model_file = os.path.join(self.recorder.model_dir,
                                   self.recorder.lang_name + "_" + self.recorder.condition +
@@ -83,14 +95,17 @@ class AudioRun:
         self.seq2seq.load_state_dict(torch.load(model_file))
 
         # check loss for test dataset
-        test_rec_loss, test_pred_loss, test_acc = (
-            self.evaluate_one_epoch(hp.n_epochs, "test", test_dataloader))
+        test_rec_loss, test_pred_loss, test_srcs, test_trgs, test_preds = (
+            self.evaluate_one_epoch(test_dataloader))
+
+        # record predictions and prediction correctness
+        test_acc = self.recorder.record_pred(hp.n_epochs, "test", test_srcs, test_trgs, test_preds)
+        # record accuracy
+        self.recorder.record_acc(hp.n_epochs, "test", test_rec_loss, test_pred_loss, test_acc)
+
         print(f"Test Reconstruction Task Loss: {test_rec_loss:7.3f} "
               f"| Test Prediction Task Loss: {test_pred_loss:7.3f} "
               f"| Test Prediction Acc: {test_acc:7.3f}")
-
-        # record accuracy
-        self.recorder.record_acc(hp.n_epochs, "test", test_rec_loss, test_pred_loss, test_acc)
 
         # save accuracy recording to file at the end of testing
         utils.save_to_file(self.recorder.acc_store, self.recorder.acc_file)
@@ -99,14 +114,18 @@ class AudioRun:
         print(f"Run {self.recorder.run_num} testing loss, accuracy, and predicted results are saved")
 
     # a function that manages training at one epoch
-    def train_one_epoch(self, epoch, record_type, data_loader, txt_teacher_forcing, aud_teacher_forcing):
+    def train_one_epoch(self, data_loader, txt_teacher_forcing, aud_teacher_forcing):
         self.seq2seq.train()  # enable dropout in training
         epoch_pred_loss = 0
         epoch_rec_loss = 0
-        epoch_acc = 0
+
+        # storing text predictions
+        src_txts = []
+        trg_txts = []
+        pred_txts = []
 
         # training in one batch
-        for i, input in enumerate(tqdm.tqdm(data_loader)):
+        for i, input in enumerate(data_loader):
             src_txt, src_aud, trg_txt, trg_aud = input
             # src_txt = [txt_src_len, batch_size]
             # src_aud = [batch_size, n_channels, freq, aud_src_len]
@@ -119,35 +138,39 @@ class AudioRun:
             # pred = [txt_trg_len, batch_size]
             # spec = [aud_trg_len, batch_size, aud_output_dim]
 
-            # record predictions and prediction correctness
-            batch_correct = self.recorder.record_pred(epoch, record_type, src_txt, trg_txt, pred)
-            batch_acc = sum(batch_correct) / len(batch_correct)  # calculate batch accuracy rate
-            epoch_acc += batch_acc  # add to epoch accuracy rate
+            # record predictions
+            src_txts.append(src_txt)
+            trg_txts.append(trg_txt)
+            pred_txts.append(pred)
 
             rec_loss, pred_loss = self.get_loss(output, spec, trg_txt, trg_aud)
             batch_loss = rec_loss + pred_loss  # calculate batch loss
             epoch_rec_loss += rec_loss.item()
             epoch_pred_loss += pred_loss.item()  # add to epoch loss
             batch_loss.backward()  # backpropagate loss
+            clip_grad_norm_(self.seq2seq.parameters(), max_norm=1.0)
+            # clip the gradients to prevent exploding, uncomment if necessary
             self.optimizer.step()  # update the weights
 
-        # average loss and accuracy over all batches
+        # average loss over all batches
         epoch_rec_loss = epoch_rec_loss / len(data_loader)
         epoch_pred_loss = epoch_pred_loss / len(data_loader)
-        epoch_acc = epoch_acc / len(data_loader)
-
-        return epoch_rec_loss, epoch_pred_loss, epoch_acc
+        return epoch_rec_loss, epoch_pred_loss, src_txts, trg_txts, pred_txts
 
     # a function that manages evaluation at one epoch
-    def evaluate_one_epoch(self, epoch, record_type, data_loader):
+    def evaluate_one_epoch(self, data_loader):
         self.seq2seq.eval()  # disable dropout in evaluation
         epoch_rec_loss = 0
         epoch_pred_loss = 0
-        epoch_acc = 0
+
+        # storing text predictions
+        src_txts = []
+        trg_txts = []
+        pred_txts = []
 
         # evaluation in one batch
         with torch.no_grad():  # disable gradient tracking
-            for i, input in enumerate(tqdm.tqdm(data_loader)):
+            for i, input in enumerate(data_loader):
                 src_txt, src_aud, trg_txt, trg_aud = input
                 # src_txt = [txt_src_len, batch_size]
                 # src_aud = [batch_size, n_channels, freq, aud_src_len]
@@ -159,10 +182,10 @@ class AudioRun:
                 # pred = [txt_trg_len, batch_size]
                 # spec = [aud_trg_len, batch_size, aud_output_dim]
 
-                # record predictions and prediction correctness
-                batch_correct = self.recorder.record_pred(epoch, record_type, src_txt, trg_txt, pred)
-                batch_acc = sum(batch_correct) / len(batch_correct)  # calculate batch accuracy rate
-                epoch_acc += batch_acc  # add to epoch accuracy rate
+                # record predictions
+                src_txts.append(src_txt)
+                trg_txts.append(trg_txt)
+                pred_txts.append(pred)
 
                 rec_loss, pred_loss = self.get_loss(output, spec, trg_txt, trg_aud)  # calculate batch loss
                 epoch_rec_loss += rec_loss.item()
@@ -171,9 +194,7 @@ class AudioRun:
         # average loss and accuracy over all batches
         epoch_rec_loss = epoch_rec_loss / len(data_loader)
         epoch_pred_loss = epoch_pred_loss / len(data_loader)
-        epoch_acc = epoch_acc / len(data_loader)
-
-        return epoch_rec_loss, epoch_pred_loss, epoch_acc
+        return epoch_rec_loss, epoch_pred_loss, src_txts, trg_txts, pred_txts
 
     # a function that manages evaluation of one random batch
     def evaluate_attention(self, test_dataloader, eval_epoch=hp.n_epochs-1):
@@ -231,10 +252,10 @@ class AudioRun:
             print(f"Run {self.recorder.run_num} attention plots are saved for investigation")
 
     def evaluate_embedding(self):
-
         # a dictionary of dictionaries to store all embeddings
         phone_spaces = {}
-        focus_spaces = {}
+        # select focus group
+        focus = list(self.recorder.language.focus.keys())
 
         for file_name in os.listdir(self.recorder.model_dir):
             # load model
@@ -244,23 +265,19 @@ class AudioRun:
             # retrieve target embedding
             embed = self.seq2seq.decoder.embedding.weight
 
-            # define focus group (different for different patterns)
-            focus_group = self.recorder.language.focus
-
             # retrieve embedding of all phonemes and focus group
-            phone_space, focus_space = self.recorder.dataset.sr_alphabet.embed2fea(embed, focus_group)
+            phone_space = self.recorder.dataset.sr_alphabet.embed2fea(embed)
             phone_spaces[file_name] = phone_space
-            focus_spaces[file_name] = focus_space
 
             embed_file = os.path.join(self.recorder.embed_plot_dir,
                                       file_name.replace("_seq2seq.pth", "_embedding.csv"))
             embed_plot = os.path.join(self.recorder.embed_plot_dir,
                                       file_name.replace("_seq2seq.pth", "_embedding.png"))
             # plot embedding
-            #utils.plot_embed(phone_space, focus_space, embed_plot)
+            utils.plot_embed(phone_space, focus, embed_plot)
             # save embedding recording to file
             utils.save_to_file(phone_space, embed_file)
 
         # plot embedding
-        utils.plot_embed_updated(phone_spaces, focus_spaces, self.recorder.embed_plot, self.recorder.focus_embed_plot)
+        utils.plot_embed_updated(phone_spaces, focus, self.recorder.embed_plot, self.recorder.focus_embed_plot)
         print(f"Run {self.recorder.run_num} embedding plots and files are saved for investigation")

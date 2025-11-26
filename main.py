@@ -32,7 +32,7 @@ def text(trial_num, lang_name, conditions, runs, run_mode, device):
         for run_num in runs:
 
             print(" - Splitting dataset:")
-            train_data, valid_data, test_data = dataset.split_dataset(hp.data_split_ratio)
+            train_data, valid_data, test_data = dataset.split_dataset(hp.text_data_split_ratio)
 
             print(" - Creating dataloader:")
             train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
@@ -85,7 +85,7 @@ def feature(trial_num, lang_name, conditions, runs, run_mode, freeze, device):
 
         for run_num in runs:
             print(" - Splitting dataset:")
-            train_data, valid_data, test_data = dataset.split_dataset(hp.data_split_ratio)
+            train_data, valid_data, test_data = dataset.split_dataset(hp.text_data_split_ratio)
 
             print(" - Creating dataloader:")
             train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
@@ -140,7 +140,7 @@ def audio(trial_num, lang_name, conditions, runs, run_mode, device):
         for run_num in runs:
 
             print(" - Splitting dataset:")
-            train_data, valid_data, test_data = dataset.split_dataset(hp.data_split_ratio)
+            train_data, valid_data, test_data = dataset.split_dataset(hp.audio_data_split_ratio)
 
             print(" - Creating dataloader:")
             train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
@@ -180,8 +180,8 @@ if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using {device} device")
 
-    trial_num = "2511231600"  # time stamp
-    lang_name = "EnglishBH_nonidentical_aud"
+    trial_num = "2511270030"  # time stamp
+    lang_name = "EnglishBH_shortened_aud"
     conditions = ["harmony", "disharmony"]
-    runs = range(1)
+    runs = range(2)
     audio(trial_num, lang_name, conditions, runs, run_mode="train and evaluate", device=device)

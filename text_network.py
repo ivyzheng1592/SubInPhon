@@ -11,7 +11,6 @@ import hyper_params as hp
 class TextEncoder(nn.Module):
     def __init__(self, input_dim):
         super(TextEncoder, self).__init__()
-
         self.input_dim = input_dim
         self.embedding_dim = hp.embedding_dim
         self.hidden_dim = hp.text_hidden_dim
@@ -60,7 +59,6 @@ class TextEncoder(nn.Module):
 class BahdanauAttention(nn.Module):
     def __init__(self, hidden_dim):
         super(BahdanauAttention, self).__init__()
-
         self.hidden_dim = hidden_dim
 
         self.W1 = nn.Linear(hidden_dim * 2, hidden_dim)
@@ -100,7 +98,6 @@ class BahdanauAttention(nn.Module):
 class TextDecoder(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(TextDecoder, self).__init__()
-
         self.input_dim = input_dim
         self.embedding_dim = hp.embedding_dim
         self.hidden_dim = hp.text_hidden_dim
@@ -137,7 +134,6 @@ class TextDecoder(nn.Module):
         # decoder_state = [1, batch_size, hidden_dim]
         # hidden = [1, batch_size, hidden_dim]
         # cell = [1, batch_size, hidden_dim]
-        assert (decoder_state == hidden).all()
 
         # the original manuscript uses all of embedding, decoder state, and context vector for the prediction
         output = self.fc_out(torch.cat((embedding, decoder_state, context_vector), dim=2))
@@ -151,7 +147,6 @@ class TextDecoder(nn.Module):
 class TextSeq2Seq(nn.Module):
     def __init__(self, encoder_input_dim, decoder_input_dim, output_dim, device='cuda'):
         super(TextSeq2Seq, self).__init__()
-
         self.device = device
         self.encoder_input_dim = encoder_input_dim
         self.decoder_input_dim = decoder_input_dim
@@ -175,11 +170,10 @@ class TextSeq2Seq(nn.Module):
         # cell = [1, batch_size, encoder_hidden_dim]
 
         trg_len = trg.shape[0]
-        batch_size = trg.shape[1]
         src_len = src.shape[0]
-        decoder_outputs = torch.zeros(trg_len, batch_size, self.output_dim).to(self.device)
-        predictions = torch.zeros(trg_len, batch_size).to(self.device)
-        attentions = torch.zeros(trg_len, batch_size, src_len).to(self.device)
+        decoder_outputs = torch.zeros(trg_len, hp.batch_size, self.output_dim).to(self.device)
+        predictions = torch.zeros(trg_len, hp.batch_size).to(self.device)
+        attentions = torch.zeros(trg_len, hp.batch_size, src_len).to(self.device)
         # decoder_outputs store the probability of all output vocabulary for each trg input token
         # predictions store the predicted output token for each trg input token
         # attentions store the attention weights for each trg input token

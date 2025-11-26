@@ -74,17 +74,14 @@ class Alphabet:
 
         return embedding_tensor
 
-    def embed2fea(self, embedding_tensor, focus_group):
+    def embed2fea(self, embedding_tensor):
         embedding_list = embedding_tensor.cpu().detach().numpy()
         # embedding_tensor = [input_dim, embedding_dim]
 
         # add embedding of each character to entire and focus feature space
         feature_space = {char: embedding_list[idx] for idx, char in self.idx2char.items()
                          if char not in self.specials}
-        focus_feature_space = {char: embedding_list[idx] for idx, char in self.idx2char.items()
-                               if char in focus_group}
-
-        return feature_space, focus_feature_space
+        return feature_space
 
 class TextDataset(Dataset):
     def __init__(self, annotations_file, special_tokens, device='cuda'):
@@ -138,14 +135,11 @@ class TextDataset(Dataset):
         return collate_fn
 
     def get_dataloader(self, dataset, batch_size, shuffle=True):
-
-        collate_fn = self.get_collate_fn()
-
         data_loader = DataLoader(
             dataset=dataset,
             batch_size=batch_size,
             shuffle=shuffle,
-            collate_fn=collate_fn,
+            collate_fn=self.get_collate_fn(),
             drop_last=True  # drop incomplete batch
         )
         return data_loader

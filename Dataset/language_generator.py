@@ -9,9 +9,10 @@ import itertools
 
 
 class LanguagePattern:
-    def __init__(self, onset, coda, vowel, syll_struct, lang_name):
-
-        self.lang_name = lang_name
+    def __init__(self, onset, coda, vowel, syll_struct, full_name):
+        self.lang_name = full_name.split("_")[0]  # EnglishBH, EnglishFD
+        self.property = full_name.split("_")[1]  # full, nonidentical, shortened
+        self.modality = full_name.split("_")[2]  # txt, fea, aud
         self.syll_struct = syll_struct
         self.onset = onset
         self.coda = coda
@@ -26,23 +27,23 @@ class LanguagePattern:
 
 
 class BacknessHarmony(LanguagePattern):
-    def __init__(self, onset, coda, vowel, syll_struct, lang_name):
-        super().__init__(onset, coda, vowel, syll_struct, lang_name)
+    def __init__(self, onset, coda, vowel, syll_struct, full_name):
+        super().__init__(onset, coda, vowel, syll_struct, full_name)
         self.focus = self.vowel
 
     # function to generate vowel harmony stimuli with specified phoneme inventory and syllable structure
     def generate_stimuli(self):
         print(" - Generating stimuli:")
-
         # identify possible stem-suffix vowel combinations for each condition
         h_v_combinations = []
         dh_v_combinations = []
         for stem_v in self.vowel:
             for ur_suffix_v in self.vowel:
                 # disallowing identical vowels, i.e. vowels w/ identical height and tenseness
-                # comment out the if statement when generating full stimuli list
-                if not (self.vowel[ur_suffix_v][1] == self.vowel[stem_v][1]
-                        and self.vowel[ur_suffix_v][2] == self.vowel[stem_v][2]):
+                # only when generating nonidentical datasets
+                if (self.property == "nonidentical" and
+                        not (self.vowel[ur_suffix_v][1] == self.vowel[stem_v][1]
+                        and self.vowel[ur_suffix_v][2] == self.vowel[stem_v][2])):
                     for sr_suffix_v in self.vowel:
                         # harmomny
                         if (self.vowel[sr_suffix_v][1] == self.vowel[ur_suffix_v][1]
@@ -136,7 +137,6 @@ class BacknessHarmony(LanguagePattern):
 
     # function to decompose vowel harmony stimuli with specified phoneme inventory
     def decompose_stimuli(self, word_list):
-
         # separate tense and lax vowels
         vowel_tense = [v for v in self.vowel if self.vowel[v][2] == "tense"]
         vowel_lax = [v for v in self.vowel if self.vowel[v][2] == "lax"]
@@ -233,7 +233,6 @@ class FinalDevoicing(LanguagePattern):
     # function to generate final devoicing stimuli with specified phoneme inventory and syllable structure
     def generate_stimuli(self):
         print(" - Generating stimuli:")
-
         # separate voiceless and voiced codas
         coda_voiceless = [c for c in self.coda if self.coda[c] == "voiceless"]
         coda_voiced = [c for c in self.coda if self.coda[c] == "voiced"]
@@ -247,7 +246,6 @@ class FinalDevoicing(LanguagePattern):
         # based on the list of syllables from previous syllable structure
         # VC -> CVC -> VCVC -> CVCVC
         for struct in self.syll_struct:
-
             if len(struct) == 2:  # VC
                 devoice_list.extend([v + c1, v + c2] for v, (c1, c2) in
                                     itertools.product(self.vowel, zip(coda_voiceless, coda_voiceless)))
@@ -266,7 +264,6 @@ class FinalDevoicing(LanguagePattern):
                                       itertools.product(self.vowel, zip(coda_voiceless, coda_voiced)))
                 previous_voice.extend([v + c1, v + c2] for v, (c1, c2) in
                                       itertools.product(self.vowel, zip(coda_voiced, coda_voiced)))
-
             elif struct[0] == 'V':  # VCVC
                 current_devoice = [[v + ur, v + sr] for v, [ur, sr] in
                                    itertools.product(self.vowel, previous_devoice)]
@@ -278,7 +275,6 @@ class FinalDevoicing(LanguagePattern):
 
                 previous_devoice = current_devoice
                 previous_voice = current_voice
-
             else:  # CVC, CVCVC
                 current_devoice = [[c + ur, c + sr] for c, [ur, sr] in
                                    itertools.product(self.onset, previous_devoice)]

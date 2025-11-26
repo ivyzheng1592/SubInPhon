@@ -11,8 +11,9 @@ class AudioRecorder(TextRecorder):
 
         # result storages
         self.acc_store = {
-            'trial_num': [], 'language': [], 'condition': [], 'run_num': [], 'epoch': [],
-            'record_type': [], 'rec_loss': [], 'pred_loss': [], 'pred_acc': []
+            'trial_num': [], 'language': [], 'dataset': [], 'modality': [],
+            'condition': [], 'run_num': [], 'epoch': [], 'record_type': [],
+            'rec_loss': [], 'pred_loss': [], 'pred_acc': []
         }
 
     # a function that records accuracy rates into a dictionary
@@ -21,6 +22,8 @@ class AudioRecorder(TextRecorder):
         # add current accuracy data to the accuracy data storage
         self.acc_store['trial_num'].append(self.trial_num)
         self.acc_store['language'].append(self.lang_name)
+        self.acc_store['dataset'].append(self.dataset)
+        self.acc_store['modality'].append(self.modality)
         self.acc_store['condition'].append(self.condition)
         self.acc_store['run_num'].append(self.run_num)
         self.acc_store['epoch'].append(epoch)

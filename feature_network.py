@@ -7,7 +7,8 @@ from text_network import *
 class FeatureEncoder(TextEncoder):
     def __init__(self, input_dim, embedding_weight, freeze):
         super().__init__(input_dim)
-        self.embedding = self.embedding.from_pretrained(embedding_weight, freeze=freeze)  # parse pretrained weight to embedding
+        self.embedding = self.embedding.from_pretrained(embedding_weight, freeze=freeze)
+        # parse pretrained weight to embedding
 
 
 class FeatureDecoder(TextDecoder):
