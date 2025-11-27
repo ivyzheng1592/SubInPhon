@@ -9,17 +9,15 @@ import itertools
 
 
 class LanguagePattern:
-    def __init__(self, onset, coda, vowel, syll_struct, full_name):
-        self.lang_name = full_name.split("_")[0]  # EnglishBH, EnglishFD
-        self.property = full_name.split("_")[1]  # full, nonidentical, shortened
-        self.modality = full_name.split("_")[2]  # txt, fea, aud
+    def __init__(self, onset, coda, vowel, syll_struct, lang_name):
+        self.lang_name = lang_name
         self.syll_struct = syll_struct
         self.onset = onset
         self.coda = coda
         self.vowel = vowel
         self.focus = {}  # different focus for different language pattern
 
-    def generate_stimuli(self):
+    def generate_stimuli(self, onset=None, coda=None, vowel=None, syll_struct=None, property=""):
         pass
 
     def decompose_stimuli(self, word_list):
@@ -27,54 +25,65 @@ class LanguagePattern:
 
 
 class BacknessHarmony(LanguagePattern):
-    def __init__(self, onset, coda, vowel, syll_struct, full_name):
-        super().__init__(onset, coda, vowel, syll_struct, full_name)
+    def __init__(self, onset, coda, vowel, syll_struct, lang_name):
+        super().__init__(onset, coda, vowel, syll_struct, lang_name)
         self.focus = self.vowel
 
     # function to generate vowel harmony stimuli with specified phoneme inventory and syllable structure
-    def generate_stimuli(self):
+    def generate_stimuli(self, onset=None, coda=None, vowel=None, syll_struct=None, property=""):
+        # check if there is override of phoneme inventory
+        if onset is None:
+            onset = self.onset
+        if coda is None:
+            coda = self.coda
+        if vowel is None:
+            vowel = self.vowel
+        if syll_struct is None:
+            syll_struct = self.syll_struct
+
         print(" - Generating stimuli:")
         # identify possible stem-suffix vowel combinations for each condition
         h_v_combinations = []
         dh_v_combinations = []
-        for stem_v in self.vowel:
-            for ur_suffix_v in self.vowel:
+        for stem_v in vowel:
+            for ur_suffix_v in vowel:
                 # disallowing identical vowels, i.e. vowels w/ identical height and tenseness
                 # only when generating nonidentical datasets
-                if (self.property == "nonidentical" and
-                        not (self.vowel[ur_suffix_v][1] == self.vowel[stem_v][1]
-                        and self.vowel[ur_suffix_v][2] == self.vowel[stem_v][2])):
-                    for sr_suffix_v in self.vowel:
+                if (property != "nonidentical" or
+                        (property == "nonidentical" and
+                        not (vowel[ur_suffix_v][1] == vowel[stem_v][1]
+                        and vowel[ur_suffix_v][2] == vowel[stem_v][2]))):
+                    for sr_suffix_v in vowel:
                         # harmomny
-                        if (self.vowel[sr_suffix_v][1] == self.vowel[ur_suffix_v][1]
-                            and self.vowel[sr_suffix_v][2] == self.vowel[ur_suffix_v][2]
-                            and self.vowel[sr_suffix_v][0] == self.vowel[stem_v][0]):
+                        if (vowel[sr_suffix_v][1] == vowel[ur_suffix_v][1]
+                            and vowel[sr_suffix_v][2] == vowel[ur_suffix_v][2]
+                            and vowel[sr_suffix_v][0] == vowel[stem_v][0]):
                             h_v_combinations.append([stem_v, ur_suffix_v, sr_suffix_v])
                         # disharmony
-                        if (self.vowel[sr_suffix_v][1] == self.vowel[ur_suffix_v][1]
-                            and self.vowel[sr_suffix_v][2] == self.vowel[ur_suffix_v][2]
-                            and self.vowel[sr_suffix_v][0] != self.vowel[stem_v][0]):
+                        if (vowel[sr_suffix_v][1] == vowel[ur_suffix_v][1]
+                            and vowel[sr_suffix_v][2] == vowel[ur_suffix_v][2]
+                            and vowel[sr_suffix_v][0] != vowel[stem_v][0]):
                             dh_v_combinations.append([stem_v, ur_suffix_v, sr_suffix_v])
 
         # create a dictionary with all kinds of syllables for each vowel
         syll_dict = {
-            v: {key: [] for key in ["V", "VC", "CV", "CVC"]}
-            for v in self.vowel
+            v: {key: [] for key in ["V", "CV", "VC", "CVC"]}
+            for v in vowel
         }
         for v, v_dict in syll_dict.items():
-            if self.vowel[v][2] == "tense":  # for tense vowels, only V and CV
+            if vowel[v][2] == "tense":  # for tense vowels, only V and CV
                 v_dict["V"] = [v]
-                v_dict["CV"] = [o + v for o in self.onset]
-            elif self.vowel[v][2] == "lax":  # for lax vowels, only VC and CVC
-                v_dict["VC"] = [v + c for c in self.coda]
-                v_dict["CVC"] = [o + v + c for o, c in itertools.product(self.onset, self.coda)]
+                v_dict["CV"] = [o + v for o in onset]
+            elif vowel[v][2] == "lax":  # for lax vowels, only VC and CVC
+                v_dict["VC"] = [v + c for c in coda]
+                v_dict["CVC"] = [o + v + c for o, c in itertools.product(onset, coda)]
             else:
-                raise RuntimeError(f"Incorrect vowel feature value {self.vowel[v][2]}")
+                raise RuntimeError(f"Problem with vowel feature quality {vowel[v][2]}")
 
         # generate all possible vowel combinations for each syllable structure
         harmony_list = []
         disharmony_list = []
-        for struct in self.syll_struct:
+        for struct in syll_struct:
             # separate stem and suffix
             # assume monosyllabic stem
             stem_struct = struct.split("-")[0]
@@ -112,8 +121,8 @@ class BacknessHarmony(LanguagePattern):
             print(f"Example {struct} disharmony pair: {disharmony_list[len(disharmony_list) - 1]}")
 
         print(" - Writing to file:")
-        harmony_file = self.lang_name + "_harmony.csv"
-        disharmony_file = self.lang_name + "_disharmony.csv"
+        harmony_file = self.lang_name + "_" + property + "_harmony.csv"
+        disharmony_file = self.lang_name + "_" + property + "_disharmony.csv"
 
         with open(harmony_file, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
@@ -231,7 +240,7 @@ class FinalDevoicing(LanguagePattern):
         self.focus = self.coda
 
     # function to generate final devoicing stimuli with specified phoneme inventory and syllable structure
-    def generate_stimuli(self):
+    def generate_stimuli(self, onset=None, coda=None, vowel=None, syll_struct=None, property=""):
         print(" - Generating stimuli:")
         # separate voiceless and voiced codas
         coda_voiceless = [c for c in self.coda if self.coda[c] == "voiceless"]

@@ -6,7 +6,7 @@ import os
 import tqdm
 import torch
 import torch.nn.functional as F
-from torch.nn.utils import clip_grad_norm_
+import torch.nn as nn
 import utils
 import hyper_params as hp
 
@@ -17,13 +17,6 @@ class AudioRun:
         # condition hyperparameters
         self.seq2seq = seq2seq
         self.recorder = recorder
-
-        # save untrained model
-        model_file = os.path.join(self.recorder.model_dir,
-                                  self.recorder.lang_name + "_" + self.recorder.condition +
-                                  "_run" + str(self.recorder.run_num) + "_epoch-1_seq2seq.pth")
-        torch.save(self.seq2seq.state_dict(), model_file)
-        print(f"Untrained model stored at {model_file}")
 
         # optimizer
         self.optimizer = torch.optim.Adam(self.seq2seq.parameters(), lr=hp.learning_rate)
@@ -39,7 +32,7 @@ class AudioRun:
         # trg = [(trg_len - 1) * batch_size]
 
         # detect padded 0s from target spectrogram for loss calculation
-        weight = torch.where(torch.eq(trg_aud, 0), 0.0, 1.0)
+        weight = torch.where(torch.eq(trg_aud, -100), 0.0, 1.0)
 
         rec_loss = F.l1_loss(spec, trg_aud, reduction='mean', weight=weight)
         pred_loss = F.cross_entropy(output, trg_txt, ignore_index=hp.special_tokens.index(hp.pad_token))
@@ -48,6 +41,13 @@ class AudioRun:
 
     # a function that completes one repetition of training
     def train(self, train_dataloader, valid_dataloader):
+        # save untrained model
+        model_file = os.path.join(self.recorder.model_dir,
+                                  self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                  self.recorder.modality + "_" + self.recorder.condition +
+                                  "_run" + str(self.recorder.run_num) + "_epoch-1_seq2seq.pth")
+        torch.save(self.seq2seq.state_dict(), model_file)
+        print(f"Untrained model stored at {model_file}")
 
         # at each epoch, display progress bar
         for epoch in tqdm.tqdm(range(hp.n_epochs)):
@@ -74,7 +74,8 @@ class AudioRun:
             # save model every other save_epochs
             if epoch % hp.save_epochs == 0 or epoch == hp.n_epochs-1:
                 model_file = os.path.join(self.recorder.model_dir,
-                                          self.recorder.lang_name + "_" + self.recorder.condition +
+                                          self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                          self.recorder.modality + "_" + self.recorder.condition +
                                           "_run" + str(self.recorder.run_num) + "_epoch" + str(epoch) +
                                           "_seq2seq.pth")
                 torch.save(self.seq2seq.state_dict(), model_file)
@@ -89,7 +90,8 @@ class AudioRun:
 
         # load model
         model_file = os.path.join(self.recorder.model_dir,
-                                  self.recorder.lang_name + "_" + self.recorder.condition +
+                                  self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                  self.recorder.modality + "_" + self.recorder.condition +
                                   "_run" + str(self.recorder.run_num) + "_epoch" + str(hp.n_epochs-1) +
                                   "_seq2seq.pth")
         self.seq2seq.load_state_dict(torch.load(model_file))
@@ -128,15 +130,15 @@ class AudioRun:
         for i, input in enumerate(data_loader):
             src_txt, src_aud, trg_txt, trg_aud = input
             # src_txt = [txt_src_len, batch_size]
-            # src_aud = [batch_size, n_channels, freq, aud_src_len]
+            # src_aud = [batch_size, n_channels, n_freq, aud_src_len]
             # trg_txt = [txt_trg_len, batch_size]
-            # trg_aud = [batch_size, n_channels, freq, aud_trg_len]
+            # trg_aud = [batch_size, n_channels, n_freq, aud_trg_len]
 
             self.optimizer.zero_grad()  # reset gradient at each iteration to 0
             output, pred, spec, _, _ = self.seq2seq(input, txt_teacher_forcing, aud_teacher_forcing)
             # output = [txt_trg_len, batch_size, txt_output_dim]
             # pred = [txt_trg_len, batch_size]
-            # spec = [aud_trg_len, batch_size, aud_output_dim]
+            # spec = [batch_size, 1, aud_output_dim, aud_trg_len]
 
             # record predictions
             src_txts.append(src_txt)
@@ -148,7 +150,7 @@ class AudioRun:
             epoch_rec_loss += rec_loss.item()
             epoch_pred_loss += pred_loss.item()  # add to epoch loss
             batch_loss.backward()  # backpropagate loss
-            clip_grad_norm_(self.seq2seq.parameters(), max_norm=1.0)
+            nn.utils.clip_grad_norm_(self.seq2seq.parameters(), max_norm=1.0)
             # clip the gradients to prevent exploding, uncomment if necessary
             self.optimizer.step()  # update the weights
 
@@ -173,14 +175,14 @@ class AudioRun:
             for i, input in enumerate(data_loader):
                 src_txt, src_aud, trg_txt, trg_aud = input
                 # src_txt = [txt_src_len, batch_size]
-                # src_aud = [batch_size, n_channels, freq, aud_src_len]
+                # src_aud = [batch_size, n_channels, n_freq, aud_src_len]
                 # trg_txt = [txt_trg_len, batch_size]
-                # trg_aud = [batch_size, n_channels, freq, aud_trg_len]
+                # trg_aud = [batch_size, n_channels, n_freq, aud_trg_len]
 
                 output, pred, spec, _, _ = self.seq2seq(input, 0, 0)  # turn off teacher forcing
                 # output = [txt_trg_len, batch_size, txt_output_dim]
                 # pred = [txt_trg_len, batch_size]
-                # spec = [aud_trg_len, batch_size, aud_output_dim]
+                # spec = [batch_size, 1, aud_output_dim, aud_trg_len]
 
                 # record predictions
                 src_txts.append(src_txt)
@@ -204,7 +206,8 @@ class AudioRun:
 
         # load model
         model_file = os.path.join(self.recorder.model_dir,
-                                  self.recorder.lang_name + "_" + self.recorder.condition +
+                                  self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                  self.recorder.modality + "_" + self.recorder.condition +
                                   "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
                                   "_seq2seq.pth")
         self.seq2seq.load_state_dict(torch.load(model_file))
@@ -220,9 +223,9 @@ class AudioRun:
 
             src_txt, src_aud, trg_txt, trg_aud = input
             # src_txt = [txt_src_len, batch_size]
-            # src_aud = [batch_size, n_channels, freq, aud_src_len]
+            # src_aud = [batch_size, n_channels, n_freq, aud_src_len]
             # trg_txt = [txt_trg_len, batch_size]
-            # trg_aud = [batch_size, n_channels, freq, aud_trg_len]
+            # trg_aud = [batch_size, n_channels, n_freq, aud_trg_len]
 
             for i in range(hp.batch_size):
                 ur_txt = src_txt[:, i]
@@ -233,7 +236,7 @@ class AudioRun:
                 ur_string, _, pred_sr_string = self.recorder.tensor2string(ur_txt, sr_txt, pred_sr_txt)
                 _, _, pred_sr_list = self.recorder.tensor2list(ur_txt, sr_txt, pred_sr_txt)
 
-                # retrieve spectrogram and attention weights
+                # retrieve spectrograms and attention weights
                 ur_spec = src_aud[i, :, :, :][0]
                 # ur_spec = [n_freq, dur]
                 pred_sr_spec = spec[i, :, :, :][0]
@@ -243,12 +246,22 @@ class AudioRun:
                 aud_att = aud_atts[:, i, :]
                 # aud_att = [aud_trg_len, aud_src_len]
 
+                # convert spectrograms
+                ur_spec, pred_sr_spec = self.recorder.dataset.remove_padding(ur_spec, pred_sr_spec)
+
                 # plot attention
-                att_plot = os.path.join(self.recorder.att_plot_dir,
-                                        self.recorder.lang_name + "_" + self.recorder.condition +
-                                        "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
-                                        ur_string + "_" + pred_sr_string + ".png")
-                utils.plot_aud_att(ur_spec, pred_sr_list, pred_sr_spec, txt_att, aud_att, att_plot)
+                txt_att_plot = os.path.join(self.recorder.att_plot_dir,
+                                            self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                            self.recorder.modality + "_" + self.recorder.condition +
+                                            "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
+                                            ur_string + "_" + pred_sr_string + "_txt.png")
+                aud_att_plot = os.path.join(self.recorder.att_plot_dir,
+                                            self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                            self.recorder.modality + "_" + self.recorder.condition +
+                                            "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
+                                            ur_string + "_" + pred_sr_string + "_aud.png")
+                utils.plot_aud_att(ur_spec, pred_sr_list, pred_sr_spec, txt_att, aud_att,
+                                   txt_att_plot, aud_att_plot)
             print(f"Run {self.recorder.run_num} attention plots are saved for investigation")
 
     def evaluate_embedding(self):

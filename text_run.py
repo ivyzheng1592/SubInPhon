@@ -23,7 +23,16 @@ class TextRun:
         self.criterion = nn.CrossEntropyLoss(ignore_index=hp.special_tokens.index(hp.pad_token))
 
     # a function that completes one repetition of training
-    def train(self, train_dataloader, valid_dataloader):
+    def train(self, train_dataloader, valid_dataloader): \
+        # save untrained model
+        model_file = os.path.join(self.recorder.model_dir,
+                                  self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                  self.recorder.modality + "_" + self.recorder.condition +
+                                  "_run" + str(self.recorder.run_num) + "_epoch-1_seq2seq.pth")
+
+        torch.save(self.seq2seq.state_dict(), model_file)
+        print(f"Untrained model stored at {model_file}")
+
         # at each epoch, display progress bar
         for epoch in tqdm.tqdm(range(hp.n_epochs)):
             # update loss
@@ -46,7 +55,8 @@ class TextRun:
             # save model every other save_epochs
             if epoch % hp.save_epochs == 0 or epoch == hp.n_epochs-1:
                 model_file = os.path.join(self.recorder.model_dir,
-                                          self.recorder.lang_name + "_" + self.recorder.condition +
+                                          self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                          self.recorder.modality + "_" + self.recorder.condition +
                                           "_run" + str(self.recorder.run_num) + "_epoch" + str(epoch) +
                                           "_seq2seq.pth")
                 torch.save(self.seq2seq.state_dict(), model_file)
@@ -60,7 +70,8 @@ class TextRun:
     def test(self, test_dataloader):
         # load model
         model_file = os.path.join(self.recorder.model_dir,
-                                  self.recorder.lang_name + "_" + self.recorder.condition +
+                                  self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                  self.recorder.modality + "_" + self.recorder.condition +
                                   "_run" + str(self.recorder.run_num) + "_epoch" + str(hp.n_epochs-1) +
                                   "_seq2seq.pth")
         self.seq2seq.load_state_dict(torch.load(model_file))
@@ -174,7 +185,8 @@ class TextRun:
 
         # load model
         model_file = os.path.join(self.recorder.model_dir,
-                                  self.recorder.lang_name + "_" + self.recorder.condition +
+                                  self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                  self.recorder.modality + "_" + self.recorder.condition +
                                   "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
                                   "_seq2seq.pth")
         self.seq2seq.load_state_dict(torch.load(model_file))
@@ -204,7 +216,8 @@ class TextRun:
 
                 # plot attention
                 att_plot = os.path.join(self.recorder.att_plot_dir,
-                                        self.recorder.lang_name + "_" + self.recorder.condition +
+                                        self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                        self.recorder.modality + "_" + self.recorder.condition +
                                         "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
                                         ur_string + "_" + pred_sr_string + ".png")
                 utils.plot_txt_att(ur_list, pred_sr_list, word_att, att_plot)
@@ -213,6 +226,8 @@ class TextRun:
     def evaluate_embedding(self):
         # a dictionary of dictionaries to store all embeddings
         phone_spaces = {}
+        # select focus group
+        focus = list(self.recorder.language.focus.keys())
 
         for file_name in os.listdir(self.recorder.model_dir):
             # load model
@@ -231,10 +246,10 @@ class TextRun:
             embed_plot = os.path.join(self.recorder.embed_plot_dir,
                                       file_name.replace("_seq2seq.pth", "_embedding.png"))
             # plot embedding
-            utils.plot_embed(phone_space, embed_plot)
+            utils.plot_embed(phone_space, focus, embed_plot)
             # save embedding recording to file
             utils.save_to_file(phone_space, embed_file)
 
         # plot embedding
-        utils.plot_embed_updated(phone_spaces, self.recorder.embed_plot, self.recorder.focus_embed_plot)
+        utils.plot_embed_updated(phone_spaces, focus, self.recorder.embed_plot, self.recorder.focus_embed_plot)
         print(f"Run {self.recorder.run_num} embedding plots and files are saved for investigation")

@@ -1,0 +1,7 @@
+trial_num,language,dataset,modality,condition,run_num,epoch,record_type,rec_loss,pred_loss,pred_acc
+2511272250,EnglishBH,shortened,aud,harmony,0,0,train,14.278609791923971,2.980311743952647,0.0
+2511272250,EnglishBH,shortened,aud,harmony,0,0,valid,19.147810531874836,2.715511932211407,0.0
+2511272250,EnglishBH,shortened,aud,harmony,0,1,test,19.138994119935116,2.71627390990823,0.0
+2511272250,EnglishBH,shortened,aud,disharmony,0,0,train,14.17198446418057,2.9700936934527227,0.0
+2511272250,EnglishBH,shortened,aud,disharmony,0,0,valid,18.835217621366855,2.727916624586461,0.0
+2511272250,EnglishBH,shortened,aud,disharmony,0,1,test,18.887495881420072,2.7295301526279774,0.0

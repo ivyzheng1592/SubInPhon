@@ -3,8 +3,8 @@
 
 import pandas as pd
 import torch
+import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, random_split
-from torch.nn.utils.rnn import pad_sequence
 
 
 class Alphabet:
@@ -127,10 +127,10 @@ class TextDataset(Dataset):
     def get_collate_fn(self):
         def collate_fn(batch):
             srcs = [item[0] for item in batch]
-            srcs = pad_sequence(srcs, batch_first=False, padding_value=self.pad_idx)
+            srcs = nn.utils.rnn.pad_sequence(srcs, batch_first=False, padding_value=self.pad_idx)
 
             trgs = [item[1] for item in batch]
-            trgs = pad_sequence(trgs, batch_first=False, padding_value=self.pad_idx)
+            trgs = nn.utils.rnn.pad_sequence(trgs, batch_first=False, padding_value=self.pad_idx)
             return srcs, trgs
         return collate_fn
 
@@ -149,7 +149,7 @@ if __name__ == "__main__":
     import hyper_params as hp
 
     print(" - Loading dataset:")
-    annotations_file = "Dataset/EnglishBH_txt_harmony.csv"
+    annotations_file = "Dataset/EnglishBH_full_harmony.csv"
     annotations = pd.read_csv(annotations_file)
     print(f"Dataset size: {len(annotations)}")
     print(f"Sample data token: {annotations.iloc[0]}")

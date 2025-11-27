@@ -234,9 +234,9 @@ class AudioSeq2Seq(nn.Module):
     def forward(self, input, txt_teacher_forcing=hp.text_teacher_forcing, aud_teacher_forcing=hp.audio_teacher_forcing):
         src_txt, src_aud, trg_txt, trg_aud = input
         # src_txt = [txt_src_len, batch_size]
-        # src_aud = [batch_size, n_channels, freq, aud_src_len]
+        # src_aud = [batch_size, n_channels, n_freq, aud_src_len]
         # trg_txt = [txt_trg_len, batch_size]
-        # trg_aud = [batch_size, n_channels, freq, aud_trg_len]
+        # trg_aud = [batch_size, n_channels, n_freq, aud_trg_len]
 
         encoder_states, _, _ = self.encoder(src_aud)
         # encoder_states = [aud_src_len, batch_size, hidden_dim * 2]
@@ -343,7 +343,7 @@ if __name__ == "__main__":
                            text_output_dim, audio_output_dim, 'cpu').to('cpu')
 
     # inspect model structure
-    torchinfo.summary(seq2seq, #input_size=[(6, 32), (32, 1, 128, 83), (6, 32), (32, 1, 128, 83)],
+    torchinfo.summary(seq2seq, #input_size=[(6, 32), (32, 1, 128, 94), (6, 32), (32, 1, 128, 94)],
                       #dtypes=[torch.long, torch.float32, torch.long, torch.float32],
                       device='cpu')
 

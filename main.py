@@ -17,20 +17,20 @@ import hyper_params as hp
 
 
 # a function that loads text dataset, initializes text model for each run of each condition
-def text(trial_num, lang_name, conditions, runs, run_mode, device):
+def text(trial_num, lang_name, property, conditions, runs, run_mode, device):
 
-    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name), exist_ok=True)
+    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name + "_" + property + "_txt"),
+                exist_ok=True)
 
     for condition in conditions:
         print(" - Instantiating language pattern:")
         language = languages[lang_name]
 
         print(" - Loading dataset:")
-        annotations_file = os.path.join("Dataset", lang_name + "_" + condition + ".csv")
+        annotations_file = os.path.join("Dataset", lang_name + "_" + property + "_" + condition + ".csv")
         dataset = TextDataset(annotations_file, hp.special_tokens, device=device)
 
         for run_num in runs:
-
             print(" - Splitting dataset:")
             train_data, valid_data, test_data = dataset.split_dataset(hp.text_data_split_ratio)
 
@@ -54,7 +54,7 @@ def text(trial_num, lang_name, conditions, runs, run_mode, device):
                     nn.init.uniform_(param.data, a=0, b=0.01)
 
             print(" - Preparing data recorder:")
-            recorder = TextRecorder(dataset, trial_num, language, condition, run_num)
+            recorder = TextRecorder(dataset, trial_num, language, property, "txt", condition, run_num)
 
             print(" - Training and evaluating model:")
             rep = TextRun(seq2seq, recorder)
@@ -70,16 +70,17 @@ def text(trial_num, lang_name, conditions, runs, run_mode, device):
 
 
 # a function that loads text dataset, initializes text model for each run of each condition
-def feature(trial_num, lang_name, conditions, runs, run_mode, freeze, device):
+def feature(trial_num, lang_name, property, conditions, runs, run_mode, freeze, device):
 
-    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name), exist_ok=True)
+    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name + "_" + property + "_fea"),
+                exist_ok=True)
 
     for condition in conditions:
         print(" - Instantiating language pattern:")
         language = languages[lang_name]
 
         print(" - Loading dataset:")
-        annotations_file = os.path.join("Dataset", lang_name + "_" + condition + ".csv")
+        annotations_file = os.path.join("Dataset", lang_name + "_" + property + "_" + condition + ".csv")
         feature_file = os.path.join("Dataset", lang_name.split("_")[0] + "_features.xlsx")
         dataset = FeatureDataset(annotations_file, feature_file, hp.special_tokens, device=device)
 
@@ -106,7 +107,7 @@ def feature(trial_num, lang_name, conditions, runs, run_mode, freeze, device):
                                      freeze=freeze, device=device)
 
             print(" - Preparing data recorder:")
-            recorder = TextRecorder(dataset, trial_num, language, condition, run_num)
+            recorder = TextRecorder(dataset, trial_num, language, property, "fea", condition, run_num)
 
             print(" - Training and evaluating model:")
             rep = TextRun(seq2seq, recorder)
@@ -122,23 +123,22 @@ def feature(trial_num, lang_name, conditions, runs, run_mode, freeze, device):
 
 
 # a function that loads audio dataset, initializes audio model for each run of each condition
-def audio(trial_num, lang_name, conditions, runs, run_mode, device):
+def audio(trial_num, lang_name, property, conditions, runs, run_mode, device):
 
-    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name), exist_ok=True)
+    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name + "_" + property + "_aud"),
+                exist_ok=True)
 
     for condition in conditions:
         print(" - Instantiating language pattern:")
         language = languages[lang_name]
 
         print(" - Loading dataset:")
-        annotations_file = os.path.join("Dataset", lang_name + "_" + condition + ".csv")
-        audio_dir = os.path.join("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon",
-                                 lang_name.split("_")[0])
+        annotations_file = os.path.join("Dataset", lang_name + "_" + property + "_" + condition + ".csv")
+        audio_dir = os.path.join("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon", lang_name)
         dataset = AudioDataset(annotations_file, audio_dir, hp.special_tokens,
                                wav2mel=True, power2db=True, device=device)
 
         for run_num in runs:
-
             print(" - Splitting dataset:")
             train_data, valid_data, test_data = dataset.split_dataset(hp.audio_data_split_ratio)
 
@@ -160,7 +160,7 @@ def audio(trial_num, lang_name, conditions, runs, run_mode, device):
                                    text_output_dim, audio_output_dim, device=device)
 
             print(" - Preparing data recorder:")
-            recorder = AudioRecorder(dataset, trial_num, language, condition, run_num)
+            recorder = AudioRecorder(dataset, trial_num, language, property, "aud", condition, run_num)
 
             print(" - Training and evaluating model:")
             rep = AudioRun(seq2seq, recorder)
@@ -180,8 +180,10 @@ if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using {device} device")
 
-    trial_num = "2511270030"  # time stamp
-    lang_name = "EnglishBH_shortened_aud"
+    trial_num = "2511272250"  # time stamp
+    lang_name = "EnglishBH"
+    property = "shortened"
     conditions = ["harmony", "disharmony"]
-    runs = range(2)
-    audio(trial_num, lang_name, conditions, runs, run_mode="train and evaluate", device=device)
+    runs = range(1)
+    audio(trial_num, lang_name, property, conditions, runs,
+          run_mode="evaluate embedding", device=device)

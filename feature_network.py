@@ -35,7 +35,7 @@ if __name__ == "__main__":
     from feature_dataset import FeatureDataset
 
     print(" - Loading dataset:")
-    annotations_file = "Dataset/EnglishBH_txt_harmony.csv"
+    annotations_file = "Dataset/EnglishBH_full_harmony.csv"
     feature_file = "Dataset/EnglishBH_features.xlsx"
     feature_dataset = FeatureDataset(annotations_file, feature_file, hp.special_tokens, device='cpu')
     encoder_embedding_weight = feature_dataset.ur_embedding

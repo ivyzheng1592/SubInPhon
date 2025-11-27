@@ -6,8 +6,8 @@ from text_record import TextRecorder
 
 
 class AudioRecorder(TextRecorder):
-    def __init__(self, dataset, trial_num, language, condition, run_num):
-        super().__init__(dataset, trial_num, language, condition, run_num)
+    def __init__(self, dataset, trial_num, language, property, modality, condition, run_num):
+        super().__init__(dataset, trial_num, language, property, modality, condition, run_num)
 
         # result storages
         self.acc_store = {
@@ -18,11 +18,11 @@ class AudioRecorder(TextRecorder):
 
     # a function that records accuracy rates into a dictionary
     # the function is called at each training/evaluation epoch
-    def record_acc(self, epoch, record_type, rec_loss, pred_loss, acc):
+    def record_acc(self, epoch, record_type, rec_loss, pred_loss, pred_acc):
         # add current accuracy data to the accuracy data storage
         self.acc_store['trial_num'].append(self.trial_num)
         self.acc_store['language'].append(self.lang_name)
-        self.acc_store['dataset'].append(self.dataset)
+        self.acc_store['dataset'].append(self.property)
         self.acc_store['modality'].append(self.modality)
         self.acc_store['condition'].append(self.condition)
         self.acc_store['run_num'].append(self.run_num)
@@ -30,4 +30,4 @@ class AudioRecorder(TextRecorder):
         self.acc_store['record_type'].append(record_type)
         self.acc_store['rec_loss'].append(rec_loss)
         self.acc_store['pred_loss'].append(pred_loss)
-        self.acc_store['pred_acc'].append(acc)
+        self.acc_store['pred_acc'].append(pred_acc)

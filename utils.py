@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 from sklearn.decomposition import PCA
 from nooverlap import push_text_free
-import hyper_params as hp
 
 
 def save_to_file(data_store, save_file):
@@ -111,7 +110,7 @@ def plot_txt_att(ur, sr, attention, att_plot):
     plt.close()
     #plt.show()
 
-def plot_aud_att(ur_aud, sr_txt, sr_aud, txt_attention, aud_attention, att_plot):
+def plot_aud_att(ur_aud, sr_txt, sr_aud, txt_attention, aud_attention, txt_att_plot, aud_att_plot):
     # convert data to numpy array
     ur_aud = ur_aud.cpu().numpy()
     sr_aud = sr_aud.cpu().numpy()
@@ -119,21 +118,25 @@ def plot_aud_att(ur_aud, sr_txt, sr_aud, txt_attention, aud_attention, att_plot)
     aud_attention = aud_attention.cpu().numpy()
 
     fig = plt.figure(figsize=(12, 8))
-    ax1 = fig.add_subplot(231)
+    ax1 = fig.add_subplot(3, 1, (1, 2))
     ax1.imshow(ur_aud, origin='lower', aspect='auto')
-    ax2 = fig.add_subplot(234)
+    ax2 = fig.add_subplot(3, 1, 3)
     ax2.matshow(txt_attention, cmap="bone")
     ax2.set_yticks(ticks=np.arange(len(sr_txt)), labels=sr_txt)
-
-    ax3 = fig.add_subplot(233)
-    ax3.imshow(ur_aud, origin='lower', aspect='auto')
-    ax4 = fig.add_subplot(235)
-    ax4.imshow(sr_aud, origin='lower', aspect='auto')
-    ax5 = fig.add_subplot(236, sharex=ax1)
-    ax5.matshow(aud_attention, cmap="bone")
-
     plt.tight_layout()
-    plt.savefig(att_plot)
+    plt.savefig(txt_att_plot)
+    plt.close()
+    #plt.show()
+
+    fig = plt.figure(figsize=(12, 8))
+    ax1 = fig.add_subplot(222)
+    ax1.imshow(ur_aud, origin='lower', aspect='auto')
+    ax2 = fig.add_subplot(223)
+    ax2.imshow(sr_aud, origin='lower', aspect='auto')
+    ax3 = fig.add_subplot(224)
+    ax3.imshow(aud_attention)
+    plt.tight_layout()
+    plt.savefig(aud_att_plot)
     plt.close()
     #plt.show()
 
@@ -228,7 +231,7 @@ def plot_embed_updated(embed_store, focus_list, embed_plot, focus_embed_plot):
     combined_df = pd.concat(dfs, ignore_index=True)
 
     # analyze file name
-    combined_df[['language', 'condition', 'run_num', 'epoch', 'none']] = \
+    combined_df[['language', 'property', 'modality', 'condition', 'run_num', 'epoch', 'none']] = \
         combined_df['file_name'].str.split("_", expand=True)
     combined_df['run_num'] = combined_df['run_num'].str.replace('run', '').astype(int)
     combined_df['epoch'] = combined_df['epoch'].str.replace('epoch', '').astype(int)
@@ -253,12 +256,38 @@ def plot_embed_updated(embed_store, focus_list, embed_plot, focus_embed_plot):
     focus_combined_df = pd.concat([focus_combined_df, focus_reduced_df], axis=1)
     focus_combined_df = focus_combined_df.sort_values(by='epoch', ascending=True)
 
+    # reorder phonemes
+    phoneme = pd.CategoricalDtype(categories=['m', 'n', 'ŋ', 'p', 't', 'k', 'b', 'd', 'g',
+                                              'f', 's', 'θ', 'ʃ', 'v', 'z', 'ð', 'ʒ', 'h',
+                                              'i', 'e', 'u', 'o', 'ɪ', 'ɛ', 'ʊ', 'ɔ'],
+                                  ordered=True)
+    # Convert the 'size' column to a CategoricalDtype
+    combined_df['phoneme'] = combined_df['phoneme'].astype(phoneme)
+    combined_df = combined_df.sort_values(by='phoneme')
+
+    # color palette
+    color_palette = [
+        'rgb(138, 29, 99)', 'rgb(107, 24, 93)', 'rgb(76, 21, 80)',
+        'rgb(250, 205, 145)', 'rgb(246, 173, 119)', 'rgb(240, 142, 98)',
+        'rgb(216, 80, 83)', 'rgb(195, 56, 90)', 'rgb(168, 40, 96)',
+        'rgb(18, 78, 43)', 'rgb(34, 120, 36)', 'rgb(115, 152, 5)', 'rgb(195, 182, 59)',
+        'rgb(140, 193, 186)', 'rgb(60, 154, 171)', 'rgb(30, 110, 161)', 'rgb(38, 62, 144)',
+        'rgb(239, 226, 156)',
+        'rgb(158,1,66)', 'rgb(213,62,79)', 'rgb(94,79,162)', 'rgb(50,136,189)',
+        'rgb(244,109,67)', 'rgb(253,174,97)', 'rgb(102,194,165)', 'rgb(171,221,164)'
+    ]
+    focus_color_palette = [
+        'rgb(158,1,66)', 'rgb(213,62,79)', 'rgb(94,79,162)', 'rgb(50,136,189)',
+        'rgb(244,109,67)', 'rgb(253,174,97)', 'rgb(102,194,165)', 'rgb(171,221,164)'
+    ]
+
     # create 3d scatter plot with plotly
     fig = px.scatter_3d(combined_df,
                         x='pc1',
                         y='pc2',
                         z='pc3',
                         color='phoneme',
+                        color_discrete_sequence=color_palette,
                         animation_frame='epoch')
     fig.write_html(embed_plot)
     plt.close()
@@ -269,6 +298,7 @@ def plot_embed_updated(embed_store, focus_list, embed_plot, focus_embed_plot):
                         y='pc2',
                         z='pc3',
                         color='phoneme',
+                        color_discrete_sequence=focus_color_palette,
                         animation_frame='epoch')
     fig.write_html(focus_embed_plot)
     plt.close()

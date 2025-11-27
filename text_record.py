@@ -7,13 +7,13 @@ import hyper_params as hp
 
 
 class TextRecorder:
-    def __init__(self, dataset, trial_num, language, condition, run_num):
+    def __init__(self, dataset, trial_num, language, property, modality, condition, run_num):
         self.dataset = dataset
         self.trial_num = trial_num
         self.language = language
         self.lang_name = language.lang_name
-        self.property = language.property
-        self.modality = language.modality
+        self.property = property
+        self.modality = modality
         self.condition = condition
         self.run_num = run_num
 
@@ -40,38 +40,38 @@ class TextRecorder:
         }
 
         # results files and directories
-        self.acc_file = os.path.join("Results", trial_num + "_" + self.lang_name,
-                                     self.lang_name + "_acc.csv")
-        self.pred_file = os.path.join("Results", trial_num + "_" + self.lang_name,
-                                      self.lang_name + "_pred.csv")
+        self.acc_file = os.path.join("Results", trial_num + "_" + self.lang_name + "_" + property + "_" + modality,
+                                     self.lang_name + "_" + property + "_" + modality + "_acc.csv")
+        self.pred_file = os.path.join("Results", trial_num + "_" + self.lang_name + "_" + property + "_" + modality,
+                                      self.lang_name + "_" + property + "_" + modality + "_pred.csv")
 
-        self.acc_plot_dir = os.path.join("Results", trial_num + "_" + self.lang_name,
-                                         self.lang_name + "_acc_plots")
+        self.acc_plot_dir = os.path.join("Results", trial_num + "_" + self.lang_name + "_" + property + "_" + modality,
+                                         self.lang_name + "_" + property + "_" + modality + "_acc_plots")
         os.makedirs(self.acc_plot_dir, exist_ok=True)
         self.acc_plot = os.path.join(self.acc_plot_dir,
-                                     self.lang_name + "_" + self.condition +
+                                     self.lang_name + "_" + property + "_" + modality + "_" + self.condition +
                                      "_run" + str(self.run_num) + "_acc_plot.png")
 
-        self.model_dir = os.path.join("Results", trial_num + "_" + self.lang_name,
-                                      self.lang_name + "_model_files",
-                                      self.lang_name + "_" + self.condition +
+        self.model_dir = os.path.join("Results", trial_num + "_" + self.lang_name + "_" + property + "_" + modality,
+                                      self.lang_name + "_" + property + "_" + modality + "_model_files",
+                                      self.lang_name + "_" + property + "_" + modality + "_" + self.condition +
                                       "_run" + str(self.run_num) + "_model_files")
         os.makedirs(self.model_dir, exist_ok=True)
 
-        self.att_plot_dir = os.path.join("Results", trial_num + "_" + self.lang_name,
-                                         self.lang_name + "_att_plots",
-                                         self.lang_name + "_" + self.condition +
+        self.att_plot_dir = os.path.join("Results", trial_num + "_" + self.lang_name + "_" + property + "_" + modality,
+                                         self.lang_name + "_" + property + "_" + modality + "_att_plots",
+                                         self.lang_name + "_" + property + "_" + modality + "_" + self.condition +
                                          "_run" + str(self.run_num) + "_att_plots")
         os.makedirs(self.att_plot_dir, exist_ok=True)
 
-        self.embed_plot_dir = os.path.join("Results", trial_num + "_" + self.lang_name,
-                                           self.lang_name + "_embed_plots")
+        self.embed_plot_dir = os.path.join("Results", trial_num + "_" + self.lang_name + "_" + property + "_" + modality,
+                                           self.lang_name + "_" + property + "_" + modality + "_embed_plots")
         os.makedirs(self.embed_plot_dir, exist_ok=True)
         self.embed_plot = os.path.join(self.embed_plot_dir,
-                                       self.lang_name + "_" + self.condition +
+                                       self.lang_name + "_" + property + "_" + modality + "_" + self.condition +
                                        "_run" + str(self.run_num) + "_embedding.html")
         self.focus_embed_plot = os.path.join(self.embed_plot_dir,
-                                             self.lang_name + "_" + self.condition +
+                                             self.lang_name + "_" + property + "_" + modality + "_" + self.condition +
                                              "_run" + str(self.run_num) + "_focus_embedding.html")
 
     # a function that converts one pair of ur, sr, and pred_sr tensor to list
@@ -120,7 +120,7 @@ class TextRecorder:
         # add current accuracy data to the accuracy data storage
         self.acc_store['trial_num'].append(self.trial_num)
         self.acc_store['language'].append(self.lang_name)
-        self.acc_store['dataset'].append(self.dataset)
+        self.acc_store['dataset'].append(self.property)
         self.acc_store['modality'].append(self.modality)
         self.acc_store['condition'].append(self.condition)
         self.acc_store['run_num'].append(self.run_num)
@@ -201,7 +201,7 @@ class TextRecorder:
 
                 self.acc_store['trial_num'].append(self.trial_num)
                 self.acc_store['language'].append(self.lang_name)
-                self.acc_store['dataset'].append(self.dataset)
+                self.acc_store['dataset'].append(self.property)
                 self.acc_store['modality'].append(self.modality)
                 self.pred_store['condition'].append(self.condition)
                 self.pred_store['run_num'].append(self.run_num)

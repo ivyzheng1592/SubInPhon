@@ -7,8 +7,8 @@ import pandas as pd
 import torch
 import torchaudio
 import torchaudio.transforms as T
+import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, random_split, default_collate
-from torch.nn.utils.rnn import pad_sequence
 from text_dataset import Alphabet
 import hyper_params as hp
 
@@ -65,17 +65,17 @@ class AudioDataset(Dataset):
         trg_audio = trg_audio.to(self.device)
 
         # pre-process source and target audio
-        src_audio = self._resampling(src_audio, src_sr)
-        trg_audio = self._resampling(trg_audio, trg_sr)
-        src_audio, trg_audio = self._padding(src_audio, trg_audio)
+        src_audio = self.resampling(src_audio, src_sr)
+        trg_audio = self.resampling(trg_audio, trg_sr)
+        src_audio, trg_audio = self.padding(src_audio, trg_audio)
 
         # transform source and target audio
-        if self.wav2mel:  # [n_channels, freq, dur]
-            src_audio = self._wav_to_mel(src_audio)
-            trg_audio = self._wav_to_mel(trg_audio)
+        if self.wav2mel:  # [n_channels, n_freq, dur]
+            src_audio = self.wav_to_mel(src_audio)
+            trg_audio = self.wav_to_mel(trg_audio)
         if self.power2db:
-            src_audio = self._power_to_db(src_audio)
-            trg_audio = self._power_to_db(trg_audio)
+            src_audio = self.power_to_db(src_audio)
+            trg_audio = self.power_to_db(trg_audio)
 
         # get source text
         src = self.ur_words[index]
@@ -89,7 +89,7 @@ class AudioDataset(Dataset):
 
         return src_tensor, src_audio, trg_tensor, trg_audio
 
-    def _resampling(self, signal, sr):
+    def resampling(self, signal, sr):
         # in this project, we expect all sr == self.sample_rate
         assert (
             sr == self.sample_rate
@@ -100,7 +100,7 @@ class AudioDataset(Dataset):
             signal = resampler(signal)
         return signal
 
-    def _padding(self, signal1, signal2):
+    def padding(self, signal1, signal2):
         # in this project, we are padding to a maximum length
         # so we expect all length_signal < self.n_samples
         length_signal1 = signal1.shape[1]
@@ -117,8 +117,19 @@ class AudioDataset(Dataset):
         # [1, [1, 1]] -> [1, [0, 1, 1, 0, 0, 0]]
         return signal1, signal2
 
+    def remove_padding(self, mel1, mel2):
+        # mel = [n_fre, dur]
+        # check if values along n_freq dimension are all 0s
+        # remove from dur dimension if all 0s
+        mel1_zeros = torch.all(torch.where(torch.eq(mel1, -100), False, True), dim=0)
+        mel1 = mel1[:, mel1_zeros]
+        mel2_zeros = torch.all(torch.where(torch.eq(mel2, -100), False, True), dim=0)
+        mel2 = mel2[:, mel2_zeros]
+
+        return mel1, mel2
+
     # converting waveform to mel spectrogram
-    def _wav_to_mel(self, signal):
+    def wav_to_mel(self, signal):
         mel_spectrogram = T.MelSpectrogram(
             sample_rate=self.sample_rate,  # sampling rate, i.e. 24000 samples in 1s
             n_fft=1024,  # length of the FFT window
@@ -136,7 +147,7 @@ class AudioDataset(Dataset):
 
     # converting power scale to decibel scale in spectrogram
     # for readability of the spectrogram figure
-    def _power_to_db(self, signal):
+    def power_to_db(self, signal):
         db_spectrogram = T.AmplitudeToDB(stype="power").to(self.device)
         signal = db_spectrogram(signal)
         return signal
@@ -151,12 +162,12 @@ class AudioDataset(Dataset):
     def get_collate_fn(self):
         def collate_fn(batch):
             src_labels = [src_txt for src_txt, _, _, _ in batch]
-            src_labels = pad_sequence(src_labels, batch_first=False, padding_value=self.pad_idx)
+            src_labels = nn.utils.rnn.pad_sequence(src_labels, batch_first=False, padding_value=self.pad_idx)
             src_audios = [src_aud for _, src_aud, _, _ in batch]
             src_audios = default_collate(src_audios)
 
             trg_labels = [trg_txt for _, _, trg_txt, _ in batch]
-            trg_labels = pad_sequence(trg_labels, batch_first=False, padding_value=self.pad_idx)
+            trg_labels = nn.utils.rnn.pad_sequence(trg_labels, batch_first=False, padding_value=self.pad_idx)
             trg_audios = [trg_aud for _, _, _, trg_aud in batch]
             trg_audios = default_collate(trg_audios)
             return src_labels, src_audios, trg_labels, trg_audios
@@ -178,7 +189,7 @@ if __name__ == "__main__":
 
     print(" - Loading dataset:")
     audio_dir = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/EnglishBH"
-    annotations_file = "Dataset/EnglishBH_shortened_aud_harmony.csv"
+    annotations_file = "Dataset/EnglishBH_shortened_harmony.csv"
     annotations = pd.read_csv(annotations_file)
     print(f"Dataset size: {len(annotations)}")
     print(f"Sample data token: {annotations.iloc[0]}")
