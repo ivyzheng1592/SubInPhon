@@ -176,14 +176,23 @@ def audio(trial_num, lang_name, property, conditions, runs, run_mode, device):
 
 
 if __name__ == "__main__":
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(description='argparse')
+    parser.add_argument('--gpu', '-gpu', type=int, default=0, help="Choose the GPU to work on")
+    parser.add_argument('--run', '-r', type=int, default=1, help="Number of runs to conduct")
+
+    args = parser.parse_args()
+    """
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using {device} device")
 
-    trial_num = "2511272250"  # time stamp
+    trial_num = "2511280030"  # time stamp
     lang_name = "EnglishBH"
     property = "shortened"
     conditions = ["harmony", "disharmony"]
     runs = range(1)
     audio(trial_num, lang_name, property, conditions, runs,
-          run_mode="evaluate embedding", device=device)
+          run_mode="train and evaluate", device=device)

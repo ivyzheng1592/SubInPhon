@@ -59,7 +59,7 @@ text_teacher_forcing = 0.5  # original=0.5
 audio_teacher_forcing = 0.5
 
 # Training hyperparameters
-n_epochs = 1  # original=50. Note: must be >1 !!!
+n_epochs = 150  # original=50. Note: must be >1 !!!
 save_epochs = 10
 learning_rate = 1e-4
 batch_size = 32  # original=32

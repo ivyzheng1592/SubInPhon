@@ -252,18 +252,21 @@ def plot_embed_updated(embed_store, focus_list, embed_plot, focus_embed_plot):
 
     # combine metalinguistic information
     combined_df = pd.concat([combined_df, reduced_df], axis=1)
-    combined_df = combined_df.sort_values(by='epoch', ascending=True)
     focus_combined_df = pd.concat([focus_combined_df, focus_reduced_df], axis=1)
-    focus_combined_df = focus_combined_df.sort_values(by='epoch', ascending=True)
 
     # reorder phonemes
     phoneme = pd.CategoricalDtype(categories=['m', 'n', 'ŋ', 'p', 't', 'k', 'b', 'd', 'g',
                                               'f', 's', 'θ', 'ʃ', 'v', 'z', 'ð', 'ʒ', 'h',
                                               'i', 'e', 'u', 'o', 'ɪ', 'ɛ', 'ʊ', 'ɔ'],
                                   ordered=True)
-    # Convert the 'size' column to a CategoricalDtype
+    vowel = pd.CategoricalDtype(categories=['i', 'e', 'u', 'o', 'ɪ', 'ɛ', 'ʊ', 'ɔ'],
+                                ordered=True)
     combined_df['phoneme'] = combined_df['phoneme'].astype(phoneme)
-    combined_df = combined_df.sort_values(by='phoneme')
+    focus_combined_df['phoneme'] = focus_combined_df['phoneme'].astype(vowel)
+
+    # reorder epochs
+    combined_df = combined_df.sort_values(by=['phoneme', 'epoch'], ascending=[True, True])
+    focus_combined_df = focus_combined_df.sort_values(by=['phoneme', 'epoch'], ascending=[True, True])
 
     # color palette
     color_palette = [

@@ -199,10 +199,10 @@ class TextRecorder:
                 if sr_v2 != pred_sr_v2:
                     v2_error = 1
 
-                self.acc_store['trial_num'].append(self.trial_num)
-                self.acc_store['language'].append(self.lang_name)
-                self.acc_store['dataset'].append(self.property)
-                self.acc_store['modality'].append(self.modality)
+                self.pred_store['trial_num'].append(self.trial_num)
+                self.pred_store['language'].append(self.lang_name)
+                self.pred_store['dataset'].append(self.property)
+                self.pred_store['modality'].append(self.modality)
                 self.pred_store['condition'].append(self.condition)
                 self.pred_store['run_num'].append(self.run_num)
                 self.pred_store['epoch'].append(epoch)
