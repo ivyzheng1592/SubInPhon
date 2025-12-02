@@ -189,11 +189,11 @@ if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using {device} device")
 
-    trial_num = "2512021030_partial"  # time stamp
+    trial_num = "2512022230_partial"  # time stamp
     lang_name = "EnglishBH"
     property = "shortened"
     conditions = ["harmony", "disharmony"]
-    runs = range(1)
+    runs = range(5)
     audio(trial_num, lang_name, property, conditions, runs, run_mode="train and evaluate", device=device)
 
     """

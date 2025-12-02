@@ -149,10 +149,7 @@ class AudioDataset(Dataset):
         return signal
 
     def split_dataset(self, data_split_ratio):
-        # in this project, we train the model with the entire dataset
-        # and test the model with a randomly selected part of the dataset
-        _, valid_data, test_data = random_split(self, data_split_ratio)
-        return self, valid_data, test_data
+        return random_split(self, data_split_ratio)
 
     # a closure of customized collate_fn
     def get_collate_fn(self):
