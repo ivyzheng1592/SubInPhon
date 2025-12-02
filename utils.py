@@ -238,6 +238,7 @@ def plot_embed_updated(embed_store, focus_list, embed_plot, focus_embed_plot):
 
     # extract focus embeddings
     focus_combined_df = combined_df[combined_df['phoneme'].isin(focus_list)]
+    focus_combined_df = focus_combined_df.reset_index()
 
     # use PCA to project the data from embedding_dim to 3D
     pca = PCA(n_components=3)

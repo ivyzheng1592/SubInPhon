@@ -117,16 +117,12 @@ class AudioDataset(Dataset):
         # [1, [1, 1]] -> [1, [0, 1, 1, 0, 0, 0]]
         return signal1, signal2
 
-    def remove_padding(self, mel1, mel2):
+    def remove_padding(self, mel):
         # mel = [n_fre, dur]
-        # check if values along n_freq dimension are all 0s
-        # remove from dur dimension if all 0s
-        mel1_zeros = torch.all(torch.where(torch.eq(mel1, -100), False, True), dim=0)
-        mel1 = mel1[:, mel1_zeros]
-        mel2_zeros = torch.all(torch.where(torch.eq(mel2, -100), False, True), dim=0)
-        mel2 = mel2[:, mel2_zeros]
+        # get the values along n_freq dimension that are not 0s
+        non_zeros = torch.all(torch.where(torch.eq(mel, -100), False, True), dim=0)
 
-        return mel1, mel2
+        return non_zeros
 
     # converting waveform to mel spectrogram
     def wav_to_mel(self, signal):

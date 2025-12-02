@@ -247,7 +247,12 @@ class AudioRun:
                 # aud_att = [aud_trg_len, aud_src_len]
 
                 # convert spectrograms
-                ur_spec, pred_sr_spec = self.recorder.dataset.remove_padding(ur_spec, pred_sr_spec)
+                # include only the parts of spectrogram that not paddings
+                non_zeros = self.recorder.dataset.remove_padding(ur_spec)
+                ur_spec = ur_spec[:, non_zeros]
+                pred_sr_spec = pred_sr_spec[:, non_zeros]
+                txt_att = txt_att[:, non_zeros]
+                aud_att = aud_att[non_zeros, :][:, non_zeros]
 
                 # plot attention
                 txt_att_plot = os.path.join(self.recorder.att_plot_dir,
