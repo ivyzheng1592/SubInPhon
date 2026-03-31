@@ -63,3 +63,12 @@ n_epochs = 120  # original=50. Note: must be >1 !!!
 save_epochs = 10
 learning_rate = 1e-4
 batch_size = 32  # original=32
+
+# Reproducibility
+base_seed = 1234
+
+# Audio data root (per-language subfolders live here)
+audio_root = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon"
+
+# Prediction logging mode: "vowel_only_error", "consonant_vowel_error", "all_correct_syll"
+pred_log = "vowel_only_error"

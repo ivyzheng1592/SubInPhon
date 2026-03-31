@@ -9,13 +9,15 @@ import itertools
 
 
 class LanguagePattern:
-    def __init__(self, onset, coda, vowel, syll_struct, lang_name):
+    def __init__(self, onset, coda, vowel, syll_struct, lang_name,
+                 allowed_templates=None):
         self.lang_name = lang_name
         self.syll_struct = syll_struct
         self.onset = onset
         self.coda = coda
         self.vowel = vowel
         self.focus = {}  # different focus for different language pattern
+        self.allowed_templates = allowed_templates
 
     def generate_stimuli(self, onset=None, coda=None, vowel=None, syll_struct=None, property=""):
         pass
@@ -25,8 +27,10 @@ class LanguagePattern:
 
 
 class BacknessHarmony(LanguagePattern):
-    def __init__(self, onset, coda, vowel, syll_struct, lang_name):
-        super().__init__(onset, coda, vowel, syll_struct, lang_name)
+    def __init__(self, onset, coda, vowel, syll_struct, lang_name,
+                 allowed_templates=None):
+        super().__init__(onset, coda, vowel, syll_struct, lang_name,
+                         allowed_templates=allowed_templates)
         self.focus = self.vowel
 
     # function to generate vowel harmony stimuli with specified phoneme inventory and syllable structure
@@ -70,15 +74,31 @@ class BacknessHarmony(LanguagePattern):
             v: {key: [] for key in ["V", "CV", "VC", "CVC"]}
             for v in vowel
         }
+
+        # infer class from vowel features (e.g., "tense"/"lax")
+        vowel_to_class = {}
+        for phone, feats in vowel.items():
+            if len(feats) < 3:
+                raise RuntimeError(f"Vowel '{phone}' missing quality for class inference")
+            vowel_to_class[phone] = feats[2]
+
+        if self.allowed_templates is None:
+            raise RuntimeError(f"allowed_templates must be specified for {self.lang_name} in the language config")
+
+        allowed_templates = self.allowed_templates
         for v, v_dict in syll_dict.items():
-            if vowel[v][2] == "tense":  # for tense vowels, only V and CV
+            v_class = vowel_to_class.get(v)
+            if v_class is None:
+                raise RuntimeError(f"Vowel '{v}' missing class for {self.lang_name}")
+            allowed = allowed_templates.get(v_class, [])
+            if "V" in allowed:
                 v_dict["V"] = [v]
+            if "CV" in allowed:
                 v_dict["CV"] = [o + v for o in onset]
-            elif vowel[v][2] == "lax":  # for lax vowels, only VC and CVC
+            if "VC" in allowed:
                 v_dict["VC"] = [v + c for c in coda]
+            if "CVC" in allowed:
                 v_dict["CVC"] = [o + v + c for o, c in itertools.product(onset, coda)]
-            else:
-                raise RuntimeError(f"Problem with vowel feature quality {vowel[v][2]}")
 
         # generate all possible vowel combinations for each syllable structure
         harmony_list = []

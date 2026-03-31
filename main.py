@@ -1,6 +1,8 @@
 import os
+import random
 import torch
 import torch.nn as nn
+import numpy as np
 
 from Dataset.languages import languages
 from text_dataset import TextDataset
@@ -16,10 +18,18 @@ from audio_record import AudioRecorder
 import hyper_params as hp
 
 
-# a function that loads text dataset, initializes text model for each run of each condition
-def text(trial_num, lang_name, property, conditions, runs, run_mode, device):
+def _set_seed(seed):
+    torch.manual_seed(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
-    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name + "_" + property + "_txt"),
+
+# a function that loads text dataset, initializes text model for each run of each condition
+def text(trial_num, lang_name, conditions, runs, run_mode="train and evaluate", device="cuda", resume_model_file=None):
+
+    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name + "_txt"),
                 exist_ok=True)
 
     for condition in conditions:
@@ -27,10 +37,11 @@ def text(trial_num, lang_name, property, conditions, runs, run_mode, device):
         language = languages[lang_name]
 
         print(" - Loading dataset:")
-        annotations_file = os.path.join("Dataset", lang_name + "_" + property + "_" + condition + ".csv")
+        annotations_file = os.path.join("Dataset", lang_name + "_" + condition + ".csv")
         dataset = TextDataset(annotations_file, hp.special_tokens, device=device)
 
         for run_num in runs:
+            _set_seed(hp.base_seed + run_num)
             print(" - Splitting dataset:")
             train_data, valid_data, test_data = dataset.split_dataset(hp.text_data_split_ratio)
 
@@ -54,13 +65,12 @@ def text(trial_num, lang_name, property, conditions, runs, run_mode, device):
                     nn.init.uniform_(param.data, a=0, b=0.01)
 
             print(" - Preparing data recorder:")
-            recorder = TextRecorder(dataset, trial_num, language, property, "txt", condition, run_num)
+            recorder = TextRecorder(dataset, trial_num, language, "txt", condition, run_num)
 
             print(" - Training and evaluating model:")
-            rep = TextRun(seq2seq, recorder)
+            rep = TextRun(seq2seq, recorder, resume_model_file=resume_model_file)
             if run_mode == "train and evaluate":
-                rep.train(train_dataloader, valid_dataloader)
-                rep.test(test_dataloader)
+                rep.run(train_dataloader, valid_dataloader, test_dataloader)
                 rep.evaluate_attention(test_dataloader)
                 rep.evaluate_embedding()
             elif run_mode == "evaluate attention":
@@ -70,9 +80,9 @@ def text(trial_num, lang_name, property, conditions, runs, run_mode, device):
 
 
 # a function that loads text dataset, initializes text model for each run of each condition
-def feature(trial_num, lang_name, property, conditions, runs, run_mode, freeze, device):
+def feature(trial_num, lang_name, conditions, runs, run_mode="train and evaluate", freeze=False, device="cuda", resume_model_file=None):
 
-    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name + "_" + property + "_fea"),
+    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name + "_fea"),
                 exist_ok=True)
 
     for condition in conditions:
@@ -80,11 +90,12 @@ def feature(trial_num, lang_name, property, conditions, runs, run_mode, freeze, 
         language = languages[lang_name]
 
         print(" - Loading dataset:")
-        annotations_file = os.path.join("Dataset", lang_name + "_" + property + "_" + condition + ".csv")
+        annotations_file = os.path.join("Dataset", lang_name + "_" + condition + ".csv")
         feature_file = os.path.join("Dataset", lang_name.split("_")[0] + "_features.xlsx")
         dataset = FeatureDataset(annotations_file, feature_file, hp.special_tokens, device=device)
 
         for run_num in runs:
+            _set_seed(hp.base_seed + run_num)
             print(" - Splitting dataset:")
             train_data, valid_data, test_data = dataset.split_dataset(hp.text_data_split_ratio)
 
@@ -107,13 +118,12 @@ def feature(trial_num, lang_name, property, conditions, runs, run_mode, freeze, 
                                      freeze=freeze, device=device)
 
             print(" - Preparing data recorder:")
-            recorder = TextRecorder(dataset, trial_num, language, property, "fea", condition, run_num)
+            recorder = TextRecorder(dataset, trial_num, language, "fea", condition, run_num)
 
             print(" - Training and evaluating model:")
-            rep = TextRun(seq2seq, recorder)
-            if run_mode == "train and evaluation":
-                rep.train(train_dataloader, valid_dataloader)
-                rep.test(test_dataloader)
+            rep = TextRun(seq2seq, recorder, resume_model_file=resume_model_file)
+            if run_mode == "train and evaluate":
+                rep.run(train_dataloader, valid_dataloader, test_dataloader)
                 rep.evaluate_attention(test_dataloader)
                 rep.evaluate_embedding()
             elif run_mode == "evaluate attention":
@@ -123,9 +133,9 @@ def feature(trial_num, lang_name, property, conditions, runs, run_mode, freeze, 
 
 
 # a function that loads audio dataset, initializes audio model for each run of each condition
-def audio(trial_num, lang_name, property, conditions, runs, run_mode, device):
+def audio(trial_num, lang_name, conditions, runs, run_mode="train and evaluate", device="cuda", resume_model_file=None):
 
-    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name + "_" + property + "_aud"),
+    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name + "_aud"),
                 exist_ok=True)
 
     for condition in conditions:
@@ -133,12 +143,13 @@ def audio(trial_num, lang_name, property, conditions, runs, run_mode, device):
         language = languages[lang_name]
 
         print(" - Loading dataset:")
-        annotations_file = os.path.join("Dataset", lang_name + "_" + property + "_" + condition + ".csv")
-        audio_dir = os.path.join("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon", lang_name)
+        annotations_file = os.path.join("Dataset", lang_name + "_" + condition + ".csv")
+        audio_dir = os.path.join(hp.audio_root, lang_name.split("_")[0])
         dataset = AudioDataset(annotations_file, audio_dir, hp.special_tokens,
                                wav2mel=True, power2db=True, device=device)
 
         for run_num in runs:
+            _set_seed(hp.base_seed + run_num)
             print(" - Splitting dataset:")
             train_data, valid_data, test_data = dataset.split_dataset(hp.audio_data_split_ratio)
 
@@ -160,13 +171,12 @@ def audio(trial_num, lang_name, property, conditions, runs, run_mode, device):
                                    text_output_dim, audio_output_dim, device=device)
 
             print(" - Preparing data recorder:")
-            recorder = AudioRecorder(dataset, trial_num, language, property, "aud", condition, run_num)
+            recorder = AudioRecorder(dataset, trial_num, language, "aud", condition, run_num)
 
             print(" - Training and evaluating model:")
-            rep = AudioRun(seq2seq, recorder)
+            rep = AudioRun(seq2seq, recorder, resume_model_file=resume_model_file)
             if run_mode == "train and evaluate":
-                rep.train(train_dataloader, valid_dataloader)
-                rep.test(test_dataloader)
+                rep.run(train_dataloader, valid_dataloader, test_dataloader)
                 rep.evaluate_attention(test_dataloader)
                 rep.evaluate_embedding()
             elif run_mode == "evaluate attention":
@@ -186,12 +196,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     """
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using {device} device")
-
     trial_num = "2512072030_partial_consonant"  # time stamp
-    lang_name = "EnglishBH"
-    property = "shortened"
+    lang_name = "EnglishBH_shortened"
     conditions = ["harmony", "disharmony"]
     runs = range(2)
-    audio(trial_num, lang_name, property, conditions, runs, run_mode="train and evaluate", device=device)
+    audio(trial_num, lang_name, conditions, runs)

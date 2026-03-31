@@ -1,99 +1,102 @@
 # 2025/06/05
 # instances of languages together with their phoneme inventory and syllable structure
 
-
-from Dataset.language_generator import *
-
-"""
-Language: English Backness Harmony
-"""
-# Phoneme inventory:
-onset = {
-    onset: None for onset in ['m', 'n', 'p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'v', 'z', 'ʃ', 'ʒ', 'θ', 'ð', 'h']
-}
-coda = {
-    coda: None for coda in ['m', 'n', 'ŋ', 'p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'v', 'z', 'ʃ', 'ʒ', 'θ', 'ð']
-}
-# vowel for text input (control for number of symbols in a phoneme)
-vowel_txt = {'i': ["front", "high", "tense"],
-             'e': ["front", "mid", "tense"],
-             'u': ["back", "high", "tense"],
-             'o': ["back", "mid", "tense"],
-             'ɪ': ["front", "high", "lax"],
-             'ɛ': ["front", "mid", "lax"],
-             'ʊ': ["back", "high", "lax"],
-             'ɔ': ["back", "mid", "lax"]}
-# vowel for audio input (actual realization of phoneme)
-vowel_aud = {'i': ["front", "high", "tense"],
-             'eɪ': ["front", "mid", "tense"],
-             'u': ["back", "high", "tense"],
-             'oʊ': ["back", "mid", "tense"],
-             'ɪ': ["front", "high", "lax"],
-             'ɛ': ["front", "mid", "lax"],
-             'ʊ': ["back", "high", "lax"],
-             'ɔ': ["back", "mid", "lax"]}
-# Syllable structure:
-syll_struct = ["V-CV", "V-CVC", "CV-CV", "CV-CVC",
-               "VC-V", "VC-VC", "CVC-V", "CVC-VC"]
-syll_struct_shortened = ["V-CV", "V-CVC", "CV-CV",
-                         "VC-V", "VC-VC", "CVC-V"]
-# Stimuli
-EnglishBH = BacknessHarmony(onset, coda, vowel_txt, syll_struct, "EnglishBH")
-#EnglishBH.generate_stimuli(property="full")
-#EnglishBH.generate_stimuli(property="nonidentical")
-#EnglishBH.generate_stimuli(vowel=vowel_aud, syll_struct=syll_struct_shortened,
-                           #property="shortened")
+import json
+import os
+from Dataset.language_generator import BacknessHarmony, FinalDevoicing
 
 
-"""
-Language: English Final Devoicing
-"""
-# Phoneme inventory:
-onset = {
-    onset: None for onset in ['p', 't', 'k', 'b', 'd', 'g', 'f', 's', 'v', 'z', 'ʃ', 'ʒ', 'θ', 'ð']
-}
-coda = {
-    voiceless: "voiceless" for voiceless in ['p', 't', 'k', 'f', 's', 'ʃ', 'θ']
-}
-coda.update({
-    voiced: "voiced" for voiced in ['b', 'd', 'g', 'v', 'z', 'ʒ', 'ð']
-})
-# vowel for text input (control for number of symbols in a phoneme)
-vowel_txt = {
-    vowel: None for vowel in ['i', 'e', 'u', 'o', 'ɪ', 'ɛ', 'ʊ', 'ɔ']
-}
-# vowel for audio input (actual realization of phoneme)
-vowel_aud = {
-    vowel: None for vowel in ['i', 'eɪ', 'u', 'oʊ', 'ɪ', 'ɛ', 'ʊ', 'ɔ']
-}
-# Syllable structure:
-syll_struct = ["VC", "CVC", "VCVC", "CVCVC"]
-# Stimuli
-EnglishFD = FinalDevoicing(onset, coda, vowel_txt, syll_struct, "EnglishFD")
-#EnglishFD.generate_stimuli(property="full", modality="txt")
+class LanguageRegistry:
+    def __init__(self, config_path=None):
+        if config_path is None:
+            config_path = os.path.join(os.path.dirname(__file__), "languages_config.json")
+        self._config_path = config_path
+        self._specs = self._load_specs()
+
+    def _load_specs(self):
+        with open(self._config_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    def names(self):
+        return list(self._specs.keys())
+
+    def build_one(self, name, variant=None):
+        spec = self._specs[name]
+        return _build_language(name, spec, variant=variant)
+
+    def build(self, variant=None):
+        languages = {name: _build_language(name, spec, variant=variant) for name, spec in self._specs.items()}
+        # Backward-compatibility alias: EnglishBH_full -> EnglishBH (if not explicitly defined)
+        for name, lang in list(languages.items()):
+            if name.endswith("_full"):
+                base = name[:-5]
+                if base not in languages:
+                    languages[base] = lang
+        return languages
 
 
-# Language: Cantonese Backness Harmony
-# Phoneme inventory:
-onset = {
-    onset: None for onset in ['m', 'n', 'ng', 'p', 't', 'k', 'b', 'd', 'g', 'z', 'c', 's', 'f', 'h']
-}
-coda = {
-    coda: None for coda in ['m', 'n', 'ng', 'p', 't', 'k']
-}
-vowel = {'i': ["front", "high", "tense"],
-         'e': ["front", "mid", "tense"],
-         'u': ["back", "high", "tense"],
-         'o': ["back", "mid", "tense"]}
-# Syllable structure:
-syll_struct = ["V-CV", "V-CVC", "CV-CV", "CV-CVC",
-               "V.CV-CV", "V.CV-CVC", "CV.CV-CV", "CV.CV-CVC"]
-# Stimuli
-#CantoneseBH = BacknessHarmony(onset, coda, vowel, syll_struct, "CantoneseBH")
-#CantoneseBH.generate_stimuli(property="full", modality="txt")
+def _build_onset(onset_spec):
+    if isinstance(onset_spec, list):
+        return {onset: None for onset in onset_spec}
+    if isinstance(onset_spec, dict):
+        onset = {}
+        for label, phones in onset_spec.items():
+            onset.update({phone: label for phone in phones})
+        return onset
+    raise ValueError("onset must be a list or a dict")
 
 
-languages = {
-    "EnglishBH": EnglishBH,
-    "EnglishFD": EnglishFD
-}
+def _build_coda(coda_spec):
+    if isinstance(coda_spec, list):
+        return {coda: None for coda in coda_spec}
+    if isinstance(coda_spec, dict):
+        coda = {}
+        for label, phones in coda_spec.items():
+            coda.update({phone: label for phone in phones})
+        return coda
+    raise ValueError("coda must be a list or a dict")
+
+
+def _build_vowel(vowel_spec):
+    if isinstance(vowel_spec, list):
+        return {vowel: None for vowel in vowel_spec}
+    if isinstance(vowel_spec, dict):
+        return vowel_spec
+    raise ValueError("vowel must be a list or a dict")
+
+
+def _merge_variant(base, variant_spec):
+    merged = dict(base)
+    for key, value in variant_spec.items():
+        merged[key] = value
+    return merged
+
+
+def _build_language(name, spec, variant=None):
+    if variant:
+        variants = spec.get("variants", {})
+        if variant not in variants:
+            raise ValueError(f"Unknown variant '{variant}' for language '{name}'")
+        spec = _merge_variant(spec, variants[variant])
+
+    onset = _build_onset(spec["onset"])
+    coda = _build_coda(spec["coda"])
+    vowel = _build_vowel(spec["vowel"])
+    syll_struct = spec["syll_struct"]
+    lang_name = spec.get("lang_name", name)
+    allowed_templates = spec.get("allowed_templates")
+
+    lang_type = spec["type"]
+    if lang_type == "BacknessHarmony":
+        return BacknessHarmony(onset, coda, vowel, syll_struct, lang_name,
+                               allowed_templates=allowed_templates)
+    if lang_type == "FinalDevoicing":
+        return FinalDevoicing(onset, coda, vowel, syll_struct, lang_name)
+
+    raise ValueError(f"Unknown language type: {lang_type}")
+
+
+registry = LanguageRegistry()
+
+# Backwards-compatible dict used by existing code
+languages = registry.build()

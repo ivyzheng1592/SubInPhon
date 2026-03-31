@@ -53,19 +53,24 @@ def plot_txt_acc(acc_store, acc_plot):
     # convert dictionary to pandas dataframe
     acc_data = pd.DataFrame(acc_store)
 
-    # separate into training and validation
+    # separate into training, validation, and test
     train_data = acc_data[acc_data["record_type"] == "train"]
     valid_data = acc_data[acc_data["record_type"] == "valid"]
+    test_data = acc_data[acc_data["record_type"] == "test"]
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, sharex='all')  # create a 2 * 1 plot
+    fig, (ax1, ax2) = plt.subplots(2, 1, sharex='all', figsize=(6, 6))  # create a 2 * 1 plot
     ax1.plot(train_data["epoch"], train_data["loss"], label="train")
     ax1.plot(valid_data["epoch"], valid_data["loss"], label="valid")
+    ax1.plot(test_data["epoch"], test_data["loss"], label="test")
     ax1.legend()
     ax1.set_title("Loss")
+    ax1.set_ylim(0, 3)
     ax2.plot(train_data["epoch"], train_data["acc"], label="train")
     ax2.plot(valid_data["epoch"], valid_data["acc"], label="valid")
+    ax2.plot(test_data["epoch"], test_data["acc"], label="test")
     ax2.legend()
     ax2.set_title("Acc")
+    ax2.set_ylim(0, 1)
 
     plt.savefig(acc_plot)
     plt.close()
@@ -75,23 +80,30 @@ def plot_aud_acc(acc_store, acc_plot):
     # convert dictionary to pandas dataframe
     acc_data = pd.DataFrame(acc_store)
 
-    # separate into training and validation
+    # separate into training, validation, and test
     train_data = acc_data[acc_data["record_type"] == "train"]
     valid_data = acc_data[acc_data["record_type"] == "valid"]
+    test_data = acc_data[acc_data["record_type"] == "test"]
 
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex='all')  # create a 3 * 1 plot
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex='all', figsize=(6, 8))  # create a 3 * 1 plot
     ax1.plot(train_data["epoch"], train_data["rec_loss"], label="train")
     ax1.plot(valid_data["epoch"], valid_data["rec_loss"], label="valid")
+    ax1.plot(test_data["epoch"], test_data["rec_loss"], label="test")
     ax1.legend()
     ax1.set_title("Reconstruction Loss")
+    ax1.set_ylim(0, 20)
     ax2.plot(train_data["epoch"], train_data["pred_loss"], label="train")
     ax2.plot(valid_data["epoch"], valid_data["pred_loss"], label="valid")
+    ax2.plot(test_data["epoch"], test_data["pred_loss"], label="test")
     ax2.legend()
     ax2.set_title("Prediction Loss")
+    ax2.set_ylim(0, 3)
     ax3.plot(train_data["epoch"], train_data["pred_acc"], label="train")
     ax3.plot(valid_data["epoch"], valid_data["pred_acc"], label="valid")
+    ax3.plot(test_data["epoch"], test_data["pred_acc"], label="test")
     ax3.legend()
     ax3.set_title("Prediction Acc")
+    ax3.set_ylim(0, 1)
 
     plt.savefig(acc_plot)
     plt.close()
@@ -117,11 +129,10 @@ def plot_aud_att(ur_aud, sr_txt, sr_aud, txt_attention, aud_attention, txt_att_p
     txt_attention = txt_attention.cpu().numpy()
     aud_attention = aud_attention.cpu().numpy()
 
-    fig = plt.figure(figsize=(12, 8))
-    ax1 = fig.add_subplot(3, 1, (1, 2))
+    fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(12, 6),
+                                   gridspec_kw={'height_ratios': [1, 1]})
     ax1.imshow(ur_aud, origin='lower', aspect='auto')
-    ax2 = fig.add_subplot(3, 1, 3)
-    ax2.matshow(txt_attention, cmap="bone")
+    ax2.imshow(txt_attention, origin='lower', aspect='auto', cmap="bone")
     ax2.set_yticks(ticks=np.arange(len(sr_txt)), labels=sr_txt)
     plt.tight_layout()
     plt.savefig(txt_att_plot)
@@ -129,12 +140,12 @@ def plot_aud_att(ur_aud, sr_txt, sr_aud, txt_attention, aud_attention, txt_att_p
     #plt.show()
 
     fig = plt.figure(figsize=(12, 8))
-    ax1 = fig.add_subplot(222)
-    ax1.imshow(ur_aud, origin='lower', aspect='auto')
-    ax2 = fig.add_subplot(223)
-    ax2.imshow(sr_aud, origin='lower', aspect='auto')
     ax3 = fig.add_subplot(224)
     ax3.imshow(aud_attention)
+    ax1 = fig.add_subplot(221, sharey=ax3)
+    ax1.imshow(ur_aud, origin='lower', aspect='auto')
+    ax2 = fig.add_subplot(223, sharex=ax3)
+    ax2.imshow(np.rot90(sr_aud), origin='lower', aspect='auto')
     plt.tight_layout()
     plt.savefig(aud_att_plot)
     plt.close()

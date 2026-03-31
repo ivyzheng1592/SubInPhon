@@ -9,36 +9,49 @@ import numpy as np
 import torch
 import torch.nn as nn
 import utils
+import re
 import hyper_params as hp
 
 
 class TextRun:
-    def __init__(self, seq2seq, recorder):
+    def __init__(self, seq2seq, recorder, resume_model_file=None):
         # condition hyperparameters
         self.seq2seq = seq2seq
         self.recorder = recorder
+        self.start_epoch = 0
+
+        if resume_model_file:
+            self.seq2seq.load_state_dict(torch.load(resume_model_file))
+            match = re.search(r"_epoch(-?\d+)_seq2seq\.pth$", resume_model_file)
+            if not match:
+                raise RuntimeError(f"Cannot parse epoch from model file: {resume_model_file}")
+            self.start_epoch = int(match.group(1)) + 1
+            print(f"Resuming from {resume_model_file} at epoch {self.start_epoch}")
 
         # optimizer and loss function
         self.optimizer = torch.optim.Adam(self.seq2seq.parameters(), lr=hp.learning_rate)
         self.criterion = nn.CrossEntropyLoss(ignore_index=hp.special_tokens.index(hp.pad_token))
 
-    # a function that completes one repetition of training
-    def train(self, train_dataloader, valid_dataloader): \
-        # save untrained model
-        model_file = os.path.join(self.recorder.model_dir,
-                                  self.recorder.lang_name + "_" + self.recorder.property + "_" +
-                                  self.recorder.modality + "_" + self.recorder.condition +
-                                  "_run" + str(self.recorder.run_num) + "_epoch-1_seq2seq.pth")
+    # a function that completes one repetition of training and evaluation
+    def run(self, train_dataloader, valid_dataloader, test_dataloader):
+        if self.start_epoch == 0:
+            # save untrained model
+            model_file = os.path.join(self.recorder.model_dir,
+                                      self.recorder.lang_name + "_" +
+                                      self.recorder.modality + "_" + self.recorder.condition +
+                                      "_run" + str(self.recorder.run_num) + "_epoch-1_seq2seq.pth")
 
-        torch.save(self.seq2seq.state_dict(), model_file)
-        print(f"Untrained model stored at {model_file}")
+            torch.save(self.seq2seq.state_dict(), model_file)
+            print(f"Untrained model stored at {model_file}")
 
         # at each epoch, display progress bar
-        for epoch in tqdm.tqdm(range(hp.n_epochs)):
+        for epoch in tqdm.tqdm(range(self.start_epoch, hp.n_epochs)):
             # update loss
-            train_loss, train_src, train_trg, train_pred = self.train_one_epoch(train_dataloader,
-                                                                                hp.teacher_forcing_ratio)
+            train_loss, train_src, train_trg, train_pred = self.train_one_epoch(
+                train_dataloader, hp.text_teacher_forcing
+            )
             valid_loss, valid_src, valid_trg, valid_pred = self.evaluate_one_epoch(valid_dataloader)
+            test_loss, test_src, test_trg, test_pred = self.evaluate_one_epoch(test_dataloader)
 
             # record predictions and prediction correctness
             train_acc = self.recorder.record_pred(epoch, "train", train_src, train_trg, train_pred)
@@ -46,16 +59,20 @@ class TextRun:
             # record accuracy
             self.recorder.record_acc(epoch, "train", train_loss, train_acc)
             self.recorder.record_acc(epoch, "valid", valid_loss, valid_acc)
+            test_acc = self.recorder.record_pred(epoch, "test", test_src, test_trg, test_pred)
+            self.recorder.record_acc(epoch, "test", test_loss, test_acc)
 
             print(f"Epoch {epoch} Train Loss: {train_loss:7.3f} | Train PPL: {np.exp(train_loss):7.3f} "
                   f"| Train Acc: {train_acc:7.3f}")
             print(f"Epoch {epoch} Valid Loss: {valid_loss:7.3f} | Valid PPL: {np.exp(valid_loss):7.3f} "
                   f"| Valid Acc: {valid_acc:7.3f}")
+            print(f"Epoch {epoch} Test Loss: {test_loss:7.3f} | Test PPL: {np.exp(test_loss):7.3f} "
+                  f"| Test Acc: {test_acc:7.3f}")
 
             # save model every other save_epochs
             if epoch % hp.save_epochs == 0 or epoch == hp.n_epochs-1:
                 model_file = os.path.join(self.recorder.model_dir,
-                                          self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                          self.recorder.lang_name + "_" +
                                           self.recorder.modality + "_" + self.recorder.condition +
                                           "_run" + str(self.recorder.run_num) + "_epoch" + str(epoch) +
                                           "_seq2seq.pth")
@@ -66,32 +83,6 @@ class TextRun:
         utils.plot_txt_acc(self.recorder.acc_store, self.recorder.acc_plot)
         print(f"Run {self.recorder.run_num} training loss, accuracy, and predicted results are saved")
 
-    # a function that completes one repetition of evaluation at the end of training
-    def test(self, test_dataloader):
-        # load model
-        model_file = os.path.join(self.recorder.model_dir,
-                                  self.recorder.lang_name + "_" + self.recorder.property + "_" +
-                                  self.recorder.modality + "_" + self.recorder.condition +
-                                  "_run" + str(self.recorder.run_num) + "_epoch" + str(hp.n_epochs-1) +
-                                  "_seq2seq.pth")
-        self.seq2seq.load_state_dict(torch.load(model_file))
-
-        # check loss for test dataset
-        test_loss, test_srcs, test_trgs, test_preds = self.evaluate_one_epoch(test_dataloader)
-
-        # record predictions and prediction correctness
-        test_acc = self.recorder.record_pred(hp.n_epochs, "test", test_srcs, test_trgs, test_preds)
-        # record accuracy
-        self.recorder.record_acc(hp.n_epochs, "test", test_loss, test_acc)
-
-        print(f"Test Loss: {test_loss:7.3f} | Test PPL: {np.exp(test_loss):7.3f} "
-              f"| Test Acc: {test_acc:7.3f}")
-
-        # save accuracy recording to file at the end of testing
-        utils.save_to_file(self.recorder.acc_store, self.recorder.acc_file)
-        # save prediction recording to file at the end of testing
-        utils.save_to_file(self.recorder.pred_store, self.recorder.pred_file)
-        print(f"Run {self.recorder.run_num} testing loss, accuracy, and predicted results are saved")
 
     # a function that manages training at one epoch
     def train_one_epoch(self, data_loader, teacher_forcing_ratio):
@@ -185,7 +176,7 @@ class TextRun:
 
         # load model
         model_file = os.path.join(self.recorder.model_dir,
-                                  self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                  self.recorder.lang_name + "_" +
                                   self.recorder.modality + "_" + self.recorder.condition +
                                   "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
                                   "_seq2seq.pth")
@@ -216,7 +207,7 @@ class TextRun:
 
                 # plot attention
                 att_plot = os.path.join(self.recorder.att_plot_dir,
-                                        self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                        self.recorder.lang_name + "_" +
                                         self.recorder.modality + "_" + self.recorder.condition +
                                         "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
                                         ur_string + "_" + pred_sr_string + ".png")

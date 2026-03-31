@@ -8,21 +8,31 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 import utils
+import re
 import hyper_params as hp
 
 
 class AudioRun:
-    def __init__(self, seq2seq, recorder):
+    def __init__(self, seq2seq, recorder, resume_model_file=None):
 
         # condition hyperparameters
         self.seq2seq = seq2seq
         self.recorder = recorder
+        self.start_epoch = 0
+
+        if resume_model_file:
+            self.seq2seq.load_state_dict(torch.load(resume_model_file))
+            match = re.search(r"_epoch(-?\\d+)_seq2seq\\.pth$", resume_model_file)
+            if not match:
+                raise RuntimeError(f"Cannot parse epoch from model file: {resume_model_file}")
+            self.start_epoch = int(match.group(1)) + 1
+            print(f"Resuming from {resume_model_file} at epoch {self.start_epoch}")
 
         # optimizer
         self.optimizer = torch.optim.Adam(self.seq2seq.parameters(), lr=hp.learning_rate)
 
     # a function for loss calculation
-    def get_loss(self, output, spec, trg_txt, trg_aud):
+    def compute_loss(self, output, spec, trg_txt, trg_aud):
 
         # remove the <SOS> token from output and target and reshape for loss calculation
         txt_dim = output.shape[2]
@@ -39,23 +49,26 @@ class AudioRun:
 
         return rec_loss, pred_loss
 
-    # a function that completes one repetition of training
-    def train(self, train_dataloader, valid_dataloader):
-        # save untrained model
-        model_file = os.path.join(self.recorder.model_dir,
-                                  self.recorder.lang_name + "_" + self.recorder.property + "_" +
-                                  self.recorder.modality + "_" + self.recorder.condition +
-                                  "_run" + str(self.recorder.run_num) + "_epoch-1_seq2seq.pth")
-        torch.save(self.seq2seq.state_dict(), model_file)
-        print(f"Untrained model stored at {model_file}")
+    # a function that completes one repetition of training and evaluation
+    def run(self, train_dataloader, valid_dataloader, test_dataloader):
+        if self.start_epoch == 0:
+            # save untrained model
+            model_file = os.path.join(self.recorder.model_dir,
+                                      self.recorder.lang_name + "_" +
+                                      self.recorder.modality + "_" + self.recorder.condition +
+                                      "_run" + str(self.recorder.run_num) + "_epoch-1_seq2seq.pth")
+            torch.save(self.seq2seq.state_dict(), model_file)
+            print(f"Untrained model stored at {model_file}")
 
         # at each epoch, display progress bar
-        for epoch in tqdm.tqdm(range(hp.n_epochs)):
+        for epoch in tqdm.tqdm(range(self.start_epoch, hp.n_epochs)):
             # update loss
             train_rec_loss, train_pred_loss, train_src, train_trg, train_pred = (
                 self.train_one_epoch(train_dataloader, hp.text_teacher_forcing, hp.audio_teacher_forcing))
             valid_rec_loss, valid_pred_loss, valid_src, valid_trg, valid_pred = (
                 self.evaluate_one_epoch(valid_dataloader))
+            test_rec_loss, test_pred_loss, test_src, test_trg, test_pred = (
+                self.evaluate_one_epoch(test_dataloader))
 
             # record predictions and prediction correctness
             train_acc = self.recorder.record_pred(epoch, "train", train_src, train_trg, train_pred)
@@ -63,6 +76,8 @@ class AudioRun:
             # record accuracy
             self.recorder.record_acc(epoch, "train", train_rec_loss, train_pred_loss, train_acc)
             self.recorder.record_acc(epoch, "valid", valid_rec_loss, valid_pred_loss, valid_acc)
+            test_acc = self.recorder.record_pred(epoch, "test", test_src, test_trg, test_pred)
+            self.recorder.record_acc(epoch, "test", test_rec_loss, test_pred_loss, test_acc)
 
             print(f"Epoch {epoch} Train Reconstruction Task Loss: {train_rec_loss:7.3f} "
                   f"| Train Prediction Task Loss: {train_pred_loss:7.3f} "
@@ -70,11 +85,14 @@ class AudioRun:
             print(f"Epoch {epoch} Valid Reconstruction Task Loss: {valid_rec_loss:7.3f} "
                   f"| Valid Prediction Task Loss: {valid_pred_loss:7.3f} "
                   f"| Valid Prediction Acc: {valid_acc:7.3f}")
+            print(f"Epoch {epoch} Test Reconstruction Task Loss: {test_rec_loss:7.3f} "
+                  f"| Test Prediction Task Loss: {test_pred_loss:7.3f} "
+                  f"| Test Prediction Acc: {test_acc:7.3f}")
 
             # save model every other save_epochs
             if epoch % hp.save_epochs == 0 or epoch == hp.n_epochs-1:
                 model_file = os.path.join(self.recorder.model_dir,
-                                          self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                          self.recorder.lang_name + "_" +
                                           self.recorder.modality + "_" + self.recorder.condition +
                                           "_run" + str(self.recorder.run_num) + "_epoch" + str(epoch) +
                                           "_seq2seq.pth")
@@ -85,35 +103,6 @@ class AudioRun:
         utils.plot_aud_acc(self.recorder.acc_store, self.recorder.acc_plot)
         print(f"Run {self.recorder.run_num} training loss, accuracy, and predicted results are saved")
 
-    # a function that completes one repetition of evaluation at the end of training
-    def test(self, test_dataloader):
-
-        # load model
-        model_file = os.path.join(self.recorder.model_dir,
-                                  self.recorder.lang_name + "_" + self.recorder.property + "_" +
-                                  self.recorder.modality + "_" + self.recorder.condition +
-                                  "_run" + str(self.recorder.run_num) + "_epoch" + str(hp.n_epochs-1) +
-                                  "_seq2seq.pth")
-        self.seq2seq.load_state_dict(torch.load(model_file))
-
-        # check loss for test dataset
-        test_rec_loss, test_pred_loss, test_srcs, test_trgs, test_preds = (
-            self.evaluate_one_epoch(test_dataloader))
-
-        # record predictions and prediction correctness
-        test_acc = self.recorder.record_pred(hp.n_epochs, "test", test_srcs, test_trgs, test_preds)
-        # record accuracy
-        self.recorder.record_acc(hp.n_epochs, "test", test_rec_loss, test_pred_loss, test_acc)
-
-        print(f"Test Reconstruction Task Loss: {test_rec_loss:7.3f} "
-              f"| Test Prediction Task Loss: {test_pred_loss:7.3f} "
-              f"| Test Prediction Acc: {test_acc:7.3f}")
-
-        # save accuracy recording to file at the end of testing
-        utils.save_to_file(self.recorder.acc_store, self.recorder.acc_file)
-        # save prediction recording to file at the end of testing
-        utils.save_to_file(self.recorder.pred_store, self.recorder.pred_file)
-        print(f"Run {self.recorder.run_num} testing loss, accuracy, and predicted results are saved")
 
     # a function that manages training at one epoch
     def train_one_epoch(self, data_loader, txt_teacher_forcing, aud_teacher_forcing):
@@ -145,7 +134,7 @@ class AudioRun:
             trg_txts.append(trg_txt)
             pred_txts.append(pred)
 
-            rec_loss, pred_loss = self.get_loss(output, spec, trg_txt, trg_aud)
+            rec_loss, pred_loss = self.compute_loss(output, spec, trg_txt, trg_aud)
             batch_loss = rec_loss + pred_loss  # calculate batch loss
             epoch_rec_loss += rec_loss.item()
             epoch_pred_loss += pred_loss.item()  # add to epoch loss
@@ -189,7 +178,7 @@ class AudioRun:
                 trg_txts.append(trg_txt)
                 pred_txts.append(pred)
 
-                rec_loss, pred_loss = self.get_loss(output, spec, trg_txt, trg_aud)  # calculate batch loss
+                rec_loss, pred_loss = self.compute_loss(output, spec, trg_txt, trg_aud)  # calculate batch loss
                 epoch_rec_loss += rec_loss.item()
                 epoch_pred_loss += pred_loss.item()  # add to epoch loss
 
@@ -206,7 +195,7 @@ class AudioRun:
 
         # load model
         model_file = os.path.join(self.recorder.model_dir,
-                                  self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                  self.recorder.lang_name + "_" +
                                   self.recorder.modality + "_" + self.recorder.condition +
                                   "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
                                   "_seq2seq.pth")
@@ -256,12 +245,12 @@ class AudioRun:
 
                 # plot attention
                 txt_att_plot = os.path.join(self.recorder.att_plot_dir,
-                                            self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                            self.recorder.lang_name + "_" +
                                             self.recorder.modality + "_" + self.recorder.condition +
                                             "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
                                             ur_string + "_" + pred_sr_string + "_txt.png")
                 aud_att_plot = os.path.join(self.recorder.att_plot_dir,
-                                            self.recorder.lang_name + "_" + self.recorder.property + "_" +
+                                            self.recorder.lang_name + "_" +
                                             self.recorder.modality + "_" + self.recorder.condition +
                                             "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
                                             ur_string + "_" + pred_sr_string + "_aud.png")

@@ -1,0 +1,90 @@
+{
+  "EnglishBH_full": {
+    "type": "BacknessHarmony",
+    "lang_name": "EnglishBH_full",
+    "onset": ["m", "n", "p", "t", "k", "b", "d", "g", "f", "s", "v", "z", "ʃ", "ʒ", "θ", "ð", "h"],
+    "coda": ["m", "n", "ŋ", "p", "t", "k", "b", "d", "g", "f", "s", "v", "z", "ʃ", "ʒ", "θ", "ð"],
+    "vowel": {
+      "i": ["front", "high", "tense"],
+      "e": ["front", "mid", "tense"],
+      "u": ["back", "high", "tense"],
+      "o": ["back", "mid", "tense"],
+      "ɪ": ["front", "high", "lax"],
+      "ɛ": ["front", "mid", "lax"],
+      "ʊ": ["back", "high", "lax"],
+      "ɔ": ["back", "mid", "lax"]
+    },
+    "allowed_templates": {
+      "tense": ["V", "CV"],
+      "lax": ["VC", "CVC"]
+    },
+    "syll_struct": ["V-CV", "V-CVC", "CV-CV", "CV-CVC", "VC-V", "VC-VC", "CVC-V", "CVC-VC"],
+    "variants": {
+      "auditory": {
+        "vowel": {
+          "i": ["front", "high", "tense"],
+          "eɪ": ["front", "mid", "tense"],
+          "u": ["back", "high", "tense"],
+          "oʊ": ["back", "mid", "tense"],
+          "ɪ": ["front", "high", "lax"],
+          "ɛ": ["front", "mid", "lax"],
+          "ʊ": ["back", "high", "lax"],
+          "ɔ": ["back", "mid", "lax"]
+        }
+      }
+    }
+  },
+  "EnglishBH_shortened": {
+    "type": "BacknessHarmony",
+    "lang_name": "EnglishBH_shortened",
+    "onset": ["m", "n", "p", "t", "k", "b", "d", "g", "f", "s", "v", "z", "ʃ", "ʒ", "θ", "ð", "h"],
+    "coda": ["m", "n", "ŋ", "p", "t", "k", "b", "d", "g", "f", "s", "v", "z", "ʃ", "ʒ", "θ", "ð"],
+    "vowel": {
+      "i": ["front", "high", "tense"],
+      "e": ["front", "mid", "tense"],
+      "u": ["back", "high", "tense"],
+      "o": ["back", "mid", "tense"],
+      "ɪ": ["front", "high", "lax"],
+      "ɛ": ["front", "mid", "lax"],
+      "ʊ": ["back", "high", "lax"],
+      "ɔ": ["back", "mid", "lax"]
+    },
+    "allowed_templates": {
+      "tense": ["V", "CV"],
+      "lax": ["VC", "CVC"]
+    },
+    "syll_struct": ["V-CV", "V-CVC", "CV-CV", "VC-V", "VC-VC", "CVC-V"]
+  },
+  "EnglishBH_nonidentical": {
+    "type": "BacknessHarmony",
+    "lang_name": "EnglishBH_nonidentical",
+    "onset": ["m", "n", "p", "t", "k", "b", "d", "g", "f", "s", "v", "z", "ʃ", "ʒ", "θ", "ð", "h"],
+    "coda": ["m", "n", "ŋ", "p", "t", "k", "b", "d", "g", "f", "s", "v", "z", "ʃ", "ʒ", "θ", "ð"],
+    "vowel": {
+      "i": ["front", "high", "tense"],
+      "e": ["front", "mid", "tense"],
+      "u": ["back", "high", "tense"],
+      "o": ["back", "mid", "tense"],
+      "ɪ": ["front", "high", "lax"],
+      "ɛ": ["front", "mid", "lax"],
+      "ʊ": ["back", "high", "lax"],
+      "ɔ": ["back", "mid", "lax"]
+    },
+    "allowed_templates": {
+      "tense": ["V", "CV"],
+      "lax": ["VC", "CVC"]
+    },
+    "syll_struct": ["V-CV", "V-CVC", "CV-CV", "CV-CVC", "VC-V", "VC-VC", "CVC-V", "CVC-VC"]
+  },
+  "EnglishFD": {
+    "type": "FinalDevoicing",
+    "lang_name": "EnglishFD",
+    "onset": ["p", "t", "k", "b", "d", "g", "f", "s", "v", "z", "ʃ", "ʒ", "θ", "ð"],
+    "coda": {
+      "voiceless": ["p", "t", "k", "f", "s", "ʃ", "θ"],
+      "voiced": ["b", "d", "g", "v", "z", "ʒ", "ð"]
+    },
+    "vowel": ["i", "e", "u", "o", "ɪ", "ɛ", "ʊ", "ɔ"],
+    "syll_struct": ["VC", "CVC", "VCVC", "CVCVC"]
+  }
+}
