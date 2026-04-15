@@ -4,7 +4,7 @@
 # Data is recorded into dictionary in TextRecorder
 
 import os
-from typing import Any, Optional
+from typing import Any, Optional, List, Tuple
 import tqdm
 import numpy as np
 import torch
@@ -86,7 +86,7 @@ class TextTrainer:
 
 
     # a function that manages training at one epoch
-    def train_one_epoch(self, data_loader: Any, teacher_forcing_ratio: float) -> tuple[float, list[Any], list[Any], list[Any]]:
+    def train_one_epoch(self, data_loader: Any, teacher_forcing_ratio: float) -> Tuple[float, List[Any], List[Any], List[Any]]:
         self.seq2seq.train()  # enable dropout in training
         epoch_loss = 0
 
@@ -129,7 +129,7 @@ class TextTrainer:
         return epoch_loss, srcs, trgs, preds
 
     # a function that manages evaluation at one epoch
-    def evaluate_one_epoch(self, data_loader: Any) -> tuple[float, list[Any], list[Any], list[Any]]:
+    def evaluate_one_epoch(self, data_loader: Any) -> Tuple[float, List[Any], List[Any], List[Any]]:
         self.seq2seq.eval()  # disable dropout in evaluation
         epoch_loss = 0
 

@@ -3,7 +3,7 @@
 # Data is recorded into dictionary in AudioRecorder
 
 import os
-from typing import Any, Optional
+from typing import Any, Optional, List, Tuple
 import tqdm
 import torch
 import torch.nn.functional as F
@@ -39,7 +39,7 @@ class AudioTrainer:
         spec: torch.Tensor,
         trg_txt: torch.Tensor,
         trg_aud: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
 
         # remove the <SOS> token from output and target and reshape for loss calculation
         txt_dim = output.shape[2]
@@ -114,7 +114,7 @@ class AudioTrainer:
         data_loader: Any,
         txt_teacher_forcing: float,
         aud_teacher_forcing: float,
-    ) -> tuple[float, float, list[Any], list[Any], list[Any]]:
+    ) -> Tuple[float, float, List[Any], List[Any], List[Any]]:
         self.seq2seq.train()  # enable dropout in training
         epoch_pred_loss = 0
         epoch_rec_loss = 0
@@ -158,7 +158,7 @@ class AudioTrainer:
         return epoch_rec_loss, epoch_pred_loss, src_txts, trg_txts, pred_txts
 
     # a function that manages evaluation at one epoch
-    def evaluate_one_epoch(self, data_loader: Any) -> tuple[float, float, list[Any], list[Any], list[Any]]:
+    def evaluate_one_epoch(self, data_loader: Any) -> Tuple[float, float, List[Any], List[Any], List[Any]]:
         self.seq2seq.eval()  # disable dropout in evaluation
         epoch_rec_loss = 0
         epoch_pred_loss = 0

@@ -7,17 +7,17 @@
 import csv
 import itertools
 import os
-from typing import Any, Optional
+from typing import Any, Optional, Dict, List, Tuple
 
 
 class LanguagePattern:
     def __init__(
         self,
-        onset: dict[str, Any],
-        coda: dict[str, Any],
-        vowel: dict[str, Any],
-        syll_struct: dict[str, Any],
-        word_struct: list[str],
+        onset: Dict[str, Any],
+        coda: Dict[str, Any],
+        vowel: Dict[str, Any],
+        syll_struct: Dict[str, Any],
+        word_struct: List[str],
         lang_name: str,
     ) -> None:
         # lang_name is the internal/base language label from the config.
@@ -36,18 +36,18 @@ class LanguagePattern:
     def generate_stimuli(self, property: str = "", variant: Optional[str] = None):
         pass
 
-    def decompose_stimuli(self, word_list: list[str]):
+    def decompose_stimuli(self, word_list: List[str]):
         pass
 
 
 class BacknessHarmony(LanguagePattern):
     def __init__(
         self,
-        onset: dict[str, Any],
-        coda: dict[str, Any],
-        vowel: dict[str, Any],
-        syll_struct: dict[str, Any],
-        word_struct: list[str],
+        onset: Dict[str, Any],
+        coda: Dict[str, Any],
+        vowel: Dict[str, Any],
+        syll_struct: Dict[str, Any],
+        word_struct: List[str],
         lang_name: str,
     ) -> None:
         super().__init__(onset, coda, vowel, syll_struct, word_struct, lang_name)
@@ -59,11 +59,11 @@ class BacknessHarmony(LanguagePattern):
         property: str = "",
         directionality: str = "l2r",
         variant: Optional[str] = None,
-    ) -> tuple[list[list[str]], list[list[str]]]:
+    ) -> Tuple[List[List[str]], List[List[str]]]:
         variant_vowel = self.variants.get(variant)
 
         print(" - Generating stimuli:")
-        def build_syll(parts: tuple[str, str, str]) -> str:
+        def build_syll(parts: Tuple[str, str, str]) -> str:
             o, v, c = parts
             return f"{o}{v}{c}"
 
@@ -210,7 +210,7 @@ class BacknessHarmony(LanguagePattern):
         return vh_list, dh_list
 
     # function to decompose vowel harmony stimuli with specified phoneme inventory
-    def decompose_stimuli(self, word_list: list[str]) -> list[list[Any]]:
+    def decompose_stimuli(self, word_list: List[str]) -> List[List[Any]]:
         word_copy = word_list.copy()  # copy of word for token removal
 
         # remove SOS token in word
@@ -269,11 +269,11 @@ class BacknessHarmony(LanguagePattern):
 class FinalDevoicing(LanguagePattern):
     def __init__(
         self,
-        onset: dict[str, Any],
-        coda: dict[str, Any],
-        vowel: dict[str, Any],
-        syll_struct: dict[str, Any],
-        word_struct: list[str],
+        onset: Dict[str, Any],
+        coda: Dict[str, Any],
+        vowel: Dict[str, Any],
+        syll_struct: Dict[str, Any],
+        word_struct: List[str],
         lang_name: str,
     ) -> None:
         super().__init__(onset, coda, vowel, syll_struct, word_struct, lang_name)
@@ -284,5 +284,5 @@ class FinalDevoicing(LanguagePattern):
         pass
 
     # function to decompose final devoicing stimuli with specified phoneme inventory
-    def decompose_stimuli(self, word_list: list[str]):
+    def decompose_stimuli(self, word_list: List[str]):
         pass

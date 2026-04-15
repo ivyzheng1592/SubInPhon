@@ -1,6 +1,8 @@
 # created 2025/01/15
 # An instance of text dataset including feature embedding
 
+from typing import List
+
 from text_dataset import *
 
 
@@ -9,7 +11,7 @@ class FeatureDataset(TextDataset):
         self,
         annotations_file: str,
         feature_file: str,
-        special_tokens: list[str],
+        special_tokens: List[str],
         device: str = 'cuda',
     ) -> None:
         super().__init__(annotations_file, special_tokens, device)

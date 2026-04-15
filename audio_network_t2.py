@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import random
 import hyper_params as hp
+from typing import List, Tuple
 
 
 class AudioEncoder(nn.Module):
@@ -29,7 +30,7 @@ class AudioEncoder(nn.Module):
         self.dropout = nn.Dropout(self.dropout)
         # dropout probability, see https://arxiv.org/abs/1207.0580
 
-    def forward(self, input: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # input = [batch_size, n_channels=1, n_freq, input_len]
 
         input = input.squeeze(1).permute(2, 0, 1)
@@ -85,7 +86,7 @@ class TextDecoder(nn.Module):
         context_vector: torch.Tensor,
         hidden: torch.Tensor,
         cell: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         # input = [batch_size]
         # context_vector = [1, batch_size, hidden_dim * 2]
         # hidden = [1, batch_size, hidden_dim]
@@ -230,7 +231,7 @@ class AudioSynthesizer(nn.Module):
         upsamples: torch.Tensor,
         durations: torch.Tensor,
         aud_teacher_forcing: float,
-    ) -> list[torch.Tensor]:
+    ) -> List[torch.Tensor]:
         # upsamples = [batch_size, aud_output_len, hidden_dim * 3]
         # durations = [txt_input_len, batch_size, 1]
 

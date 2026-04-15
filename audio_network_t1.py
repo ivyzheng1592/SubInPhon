@@ -7,6 +7,7 @@ import torch.nn as nn
 import random
 import hyper_params as hp
 from text_network import BahdanauAttention
+from typing import Tuple
 
 
 class AudioEncoder(nn.Module):
@@ -30,7 +31,7 @@ class AudioEncoder(nn.Module):
         self.dropout = nn.Dropout(self.dropout)
         # dropout probability, see https://arxiv.org/abs/1207.0580
 
-    def forward(self, input: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # input = [batch_size, n_channels=1, n_freq, input_len]
 
         input = input.squeeze(1).permute(2, 0, 1)
@@ -81,7 +82,7 @@ class TextDecoder(nn.Module):
         context_vector: torch.Tensor,
         hidden: torch.Tensor,
         cell: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # input = [batch_size]
         # context_vector = [1, batch_size, hidden_dim * 2]
         # hidden = [n_layers, batch_size, hidden_dim]
@@ -121,7 +122,7 @@ class MultiheadAttention(nn.Module):
         self.mha = nn.MultiheadAttention(embed_dim=qdim, num_heads=self.num_heads,
                                          kdim=kdim, vdim=vdim, dropout=self.dropout)
 
-    def forward(self, encoder_states: torch.Tensor, hidden: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, encoder_states: torch.Tensor, hidden: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         # encoder_states = [src_len, batch_size, hidden_dim * 2]
         # hidden = [n_layers, batch_size, hidden_dim]
 
@@ -164,7 +165,7 @@ class AudioSynthesizer(nn.Module):
         context_vector: torch.Tensor,
         hidden: torch.Tensor,
         cell: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # input = [batch_size, n_freq]
         # context_vector = [1, batch_size, hidden_dim * n_layers]
         # hidden = [n_layers, batch_size, hidden_dim]
@@ -248,7 +249,7 @@ class AudioSeq2Seq(nn.Module):
         input,
         txt_teacher_forcing: float = hp.text_teacher_forcing,
         aud_teacher_forcing: float = hp.audio_teacher_forcing,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         src_txt, src_aud, trg_txt, trg_aud = input
         # src_txt = [txt_src_len, batch_size]
         # src_aud = [batch_size, n_channels, n_freq, aud_src_len]

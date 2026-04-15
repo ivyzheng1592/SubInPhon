@@ -3,8 +3,9 @@
 
 import json
 import os
-from typing import Any, Optional
-from language_generator import BacknessHarmony, FinalDevoicing
+from typing import Any, Optional, Dict, List
+
+from Dataset.language_generator import BacknessHarmony, FinalDevoicing
 
 
 class LanguageRegistry:
@@ -14,23 +15,23 @@ class LanguageRegistry:
         self._config_path = config_path
         self._specs = self._load_specs()
 
-    def _load_specs(self) -> dict[str, Any]:
+    def _load_specs(self) -> Dict[str, Any]:
         with open(self._config_path, "r", encoding="utf-8") as f:
             return json.load(f)
 
-    def names(self) -> list[str]:
+    def names(self) -> List[str]:
         return list(self._specs.keys())
 
     def build_one(self, name: str, variant: Optional[str] = None) -> Any:
         spec = self._specs[name]
         return _build_language(name, spec, variant=variant)
 
-    def build(self, variant: Optional[str] = None) -> dict[str, Any]:
+    def build(self, variant: Optional[str] = None) -> Dict[str, Any]:
         languages = {name: _build_language(name, spec, variant=variant) for name, spec in self._specs.items()}
         return languages
 
 
-def _build_onset(onset_spec: Any) -> dict[str, Any]:
+def _build_onset(onset_spec: Any) -> Dict[str, Any]:
     if isinstance(onset_spec, list):
         return {onset: None for onset in onset_spec}
     if isinstance(onset_spec, dict):
@@ -41,7 +42,7 @@ def _build_onset(onset_spec: Any) -> dict[str, Any]:
     raise ValueError("onset must be a list or a dict")
 
 
-def _build_coda(coda_spec: Any) -> dict[str, Any]:
+def _build_coda(coda_spec: Any) -> Dict[str, Any]:
     if isinstance(coda_spec, list):
         return {coda: None for coda in coda_spec}
     if isinstance(coda_spec, dict):
@@ -52,7 +53,7 @@ def _build_coda(coda_spec: Any) -> dict[str, Any]:
     raise ValueError("coda must be a list or a dict")
 
 
-def _build_vowel(vowel_spec: Any) -> dict[str, Any]:
+def _build_vowel(vowel_spec: Any) -> Dict[str, Any]:
     if isinstance(vowel_spec, list):
         return {vowel: None for vowel in vowel_spec}
     if isinstance(vowel_spec, dict):
@@ -71,11 +72,11 @@ def _template_to_bits(template: str) -> str:
     raise ValueError(f"Unknown syllable template: {template}")
 
 
-def _convert_syll_struct(syll_struct: dict[str, Any]) -> dict[str, Any]:
+def _convert_syll_struct(syll_struct: Dict[str, Any]) -> Dict[str, Any]:
     return {_template_to_bits(k): v for k, v in syll_struct.items()}
 
 
-def _convert_word_struct(word_struct: list[str]) -> list[str]:
+def _convert_word_struct(word_struct: List[str]) -> List[str]:
     converted = []
     for struct in word_struct:
         parts = struct.split("-")
@@ -83,7 +84,7 @@ def _convert_word_struct(word_struct: list[str]) -> list[str]:
     return converted
 
 
-def _build_language(name: str, spec: dict[str, Any], variant: Optional[str] = None) -> Any:
+def _build_language(name: str, spec: Dict[str, Any], variant: Optional[str] = None) -> Any:
     onset = _build_onset(spec["onset"])
     coda = _build_coda(spec["coda"])
     vowel = _build_vowel(spec["vowel"])

@@ -40,6 +40,7 @@ n_samples = 24000
 n_mels = 128
 
 # Dataset hyperparameters
+data_percentage = 1.0
 text_data_split_ratio = [0.6, 0.2, 0.2]
 audio_data_split_ratio = [0.8, 0.1, 0.1]
 
@@ -76,7 +77,7 @@ base_seed = 1234
 audio_root = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon"
 
 # Experiment settings
-lang_name = "EnglishBH_shortened"
+lang_name = "EnglishBH"
 property = ""
 directionality = ["l2r", "r2l"]
 conditions = ["harmony", "disharmony"]

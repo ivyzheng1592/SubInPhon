@@ -5,6 +5,7 @@ from typing import Optional
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.utils.data import random_split
 
 from Dataset.language_registry import languages
 from audio_dataset import AudioDataset
@@ -46,7 +47,8 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
             for run_num in runs:
                 set_seed(hp.base_seed + run_num)
                 print(" - Splitting dataset:")
-                train_data, valid_data, test_data = dataset.split_dataset(hp.text_data_split_ratio)
+                sampled_dataset = dataset.sample_dataset(hp.data_percentage)
+                train_data, valid_data, test_data = random_split(sampled_dataset, hp.text_data_split_ratio)
 
                 print(" - Creating dataloader:")
                 train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
@@ -100,7 +102,8 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
             for run_num in runs:
                 set_seed(hp.base_seed + run_num)
                 print(" - Splitting dataset:")
-                train_data, valid_data, test_data = dataset.split_dataset(hp.text_data_split_ratio)
+                sampled_dataset = dataset.sample_dataset(hp.data_percentage)
+                train_data, valid_data, test_data = random_split(sampled_dataset, hp.text_data_split_ratio)
 
                 print(" - Creating dataloader:")
                 train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
@@ -168,7 +171,8 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
             for run_num in runs:
                 set_seed(hp.base_seed + run_num)
                 print(" - Splitting dataset:")
-                train_data, valid_data, test_data = dataset.split_dataset(hp.audio_data_split_ratio)
+                sampled_dataset = dataset.sample_dataset(hp.data_percentage)
+                train_data, valid_data, test_data = random_split(sampled_dataset, hp.audio_data_split_ratio)
 
                 print(" - Creating dataloader:")
                 train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)

@@ -3,13 +3,14 @@
 # A script to load custom dataset with self-defined class inherited from torch Dataset
 
 import os
-from typing import Any
+from typing import Any, List, Tuple
+import math
 import pandas as pd
 import torch
 import torchaudio
 import torchaudio.transforms as T
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader, random_split, default_collate
+from torch.utils.data import Dataset, DataLoader, Subset, random_split, default_collate
 from text_dataset import Alphabet
 import hyper_params as hp
 
@@ -19,7 +20,7 @@ class AudioDataset(Dataset):
         self,
         annotations_file: str,
         audio_dir: str,
-        special_tokens: list[str],
+        special_tokens: List[str],
         wav2mel: bool = True,
         power2db: bool = True,
         device: str = 'cuda',
@@ -58,7 +59,7 @@ class AudioDataset(Dataset):
     def __len__(self) -> int:
         return len(self.annotations)
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         # audio: [n_channels, n_samples]
         # retrieve source audio
         src_ref = self.ur_refs[index]
@@ -108,7 +109,7 @@ class AudioDataset(Dataset):
             signal = resampler(signal)
         return signal
 
-    def padding(self, signal1: torch.Tensor, signal2: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def padding(self, signal1: torch.Tensor, signal2: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         # in this project, we are padding to a maximum length
         # so we expect all length_signal < self.n_samples
         length_signal1 = signal1.shape[1]
@@ -156,14 +157,22 @@ class AudioDataset(Dataset):
         signal = db_spectrogram(signal)
         return signal
 
-    def split_dataset(self, data_split_ratio: list[float]) -> Any:
+    def split_dataset(self, data_split_ratio: List[float]) -> Any:
         return random_split(self, data_split_ratio)
+
+    def sample_dataset(self, data_percentage: float) -> Dataset:
+        if data_percentage == 1:
+            return self
+
+        subset_size = math.ceil(len(self) * data_percentage)
+        subset_indices = torch.randperm(len(self))[:subset_size].tolist()
+        return Subset(self, subset_indices)
 
     # a closure of customized collate_fn
     def get_collate_fn(self):
         def collate_fn(
-            batch: list[tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]]
-        ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+            batch: List[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]]
+        ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
             src_labels = [src_txt for src_txt, _, _, _ in batch]
             src_labels = nn.utils.rnn.pad_sequence(src_labels, batch_first=False, padding_value=self.pad_idx)
             src_audios = [src_aud for _, src_aud, _, _ in batch]

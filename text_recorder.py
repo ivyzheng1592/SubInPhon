@@ -3,7 +3,7 @@
 # Dictionary data are saved to file using utils in TextTrainer
 
 import os
-from typing import Any
+from typing import Any, Dict, List, Tuple
 import hyper_params as hp
 
 
@@ -105,7 +105,7 @@ class TextRecorder:
                                              self.lang_name + "_" + modality + "_" + self.directionality + "_" + self.condition +
                                              "_run" + str(self.run_num) + "_focus_embedding.html")
 
-    def _append_base_fields(self, store: dict[str, list[Any]], epoch: int, record_type: str) -> None:
+    def _append_base_fields(self, store: Dict[str, List[Any]], epoch: int, record_type: str) -> None:
         store['trial_num'].append(self.trial_num)
         store['language'].append(self.lang_name)
         store['modality'].append(self.modality)
@@ -121,7 +121,7 @@ class TextRecorder:
         ur: Any,
         sr: Any,
         pred_sr: Any,
-    ) -> tuple[list[str], list[str], list[str]]:
+    ) -> Tuple[List[str], List[str], List[str]]:
         # convert tensor to vector
         ur_vector = ur.cpu().numpy()
         sr_vector = sr.cpu().numpy()
@@ -135,7 +135,7 @@ class TextRecorder:
         return ur_list, sr_list, pred_sr_list
 
     # a function that converts one pair of ur, sr, and pred_sr tensor to string
-    def tensor2string(self, ur: Any, sr: Any, pred_sr: Any) -> tuple[str, str, str]:
+    def tensor2string(self, ur: Any, sr: Any, pred_sr: Any) -> Tuple[str, str, str]:
         # convert tensor to vector
         ur_vector = ur.cpu().numpy()
         sr_vector = sr.cpu().numpy()
@@ -149,7 +149,7 @@ class TextRecorder:
         return ur_string, sr_string, pred_sr_string
 
     # a function that converts one pair of ur, sr, and pred_sr tensor to syllables
-    def tensor2syll(self, ur: Any, sr: Any, pred_sr: Any) -> tuple[list[list[Any]], list[list[Any]], list[list[Any]]]:
+    def tensor2syll(self, ur: Any, sr: Any, pred_sr: Any) -> Tuple[List[List[Any]], List[List[Any]], List[List[Any]]]:
         # convert tensor to word list
         ur_list, sr_list, pred_sr_list = self.tensor2list(ur, sr, pred_sr)
 
@@ -174,9 +174,9 @@ class TextRecorder:
         self,
         epoch: int,
         record_type: str,
-        src: list[Any],
-        trg: list[Any],
-        pred_trg: list[Any],
+        src: List[Any],
+        trg: List[Any],
+        pred_trg: List[Any],
     ) -> float:
 
         epoch_correct = []
