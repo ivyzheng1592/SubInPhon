@@ -106,6 +106,7 @@ registry = LanguageRegistry()
 languages = registry.build()
 
 if __name__ == "__main__":
+    """
     languages["EnglishBH"].generate_stimuli(property="nonidentical", 
                                             directionality="l2r",
                                             variant="aud_vowel")
@@ -118,6 +119,7 @@ if __name__ == "__main__":
     languages["EnglishBH"].generate_stimuli(property="full",
                                             directionality="r2l",
                                             variant="aud_vowel")
+    """
     languages["EnglishBH_shortened"].generate_stimuli(property="shortened",
                                                       directionality="l2r")
     languages["EnglishBH_shortened"].generate_stimuli(property="shortened",
