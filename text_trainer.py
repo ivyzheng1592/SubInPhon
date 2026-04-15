@@ -4,6 +4,7 @@
 # Data is recorded into dictionary in TextRecorder
 
 import os
+from typing import Any, Optional
 import tqdm
 import numpy as np
 import torch
@@ -14,7 +15,7 @@ import hyper_params as hp
 
 
 class TextTrainer:
-    def __init__(self, seq2seq, recorder, resume_model_file=None):
+    def __init__(self, seq2seq: Any, recorder: Any, resume_model_file: Optional[str] = None) -> None:
         # condition hyperparameters
         self.seq2seq = seq2seq
         self.recorder = recorder
@@ -33,7 +34,7 @@ class TextTrainer:
         self.criterion = nn.CrossEntropyLoss(ignore_index=hp.special_tokens.index(hp.pad_token))
 
     # a function that completes one repetition of training and evaluation
-    def run(self, train_dataloader, eval_dataloader, eval_record_type):
+    def run(self, train_dataloader: Any, eval_dataloader: Any, eval_record_type: str) -> None:
         if self.start_epoch == 0:
             # save untrained model
             model_file = os.path.join(self.recorder.model_dir,
@@ -85,7 +86,7 @@ class TextTrainer:
 
 
     # a function that manages training at one epoch
-    def train_one_epoch(self, data_loader, teacher_forcing_ratio):
+    def train_one_epoch(self, data_loader: Any, teacher_forcing_ratio: float) -> tuple[float, list[Any], list[Any], list[Any]]:
         self.seq2seq.train()  # enable dropout in training
         epoch_loss = 0
 
@@ -128,7 +129,7 @@ class TextTrainer:
         return epoch_loss, srcs, trgs, preds
 
     # a function that manages evaluation at one epoch
-    def evaluate_one_epoch(self, data_loader):
+    def evaluate_one_epoch(self, data_loader: Any) -> tuple[float, list[Any], list[Any], list[Any]]:
         self.seq2seq.eval()  # disable dropout in evaluation
         epoch_loss = 0
 
@@ -167,7 +168,7 @@ class TextTrainer:
         return epoch_loss, srcs, trgs, preds
 
     # a function that manages evaluation of one random batch
-    def evaluate_attention(self, test_dataloader, eval_epoch=hp.n_epochs-1):
+    def evaluate_attention(self, test_dataloader: Any, eval_epoch: int = hp.n_epochs-1) -> None:
         # get one random batch of test data
         dataiter = iter(test_dataloader)
         src, trg = next(dataiter)
@@ -216,7 +217,7 @@ class TextTrainer:
                 utils.plot_txt_att(ur_list, pred_sr_list, word_att, att_plot)
             print(f"Run {self.recorder.run_num} attention plots are saved for investigation")
 
-    def evaluate_embedding(self):
+    def evaluate_embedding(self) -> None:
         # a dictionary of dictionaries to store all embeddings
         phone_spaces = {}
         # select focus group

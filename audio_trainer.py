@@ -3,6 +3,7 @@
 # Data is recorded into dictionary in AudioRecorder
 
 import os
+from typing import Any, Optional
 import tqdm
 import torch
 import torch.nn.functional as F
@@ -13,7 +14,7 @@ import hyper_params as hp
 
 
 class AudioTrainer:
-    def __init__(self, seq2seq, recorder, resume_model_file=None):
+    def __init__(self, seq2seq: Any, recorder: Any, resume_model_file: Optional[str] = None) -> None:
 
         # condition hyperparameters
         self.seq2seq = seq2seq
@@ -32,7 +33,13 @@ class AudioTrainer:
         self.optimizer = torch.optim.Adam(self.seq2seq.parameters(), lr=hp.learning_rate)
 
     # a function for loss calculation
-    def compute_loss(self, output, spec, trg_txt, trg_aud):
+    def compute_loss(
+        self,
+        output: torch.Tensor,
+        spec: torch.Tensor,
+        trg_txt: torch.Tensor,
+        trg_aud: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
 
         # remove the <SOS> token from output and target and reshape for loss calculation
         txt_dim = output.shape[2]
@@ -50,7 +57,7 @@ class AudioTrainer:
         return rec_loss, pred_loss
 
     # a function that completes one repetition of training and evaluation
-    def run(self, train_dataloader, eval_dataloader, eval_record_type):
+    def run(self, train_dataloader: Any, eval_dataloader: Any, eval_record_type: str) -> None:
         if self.start_epoch == 0:
             # save untrained model
             model_file = os.path.join(self.recorder.model_dir,
@@ -102,7 +109,12 @@ class AudioTrainer:
 
 
     # a function that manages training at one epoch
-    def train_one_epoch(self, data_loader, txt_teacher_forcing, aud_teacher_forcing):
+    def train_one_epoch(
+        self,
+        data_loader: Any,
+        txt_teacher_forcing: float,
+        aud_teacher_forcing: float,
+    ) -> tuple[float, float, list[Any], list[Any], list[Any]]:
         self.seq2seq.train()  # enable dropout in training
         epoch_pred_loss = 0
         epoch_rec_loss = 0
@@ -146,7 +158,7 @@ class AudioTrainer:
         return epoch_rec_loss, epoch_pred_loss, src_txts, trg_txts, pred_txts
 
     # a function that manages evaluation at one epoch
-    def evaluate_one_epoch(self, data_loader):
+    def evaluate_one_epoch(self, data_loader: Any) -> tuple[float, float, list[Any], list[Any], list[Any]]:
         self.seq2seq.eval()  # disable dropout in evaluation
         epoch_rec_loss = 0
         epoch_pred_loss = 0
@@ -185,7 +197,7 @@ class AudioTrainer:
         return epoch_rec_loss, epoch_pred_loss, src_txts, trg_txts, pred_txts
 
     # a function that manages evaluation of one random batch
-    def evaluate_attention(self, test_dataloader, eval_epoch=hp.n_epochs-1):
+    def evaluate_attention(self, test_dataloader: Any, eval_epoch: int = hp.n_epochs-1) -> None:
         # get one random batch of test data
         dataiter = iter(test_dataloader)
         input = next(dataiter)
@@ -258,7 +270,7 @@ class AudioTrainer:
                                    txt_att_plot, aud_att_plot)
             print(f"Run {self.recorder.run_num} attention plots are saved for investigation")
 
-    def evaluate_embedding(self):
+    def evaluate_embedding(self) -> None:
         # a dictionary of dictionaries to store all embeddings
         phone_spaces = {}
         # select focus group

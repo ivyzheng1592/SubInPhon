@@ -1,4 +1,5 @@
 import os
+from typing import Any, Mapping, Sequence
 import torch
 import numpy as np
 import pandas as pd
@@ -8,7 +9,7 @@ from sklearn.decomposition import PCA
 from nooverlap import push_text_free
 
 
-def save_to_file(data_store, save_file):
+def save_to_file(data_store: Mapping[str, Any], save_file: str) -> None:
     # convert dictionary to pandas dataframe
     data_df = pd.DataFrame(data_store)
 
@@ -18,7 +19,7 @@ def save_to_file(data_store, save_file):
     else:
         data_df.to_csv(save_file, header=True, index=False, mode='w')
 
-def plot_waveform(waveform, sample_rate, title="Waveform"):
+def plot_waveform(waveform: torch.Tensor, sample_rate: int, title: str = "Waveform") -> None:
     waveform = waveform.cpu().numpy()  # [n_channels, n_samples]
     time_axis = torch.arange(0, waveform.shape[1]) / sample_rate
 
@@ -31,8 +32,13 @@ def plot_waveform(waveform, sample_rate, title="Waveform"):
     plt.close()
     #plt.show()
 
-def plot_spectrogram(spectrogram1, spectrogram2, spectrogram1_name, spectrogram2_name,
-                     title="Spectrogram"):
+def plot_spectrogram(
+    spectrogram1: torch.Tensor,
+    spectrogram2: torch.Tensor,
+    spectrogram1_name: str,
+    spectrogram2_name: str,
+    title: str = "Spectrogram",
+) -> None:
     spectrogram1 = spectrogram1[0]  # [1, n_freq, dur]
     spectrogram2 = spectrogram2[0]  # [1, n_freq, dur]
 
@@ -49,7 +55,7 @@ def plot_spectrogram(spectrogram1, spectrogram2, spectrogram1_name, spectrogram2
     plt.close()
     #plt.show()
 
-def plot_txt_acc(acc_store, acc_plot):
+def plot_txt_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
     # convert dictionary to pandas dataframe
     acc_data = pd.DataFrame(acc_store)
 
@@ -76,7 +82,7 @@ def plot_txt_acc(acc_store, acc_plot):
     plt.close()
     #plt.show()
 
-def plot_aud_acc(acc_store, acc_plot):
+def plot_aud_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
     # convert dictionary to pandas dataframe
     acc_data = pd.DataFrame(acc_store)
 
@@ -109,7 +115,7 @@ def plot_aud_acc(acc_store, acc_plot):
     plt.close()
     #plt.show()
 
-def plot_txt_att(ur, sr, attention, att_plot):
+def plot_txt_att(ur: Sequence[str], sr: Sequence[str], attention: torch.Tensor, att_plot: str) -> None:
     # convert attention data to numpy array
     attention = attention.cpu().numpy()
 
@@ -122,7 +128,15 @@ def plot_txt_att(ur, sr, attention, att_plot):
     plt.close()
     #plt.show()
 
-def plot_aud_att(ur_aud, sr_txt, sr_aud, txt_attention, aud_attention, txt_att_plot, aud_att_plot):
+def plot_aud_att(
+    ur_aud: torch.Tensor,
+    sr_txt: Sequence[str],
+    sr_aud: torch.Tensor,
+    txt_attention: torch.Tensor,
+    aud_attention: torch.Tensor,
+    txt_att_plot: str,
+    aud_att_plot: str,
+) -> None:
     # convert data to numpy array
     ur_aud = ur_aud.cpu().numpy()
     sr_aud = sr_aud.cpu().numpy()
@@ -151,7 +165,7 @@ def plot_aud_att(ur_aud, sr_txt, sr_aud, txt_attention, aud_attention, txt_att_p
     plt.close()
     #plt.show()
 
-def plot_embed(embed_store, focus_list, embed_plot):
+def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_plot: str) -> None:
     # convert dictionary to pandas dataframe
     embed_df = pd.DataFrame.from_dict(embed_store, orient='index')
     # extract focus embeddings
@@ -226,7 +240,12 @@ def plot_embed(embed_store, focus_list, embed_plot):
     plt.close()
     #plt.show()
 
-def plot_embed_updated(embed_store, focus_list, embed_plot, focus_embed_plot):
+def plot_embed_updated(
+    embed_store: Mapping[str, Mapping[str, Any]],
+    focus_list: Sequence[str],
+    embed_plot: str,
+    focus_embed_plot: str,
+) -> None:
 
     dfs = []
     # iterate through all dictionaries and read into dataframes

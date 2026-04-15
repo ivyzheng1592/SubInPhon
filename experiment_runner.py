@@ -1,5 +1,6 @@
 import os
 import random
+from typing import Optional
 
 import numpy as np
 import torch
@@ -19,7 +20,7 @@ from text_recorder import TextRecorder
 from text_trainer import TextTrainer
 
 
-def set_seed(seed):
+def set_seed(seed: int) -> None:
     torch.manual_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
@@ -27,7 +28,7 @@ def set_seed(seed):
         torch.cuda.manual_seed_all(seed)
 
 
-def text(trial_num, runs, resume_model_file=None):
+def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -> None:
     os.makedirs(os.path.join("Results", trial_num + "_" + hp.lang_name + "_txt"), exist_ok=True)
 
     for directionality in hp.directionality:
@@ -80,7 +81,7 @@ def text(trial_num, runs, resume_model_file=None):
                     rep.evaluate_embedding()
 
 
-def feature(trial_num, runs, resume_model_file=None):
+def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -> None:
     os.makedirs(os.path.join("Results", trial_num + "_" + hp.lang_name + "_fea"), exist_ok=True)
 
     for directionality in hp.directionality:
@@ -141,7 +142,7 @@ def feature(trial_num, runs, resume_model_file=None):
                     rep.evaluate_embedding()
 
 
-def audio(trial_num, runs, resume_model_file=None):
+def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -> None:
     os.makedirs(os.path.join("Results", trial_num + "_" + hp.lang_name + "_aud"), exist_ok=True)
 
     for directionality in hp.directionality:
@@ -208,7 +209,12 @@ def audio(trial_num, runs, resume_model_file=None):
                     rep.evaluate_embedding()
 
 
-def run_experiment(modality, trial_num, runs, resume_model_file=None):
+def run_experiment(
+    modality: str,
+    trial_num: str,
+    runs: range,
+    resume_model_file: Optional[str] = None,
+) -> None:
     if modality == "text":
         text(trial_num, runs, resume_model_file=resume_model_file)
     elif modality == "feature":

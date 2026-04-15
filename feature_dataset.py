@@ -5,7 +5,13 @@ from text_dataset import *
 
 
 class FeatureDataset(TextDataset):
-    def __init__(self, annotations_file, feature_file, special_tokens, device='cuda'):
+    def __init__(
+        self,
+        annotations_file: str,
+        feature_file: str,
+        special_tokens: list[str],
+        device: str = 'cuda',
+    ) -> None:
         super().__init__(annotations_file, special_tokens, device)
         # get the dataframe of features
         self.feature_df = pd.read_excel(feature_file, sheet_name=0, index_col=0)

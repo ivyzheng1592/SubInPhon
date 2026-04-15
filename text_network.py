@@ -28,7 +28,7 @@ class TextEncoder(nn.Module):
         self.dropout = nn.Dropout(self.dropout)
         # dropout probability, see https://arxiv.org/abs/1207.0580
 
-    def forward(self, input):
+    def forward(self, input: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # input = [input_len, batch_size]
 
         embedding = self.dropout(self.embedding(input))
@@ -69,7 +69,7 @@ class BahdanauAttention(nn.Module):
         # output a score for each alignment
         # ignoring bias=False in Ben Trevett tutorial
 
-    def forward(self, encoder_states, hidden):
+    def forward(self, encoder_states: torch.Tensor, hidden: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         # encoder_states = [src_len, batch_size, hidden_dim * 2]
         # hidden = [1, batch_size, hidden_dim]
 
@@ -116,7 +116,13 @@ class TextDecoder(nn.Module):
         # take into account context vector, decoder hidden, and embedding for the prediction
         self.dropout = nn.Dropout(self.dropout)
 
-    def forward(self, input, context_vector, hidden, cell):
+    def forward(
+        self,
+        input: torch.Tensor,
+        context_vector: torch.Tensor,
+        hidden: torch.Tensor,
+        cell: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # input = [batch_size]
         # context_vector = [1, batch_size, hidden_dim * 2]
         # hidden = [1, batch_size, hidden_dim]
@@ -158,7 +164,12 @@ class TextSeq2Seq(nn.Module):
         self.encoder = TextEncoder(encoder_input_dim).to(self.device)
         self.decoder = TextDecoder(decoder_input_dim, output_dim).to(self.device)
 
-    def forward(self, src, trg, teacher_forcing_ratio=hp.text_teacher_forcing):
+    def forward(
+        self,
+        src: torch.Tensor,
+        trg: torch.Tensor,
+        teacher_forcing_ratio: float = hp.text_teacher_forcing,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # src = [src_len, batch_size]
         # trg = [trg_len, batch_size]
 

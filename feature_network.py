@@ -5,21 +5,21 @@ from text_network import *
 
 
 class FeatureEncoder(TextEncoder):
-    def __init__(self, input_dim, embedding_weight, freeze):
+    def __init__(self, input_dim, embedding_weight, freeze) -> None:
         super().__init__(input_dim)
         self.embedding = self.embedding.from_pretrained(embedding_weight, freeze=freeze)
         # parse pretrained weight to embedding
 
 
 class FeatureDecoder(TextDecoder):
-    def __init__(self, input_dim, output_dim, embedding_weight, freeze):
+    def __init__(self, input_dim, output_dim, embedding_weight, freeze) -> None:
         super().__init__(input_dim, output_dim)
         self.embedding = self.embedding.from_pretrained(embedding_weight, freeze=freeze)
 
 
 class FeatureSeq2Seq(TextSeq2Seq):
     def __init__(self, encoder_input_dim, decoder_input_dim, output_dim,
-                 encoder_embedding_weight, decoder_embedding_weight, freeze, device='cuda'):
+                 encoder_embedding_weight, decoder_embedding_weight, freeze, device='cuda') -> None:
         super().__init__(encoder_input_dim, decoder_input_dim, output_dim, device)
         self.encoder_embedding_weight = encoder_embedding_weight
         self.decoder_embedding_weight = decoder_embedding_weight

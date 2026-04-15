@@ -1,6 +1,8 @@
 # created 2025/01/15
 # A script to load custom text dataset with self-defined class inherited from torch Dataset
 
+from typing import Any, Iterable
+
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -8,17 +10,17 @@ from torch.utils.data import Dataset, DataLoader, random_split
 
 
 class Alphabet:
-    def __init__(self, special_tokens):
+    def __init__(self, special_tokens: list[str]) -> None:
         self.idx2char = {} # {index: character}
         self.char2idx = {}  # {character: index}
         self.char2count = {}  # {char: number of occurrences}
         self.specials = special_tokens
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.idx2char)
 
     # convert each word to a vector
-    def word2vec(self, word):
+    def word2vec(self, word: str) -> list[int]:
         word_vector = [self.char2idx["<SOS>"]]
         word_vector.extend([self.char2idx[char] if char in self.char2idx
                             else self.char2idx["<UNK>"]
@@ -27,7 +29,7 @@ class Alphabet:
         return word_vector
 
     # convert each vector to a word
-    def vec2word(self, vector):
+    def vec2word(self, vector: Iterable[int]) -> tuple[list[str], str]:
         # in list format (including <SOS> and <EOS>)
         word_list = []
         for idx in vector:
@@ -43,7 +45,7 @@ class Alphabet:
         return word_list, word_string
 
     # build vocabulary with a list of words and special characters
-    def build_alphabet(self, words):
+    def build_alphabet(self, words: Iterable[str]) -> None:
         # add special characters to vocabulary
         self.idx2char.update({idx: char for idx, char in enumerate(self.specials)})
         self.char2idx.update({char: idx for idx, char in enumerate(self.specials)})
@@ -60,7 +62,7 @@ class Alphabet:
                 else:
                     self.char2count[char] += 1
 
-    def fea2embed(self, feature_df):
+    def fea2embed(self, feature_df: pd.DataFrame) -> torch.Tensor:
         # set all features of special characters to -1
         num_feature = feature_df.shape[1]
         num_special = len(self.specials)
@@ -74,7 +76,7 @@ class Alphabet:
 
         return embedding_tensor
 
-    def embed2fea(self, embedding_tensor):
+    def embed2fea(self, embedding_tensor: torch.Tensor) -> dict[str, Any]:
         embedding_list = embedding_tensor.cpu().detach().numpy()
         # embedding_tensor = [input_dim, embedding_dim]
 
@@ -84,7 +86,7 @@ class Alphabet:
         return feature_space
 
 class TextDataset(Dataset):
-    def __init__(self, annotations_file, special_tokens, device='cuda'):
+    def __init__(self, annotations_file: str, special_tokens: list[str], device: str = 'cuda') -> None:
         self.device = device
 
         # get the list of ur and sr words
@@ -104,10 +106,10 @@ class TextDataset(Dataset):
         self.sr_alphabet = Alphabet(self.specials)
         self.sr_alphabet.build_alphabet(self.sr_words)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.annotations)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         # get source word
         src_word = self.ur_words[index]
         src_vector = self.ur_alphabet.word2vec(src_word)
@@ -120,12 +122,12 @@ class TextDataset(Dataset):
 
         return src_tensor, trg_tensor
 
-    def split_dataset(self, data_split_ratio):
+    def split_dataset(self, data_split_ratio: list[float]) -> Any:
         return random_split(self, data_split_ratio)
 
     # a closure of customized collate_fn
     def get_collate_fn(self):
-        def collate_fn(batch):
+        def collate_fn(batch: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, torch.Tensor]:
             srcs = [item[0] for item in batch]
             srcs = nn.utils.rnn.pad_sequence(srcs, batch_first=False, padding_value=self.pad_idx)
 
@@ -134,7 +136,7 @@ class TextDataset(Dataset):
             return srcs, trgs
         return collate_fn
 
-    def get_dataloader(self, dataset, batch_size, shuffle=True):
+    def get_dataloader(self, dataset: Dataset, batch_size: int, shuffle: bool = True) -> DataLoader:
         data_loader = DataLoader(
             dataset=dataset,
             batch_size=batch_size,

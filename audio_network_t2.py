@@ -29,7 +29,7 @@ class AudioEncoder(nn.Module):
         self.dropout = nn.Dropout(self.dropout)
         # dropout probability, see https://arxiv.org/abs/1207.0580
 
-    def forward(self, input):
+    def forward(self, input: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # input = [batch_size, n_channels=1, n_freq, input_len]
 
         input = input.squeeze(1).permute(2, 0, 1)
@@ -79,7 +79,13 @@ class TextDecoder(nn.Module):
         # take into account context vector, decoder hidden, and embedding for the prediction
         self.dropout = nn.Dropout(self.dropout)
 
-    def forward(self, input, context_vector, hidden, cell):
+    def forward(
+        self,
+        input: torch.Tensor,
+        context_vector: torch.Tensor,
+        hidden: torch.Tensor,
+        cell: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         # input = [batch_size]
         # context_vector = [1, batch_size, hidden_dim * 2]
         # hidden = [1, batch_size, hidden_dim]
@@ -122,7 +128,7 @@ class DurationPredictor(nn.Module):
         self.proj = nn.Linear(self.hidden_dim * 2, 1)
         # project to single-dimension duration vector
 
-    def forward(self, input):
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
         # input = [input_len, batch_size, hidden_dim * 3]
 
         durations, _ = self.lstm(input)
@@ -146,7 +152,7 @@ class RangePredictor(nn.Module):
         # project to single-dimension range vector
         self.softplus = nn.Softplus()
 
-    def forward(self, input, durations):
+    def forward(self, input: torch.Tensor, durations: torch.Tensor) -> torch.Tensor:
         # input = [input_len, batch_size, hidden_dim * 3]
         # durations = [input_len, batch_size, 1]
 
@@ -166,7 +172,13 @@ class GaussianUpsampling(nn.Module):
 
         self.device = device
 
-    def forward(self, input, output_len, durations, ranges):
+    def forward(
+        self,
+        input: torch.Tensor,
+        output_len: int,
+        durations: torch.Tensor,
+        ranges: torch.Tensor,
+    ) -> torch.Tensor:
         # input = [txt_input_len, batch_size, hidden_dim * 3]
         # durations = [txt_input_len, batch_size, 1]
         # ranges = [txt_input_len, batch_size, 1]
@@ -212,7 +224,13 @@ class AudioSynthesizer(nn.Module):
         #
         self.dropout = nn.Dropout(self.dropout)
 
-    def forward(self, input, upsamples, durations, aud_teacher_forcing):
+    def forward(
+        self,
+        input,
+        upsamples: torch.Tensor,
+        durations: torch.Tensor,
+        aud_teacher_forcing: float,
+    ) -> list[torch.Tensor]:
         # upsamples = [batch_size, aud_output_len, hidden_dim * 3]
         # durations = [txt_input_len, batch_size, 1]
 
@@ -273,7 +291,13 @@ class AudioSeq2Seq(nn.Module):
         self.decoder = TextDecoder(decoder_input_dim, text_output_dim).to(self.device)
         self.synthesizer = AudioSynthesizer(synthesizer_input_dim, audio_output_dim, device).to(self.device)
 
-    def forward(self, src, trg, txt_teacher_forcing=0.5, aud_teacher_forcing=1.0):
+    def forward(
+        self,
+        src,
+        trg,
+        txt_teacher_forcing: float = 0.5,
+        aud_teacher_forcing: float = 1.0,
+    ):
         # src = ([txt_src_len, batch_size], [batch_size, n_channels, freq, aud_src_len])
         # trg = ([txt_trg_len, batch_size], [batch_size, n_channels, freq, aud_trg_len])
 

@@ -7,10 +7,19 @@
 import csv
 import itertools
 import os
+from typing import Any, Optional
 
 
 class LanguagePattern:
-    def __init__(self, onset, coda, vowel, syll_struct, word_struct, lang_name):
+    def __init__(
+        self,
+        onset: dict[str, Any],
+        coda: dict[str, Any],
+        vowel: dict[str, Any],
+        syll_struct: dict[str, Any],
+        word_struct: list[str],
+        lang_name: str,
+    ) -> None:
         # lang_name is the internal/base language label from the config.
         # The registry key used for dataset file naming is attached later as registry_name.
         # Example: for the "EnglishBH_shortened" entry, lang_name may still be "EnglishBH".
@@ -24,28 +33,41 @@ class LanguagePattern:
         self.focus = {}  # different focus for different language pattern
         self.registry_name = lang_name
 
-    def generate_stimuli(self, property="", variant=None):
+    def generate_stimuli(self, property: str = "", variant: Optional[str] = None):
         pass
 
-    def decompose_stimuli(self, word_list):
+    def decompose_stimuli(self, word_list: list[str]):
         pass
 
 
 class BacknessHarmony(LanguagePattern):
-    def __init__(self, onset, coda, vowel, syll_struct, word_struct, lang_name):
+    def __init__(
+        self,
+        onset: dict[str, Any],
+        coda: dict[str, Any],
+        vowel: dict[str, Any],
+        syll_struct: dict[str, Any],
+        word_struct: list[str],
+        lang_name: str,
+    ) -> None:
         super().__init__(onset, coda, vowel, syll_struct, word_struct, lang_name)
         self.focus = self.vowel
 
     # function to generate vowel harmony stimuli with specified phoneme inventory and syllable structure
-    def generate_stimuli(self, property="", directionality="l2r", variant=None):
+    def generate_stimuli(
+        self,
+        property: str = "",
+        directionality: str = "l2r",
+        variant: Optional[str] = None,
+    ) -> tuple[list[list[str]], list[list[str]]]:
         variant_vowel = self.variants.get(variant)
 
         print(" - Generating stimuli:")
-        def build_syll(parts):
+        def build_syll(parts: tuple[str, str, str]) -> str:
             o, v, c = parts
             return f"{o}{v}{c}"
 
-        def match_vowel(trigger_vowel, agree):
+        def match_vowel(trigger_vowel: str, agree: str) -> str:
             t_height = self.vowel[trigger_vowel][1]
             t_tense = self.vowel[trigger_vowel][2]
             t_backness = self.vowel[trigger_vowel][0]
@@ -58,7 +80,7 @@ class BacknessHarmony(LanguagePattern):
                     return target_vowel
             raise RuntimeError(f"No vowel matches {agree} for {trigger_vowel}")
 
-        def map_variant_vowel(base_vowel):
+        def map_variant_vowel(base_vowel: str) -> str:
             # map base vowel to its variant counterpart with the same features
             if not variant_vowel:
                 return base_vowel
@@ -188,7 +210,7 @@ class BacknessHarmony(LanguagePattern):
         return vh_list, dh_list
 
     # function to decompose vowel harmony stimuli with specified phoneme inventory
-    def decompose_stimuli(self, word_list):
+    def decompose_stimuli(self, word_list: list[str]) -> list[list[Any]]:
         word_copy = word_list.copy()  # copy of word for token removal
 
         # remove SOS token in word
@@ -245,14 +267,22 @@ class BacknessHarmony(LanguagePattern):
 
 
 class FinalDevoicing(LanguagePattern):
-    def __init__(self, onset, coda, vowel, syll_struct, word_struct, lang_name):
+    def __init__(
+        self,
+        onset: dict[str, Any],
+        coda: dict[str, Any],
+        vowel: dict[str, Any],
+        syll_struct: dict[str, Any],
+        word_struct: list[str],
+        lang_name: str,
+    ) -> None:
         super().__init__(onset, coda, vowel, syll_struct, word_struct, lang_name)
         self.focus = self.coda
 
     # function to generate final devoicing stimuli with specified phoneme inventory and syllable structure
-    def generate_stimuli(self, property="", variant=None):
+    def generate_stimuli(self, property: str = "", variant: Optional[str] = None):
         pass
 
     # function to decompose final devoicing stimuli with specified phoneme inventory
-    def decompose_stimuli(self, word_list):
+    def decompose_stimuli(self, word_list: list[str]):
         pass

@@ -3,6 +3,7 @@
 # A script to load custom dataset with self-defined class inherited from torch Dataset
 
 import os
+from typing import Any
 import pandas as pd
 import torch
 import torchaudio
@@ -14,8 +15,15 @@ import hyper_params as hp
 
 
 class AudioDataset(Dataset):
-    def __init__(self, annotations_file, audio_dir, special_tokens,
-                 wav2mel=True, power2db=True, device='cuda'):
+    def __init__(
+        self,
+        annotations_file: str,
+        audio_dir: str,
+        special_tokens: list[str],
+        wav2mel: bool = True,
+        power2db: bool = True,
+        device: str = 'cuda',
+    ) -> None:
         # get the list of ur and sr words
         # note that word text are separate from word reference for audio extraction
         self.device = device
@@ -47,10 +55,10 @@ class AudioDataset(Dataset):
         self.wav2mel = wav2mel
         self.power2db = power2db
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.annotations)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         # audio: [n_channels, n_samples]
         # retrieve source audio
         src_ref = self.ur_refs[index]
@@ -89,7 +97,7 @@ class AudioDataset(Dataset):
 
         return src_tensor, src_audio, trg_tensor, trg_audio
 
-    def resampling(self, signal, sr):
+    def resampling(self, signal: torch.Tensor, sr: int) -> torch.Tensor:
         # in this project, we expect all sr == self.sample_rate
         assert (
             sr == self.sample_rate
@@ -100,7 +108,7 @@ class AudioDataset(Dataset):
             signal = resampler(signal)
         return signal
 
-    def padding(self, signal1, signal2):
+    def padding(self, signal1: torch.Tensor, signal2: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         # in this project, we are padding to a maximum length
         # so we expect all length_signal < self.n_samples
         length_signal1 = signal1.shape[1]
@@ -117,7 +125,7 @@ class AudioDataset(Dataset):
         # [1, [1, 1]] -> [1, [0, 1, 1, 0, 0, 0]]
         return signal1, signal2
 
-    def remove_padding(self, mel):
+    def remove_padding(self, mel: torch.Tensor) -> torch.Tensor:
         # mel = [n_fre, dur]
         # get the values along n_freq dimension that are not 0s
         non_zeros = torch.all(torch.where(torch.eq(mel, -100), False, True), dim=0)
@@ -125,7 +133,7 @@ class AudioDataset(Dataset):
         return non_zeros
 
     # converting waveform to mel spectrogram
-    def wav_to_mel(self, signal):
+    def wav_to_mel(self, signal: torch.Tensor) -> torch.Tensor:
         mel_spectrogram = T.MelSpectrogram(
             sample_rate=self.sample_rate,  # sampling rate, i.e. 24000 samples in 1s
             n_fft=1024,  # length of the FFT window
@@ -143,17 +151,19 @@ class AudioDataset(Dataset):
 
     # converting power scale to decibel scale in spectrogram
     # for readability of the spectrogram figure
-    def power_to_db(self, signal):
+    def power_to_db(self, signal: torch.Tensor) -> torch.Tensor:
         db_spectrogram = T.AmplitudeToDB(stype="power").to(self.device)
         signal = db_spectrogram(signal)
         return signal
 
-    def split_dataset(self, data_split_ratio):
+    def split_dataset(self, data_split_ratio: list[float]) -> Any:
         return random_split(self, data_split_ratio)
 
     # a closure of customized collate_fn
     def get_collate_fn(self):
-        def collate_fn(batch):
+        def collate_fn(
+            batch: list[tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]]
+        ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
             src_labels = [src_txt for src_txt, _, _, _ in batch]
             src_labels = nn.utils.rnn.pad_sequence(src_labels, batch_first=False, padding_value=self.pad_idx)
             src_audios = [src_aud for _, src_aud, _, _ in batch]
@@ -166,7 +176,7 @@ class AudioDataset(Dataset):
             return src_labels, src_audios, trg_labels, trg_audios
         return collate_fn
 
-    def get_dataloader(self, dataset, batch_size, shuffle=True):
+    def get_dataloader(self, dataset: Dataset, batch_size: int, shuffle: bool = True) -> DataLoader:
         data_loader = DataLoader(
             dataset=dataset,
             batch_size=batch_size,

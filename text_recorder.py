@@ -3,11 +3,21 @@
 # Dictionary data are saved to file using utils in TextTrainer
 
 import os
+from typing import Any
 import hyper_params as hp
 
 
 class TextRecorder:
-    def __init__(self, dataset, trial_num, language, modality, directionality, condition, run_num):
+    def __init__(
+        self,
+        dataset: Any,
+        trial_num: str,
+        language: Any,
+        modality: str,
+        directionality: str,
+        condition: str,
+        run_num: int,
+    ) -> None:
         self.dataset = dataset
         self.trial_num = trial_num
         self.language = language
@@ -95,7 +105,7 @@ class TextRecorder:
                                              self.lang_name + "_" + modality + "_" + self.directionality + "_" + self.condition +
                                              "_run" + str(self.run_num) + "_focus_embedding.html")
 
-    def _append_base_fields(self, store, epoch, record_type):
+    def _append_base_fields(self, store: dict[str, list[Any]], epoch: int, record_type: str) -> None:
         store['trial_num'].append(self.trial_num)
         store['language'].append(self.lang_name)
         store['modality'].append(self.modality)
@@ -106,7 +116,12 @@ class TextRecorder:
         store['record_type'].append(record_type)
 
     # a function that converts one pair of ur, sr, and pred_sr tensor to list
-    def tensor2list(self, ur, sr, pred_sr):
+    def tensor2list(
+        self,
+        ur: Any,
+        sr: Any,
+        pred_sr: Any,
+    ) -> tuple[list[str], list[str], list[str]]:
         # convert tensor to vector
         ur_vector = ur.cpu().numpy()
         sr_vector = sr.cpu().numpy()
@@ -120,7 +135,7 @@ class TextRecorder:
         return ur_list, sr_list, pred_sr_list
 
     # a function that converts one pair of ur, sr, and pred_sr tensor to string
-    def tensor2string(self, ur, sr, pred_sr):
+    def tensor2string(self, ur: Any, sr: Any, pred_sr: Any) -> tuple[str, str, str]:
         # convert tensor to vector
         ur_vector = ur.cpu().numpy()
         sr_vector = sr.cpu().numpy()
@@ -134,7 +149,7 @@ class TextRecorder:
         return ur_string, sr_string, pred_sr_string
 
     # a function that converts one pair of ur, sr, and pred_sr tensor to syllables
-    def tensor2syll(self, ur, sr, pred_sr):
+    def tensor2syll(self, ur: Any, sr: Any, pred_sr: Any) -> tuple[list[list[Any]], list[list[Any]], list[list[Any]]]:
         # convert tensor to word list
         ur_list, sr_list, pred_sr_list = self.tensor2list(ur, sr, pred_sr)
 
@@ -147,7 +162,7 @@ class TextRecorder:
 
     # a function that records accuracy rates into a dictionary
     # the function is called at each training/evaluation epoch
-    def record_acc(self, epoch, record_type, loss, acc):
+    def record_acc(self, epoch: int, record_type: str, loss: float, acc: float) -> None:
         # add current accuracy data to the accuracy data storage
         self._append_base_fields(self.acc_store, epoch, record_type)
         self.acc_store['loss'].append(loss)
@@ -155,7 +170,14 @@ class TextRecorder:
 
     # a function that records the prediction information line into a dictionary and the prediction correctness in a list
     # the function is called at each training/evaluation epoch
-    def record_pred(self, epoch, record_type, src, trg, pred_trg):
+    def record_pred(
+        self,
+        epoch: int,
+        record_type: str,
+        src: list[Any],
+        trg: list[Any],
+        pred_trg: list[Any],
+    ) -> float:
 
         epoch_correct = []
 

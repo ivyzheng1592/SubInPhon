@@ -1,5 +1,6 @@
 import argparse
 from datetime import datetime
+from typing import Optional, Union
 
 from experiment_runner import run_experiment
 import hyper_params as hp
@@ -28,7 +29,7 @@ Set these directly in hyper_params.py:
 """
 
 
-def _parse_runs(run_spec):
+def _parse_runs(run_spec: Union[str, int, range]) -> range:
     if isinstance(run_spec, range):
         return run_spec
     if isinstance(run_spec, int):
@@ -47,11 +48,11 @@ def _parse_runs(run_spec):
     return range(int(run_spec))
 
 
-def _resolve_trial_num(trial_num):
+def _resolve_trial_num(trial_num: Optional[str]) -> str:
     return trial_num or datetime.now().strftime("%Y%m%d%H%M")
 
 
-def _build_parser():
+def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run SubInPhon experiments.")
     parser.add_argument(
         "--modality",
@@ -96,7 +97,7 @@ def _build_parser():
     return parser
 
 
-def main():
+def main() -> None:
     args = _build_parser().parse_args()
 
     if args.lang_name is not None:
