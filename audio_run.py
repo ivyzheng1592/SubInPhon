@@ -50,7 +50,7 @@ class AudioRun:
         return rec_loss, pred_loss
 
     # a function that completes one repetition of training and evaluation
-    def run(self, train_dataloader, valid_dataloader, test_dataloader):
+    def run(self, train_dataloader, eval_dataloader, eval_record_type):
         if self.start_epoch == 0:
             # save untrained model
             model_file = os.path.join(self.recorder.model_dir,
@@ -65,29 +65,22 @@ class AudioRun:
             # update loss
             train_rec_loss, train_pred_loss, train_src, train_trg, train_pred = (
                 self.train_one_epoch(train_dataloader, hp.text_teacher_forcing, hp.audio_teacher_forcing))
-            valid_rec_loss, valid_pred_loss, valid_src, valid_trg, valid_pred = (
-                self.evaluate_one_epoch(valid_dataloader))
-            test_rec_loss, test_pred_loss, test_src, test_trg, test_pred = (
-                self.evaluate_one_epoch(test_dataloader))
+            eval_rec_loss, eval_pred_loss, eval_src, eval_trg, eval_pred = (
+                self.evaluate_one_epoch(eval_dataloader))
 
             # record predictions and prediction correctness
             train_acc = self.recorder.record_pred(epoch, "train", train_src, train_trg, train_pred)
-            valid_acc = self.recorder.record_pred(epoch, "valid", valid_src, valid_trg, valid_pred)
+            eval_acc = self.recorder.record_pred(epoch, eval_record_type, eval_src, eval_trg, eval_pred)
             # record accuracy
             self.recorder.record_acc(epoch, "train", train_rec_loss, train_pred_loss, train_acc)
-            self.recorder.record_acc(epoch, "valid", valid_rec_loss, valid_pred_loss, valid_acc)
-            test_acc = self.recorder.record_pred(epoch, "test", test_src, test_trg, test_pred)
-            self.recorder.record_acc(epoch, "test", test_rec_loss, test_pred_loss, test_acc)
+            self.recorder.record_acc(epoch, eval_record_type, eval_rec_loss, eval_pred_loss, eval_acc)
 
             print(f"Epoch {epoch} Train Reconstruction Task Loss: {train_rec_loss:7.3f} "
                   f"| Train Prediction Task Loss: {train_pred_loss:7.3f} "
                   f"| Train Prediction Acc: {train_acc:7.3f}")
-            print(f"Epoch {epoch} Valid Reconstruction Task Loss: {valid_rec_loss:7.3f} "
-                  f"| Valid Prediction Task Loss: {valid_pred_loss:7.3f} "
-                  f"| Valid Prediction Acc: {valid_acc:7.3f}")
-            print(f"Epoch {epoch} Test Reconstruction Task Loss: {test_rec_loss:7.3f} "
-                  f"| Test Prediction Task Loss: {test_pred_loss:7.3f} "
-                  f"| Test Prediction Acc: {test_acc:7.3f}")
+            print(f"Epoch {epoch} {eval_record_type.capitalize()} Reconstruction Task Loss: {eval_rec_loss:7.3f} "
+                  f"| {eval_record_type.capitalize()} Prediction Task Loss: {eval_pred_loss:7.3f} "
+                  f"| {eval_record_type.capitalize()} Prediction Acc: {eval_acc:7.3f}")
 
             # save model every other save_epochs
             if epoch % hp.save_epochs == 0 or epoch == hp.n_epochs-1:

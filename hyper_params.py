@@ -1,30 +1,30 @@
 """
 data structure:
-- "subinphon_audio"
-    - {language}
+- audio_root
+    - {language_root}  # e.g., EnglishBH
         - {src} + ".mp3"
         - {src} + ".wav"
 - "Dataset"
-    - {language} + "_" + {condition} + ".csv"
+    - {lang_name} + "_" + {condition} + ".csv"
 - "Results"
-    - {trial_num} + "_" + {language}
-        - {language} + "_acc.csv"
-        - {language} + "_pred.csv"
-        - {language} + "_acc_plots"
-            - {language} + "_" + {condition} + "_run" + {run_num} + "_acc_plot.png"
-        - {language} + "_model_files"
-            - {language} + "_" + {condition} + "_run" + {run_num} + "_model_files"
-                - {language} + "_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_seq2seq.pth"
-        - {language} + "_att_plots"
-            - {language} + "_" + {condition} + "_run" + {run_num} + "_att_plots"
-                - {language} + "_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "att_type.csv"
-                - {language} + "_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + {src}_{trg} + ".png"
-        - {language} + "_embed_plots"
-            - {language} + "_" + {condition} + "_run" + {run_num} + "_embed_plots"
-                - {language} + "_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_sr_vowel.csv"
-                - {language} + "_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_ur_vowel.csv"
-                - {language} + "_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_sr_vowel.png"
-                - {language} + "_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_ur_vowel.png"
+    - {trial_num} + "_" + {lang_name} + "_" + {modality}
+        - {lang_name} + "_" + {modality} + "_acc.csv"
+        - {lang_name} + "_" + {modality} + "_pred.csv"
+        - {lang_name} + "_" + {modality} + "_acc_plots"
+            - {lang_name} + "_" + {modality} + "_" + {condition} + "_run" + {run_num} + "_acc_plot.png"
+        - {lang_name} + "_" + {modality} + "_model_files"
+            - {lang_name} + "_" + {modality} + "_" + {condition} + "_run" + {run_num} + "_model_files"
+                - {lang_name} + "_" + {modality} + "_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_seq2seq.pth"
+        - {lang_name} + "_" + {modality} + "_att_plots"
+            - {lang_name} + "_" + {modality} + "_" + {condition} + "_run" + {run_num} + "_att_plots"
+                - {lang_name} + "_" + {modality} + "_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_" + {src} + "_" + {trg} + ".png"
+                - {lang_name} + "_" + {modality} + "_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_" + {src} + "_" + {trg} + "_txt.png"
+                - {lang_name} + "_" + {modality} + "_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_" + {src} + "_" + {trg} + "_aud.png"
+        - {lang_name} + "_" + {modality} + "_embed_plots"
+            - {lang_name} + "_" + {modality} + "_" + {condition} + "_run" + {run_num} + "_embedding.html"
+            - {lang_name} + "_" + {modality} + "_" + {condition} + "_run" + {run_num} + "_focus_embedding.html"
+            - {lang_name} + "_" + {modality} + "_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_embedding.csv"
+            - {lang_name} + "_" + {modality} + "_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_embedding.png"
 """
 
 # Alphabet
@@ -58,11 +58,16 @@ audio_dropout = 0.2  # 0.0 is equivalent to Identity function
 text_teacher_forcing = 0.5  # original=0.5
 audio_teacher_forcing = 0.5
 
+# Embedding settings
+embedding_init_low = 0.0
+embedding_init_high = 1.0  # original=0.01
+freeze = False
+
 # Training hyperparameters
-n_epochs = 120  # original=50. Note: must be >1 !!!
+n_epochs = 120
 save_epochs = 10
 learning_rate = 1e-4
-batch_size = 32  # original=32
+batch_size = 32
 
 # Reproducibility
 base_seed = 1234
@@ -70,5 +75,11 @@ base_seed = 1234
 # Audio data root (per-language subfolders live here)
 audio_root = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon"
 
-# Prediction logging mode: "vowel_only_error", "consonant_vowel_error", "all_correct_syll"
+# Experiment settings
+lang_name = "EnglishBH_shortened"
+conditions = ["harmony", "disharmony"]
+# Run mode options: "train and evaluate", "tuning", "evaluate only"
+run_mode = "train and evaluate"
+# Prediction logging mode options: "vowel_only_error", "consonant_vowel_error", "all_correct_syll"
 pred_log = "vowel_only_error"
+device = "cuda"

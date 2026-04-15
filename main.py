@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from Dataset.languages import languages
+from Dataset.language_registry import languages
 from text_dataset import TextDataset
 from text_network import TextSeq2Seq
 from text_run import TextRun
@@ -27,18 +27,18 @@ def _set_seed(seed):
 
 
 # a function that loads text dataset, initializes text model for each run of each condition
-def text(trial_num, lang_name, conditions, runs, run_mode="train and evaluate", device="cuda", resume_model_file=None):
+def text(trial_num, runs, resume_model_file=None):
 
-    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name + "_txt"),
+    os.makedirs(os.path.join("Results", trial_num + "_" + hp.lang_name + "_txt"),
                 exist_ok=True)
 
-    for condition in conditions:
+    for condition in hp.conditions:
         print(" - Instantiating language pattern:")
-        language = languages[lang_name]
+        language = languages[hp.lang_name]
 
         print(" - Loading dataset:")
-        annotations_file = os.path.join("Dataset", lang_name + "_" + condition + ".csv")
-        dataset = TextDataset(annotations_file, hp.special_tokens, device=device)
+        annotations_file = os.path.join("Dataset", hp.lang_name + "_" + condition + ".csv")
+        dataset = TextDataset(annotations_file, hp.special_tokens, device=hp.device)
 
         for run_num in runs:
             _set_seed(hp.base_seed + run_num)
@@ -57,42 +57,45 @@ def text(trial_num, lang_name, conditions, runs, run_mode="train and evaluate", 
             output_dim = len(dataset.sr_alphabet)
 
             # model initialization
-            seq2seq = TextSeq2Seq(encoder_input_dim, decoder_input_dim, output_dim, device=device)
+            seq2seq = TextSeq2Seq(encoder_input_dim, decoder_input_dim, output_dim, device=hp.device)
 
             # embedding weight initialization
             for name, param in seq2seq.named_parameters():
                 if "embedding.weight" in name:
-                    nn.init.uniform_(param.data, a=0, b=0.01)
+                    nn.init.uniform_(param.data, a=hp.embedding_init_low, b=hp.embedding_init_high)
 
             print(" - Preparing data recorder:")
             recorder = TextRecorder(dataset, trial_num, language, "txt", condition, run_num)
 
             print(" - Training and evaluating model:")
             rep = TextRun(seq2seq, recorder, resume_model_file=resume_model_file)
-            if run_mode == "train and evaluate":
-                rep.run(train_dataloader, valid_dataloader, test_dataloader)
+            if hp.run_mode == "train and evaluate":
+                rep.run(train_dataloader, test_dataloader, "test")
                 rep.evaluate_attention(test_dataloader)
                 rep.evaluate_embedding()
-            elif run_mode == "evaluate attention":
+            elif hp.run_mode == "tuning":
+                rep.run(train_dataloader, valid_dataloader, "valid")
+                rep.evaluate_attention(valid_dataloader)
+                rep.evaluate_embedding()
+            else: # evaluate only
                 rep.evaluate_attention(test_dataloader)
-            else: # evaluate embedding only
                 rep.evaluate_embedding()
 
 
 # a function that loads text dataset, initializes text model for each run of each condition
-def feature(trial_num, lang_name, conditions, runs, run_mode="train and evaluate", freeze=False, device="cuda", resume_model_file=None):
+def feature(trial_num, runs, resume_model_file=None):
 
-    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name + "_fea"),
+    os.makedirs(os.path.join("Results", trial_num + "_" + hp.lang_name + "_fea"),
                 exist_ok=True)
 
-    for condition in conditions:
+    for condition in hp.conditions:
         print(" - Instantiating language pattern:")
-        language = languages[lang_name]
+        language = languages[hp.lang_name]
 
         print(" - Loading dataset:")
-        annotations_file = os.path.join("Dataset", lang_name + "_" + condition + ".csv")
-        feature_file = os.path.join("Dataset", lang_name.split("_")[0] + "_features.xlsx")
-        dataset = FeatureDataset(annotations_file, feature_file, hp.special_tokens, device=device)
+        annotations_file = os.path.join("Dataset", hp.lang_name + "_" + condition + ".csv")
+        feature_file = os.path.join("Dataset", hp.lang_name.split("_")[0] + "_features.xlsx")
+        dataset = FeatureDataset(annotations_file, feature_file, hp.special_tokens, device=hp.device)
 
         for run_num in runs:
             _set_seed(hp.base_seed + run_num)
@@ -115,38 +118,41 @@ def feature(trial_num, lang_name, conditions, runs, run_mode="train and evaluate
             # model initialization
             seq2seq = FeatureSeq2Seq(encoder_input_dim, decoder_input_dim, output_dim,
                                      encoder_embedding_weight, decoder_embedding_weight,
-                                     freeze=freeze, device=device)
+                                     freeze=hp.freeze, device=hp.device)
 
             print(" - Preparing data recorder:")
             recorder = TextRecorder(dataset, trial_num, language, "fea", condition, run_num)
 
             print(" - Training and evaluating model:")
             rep = TextRun(seq2seq, recorder, resume_model_file=resume_model_file)
-            if run_mode == "train and evaluate":
-                rep.run(train_dataloader, valid_dataloader, test_dataloader)
+            if hp.run_mode == "train and evaluate":
+                rep.run(train_dataloader, test_dataloader, "test")
                 rep.evaluate_attention(test_dataloader)
                 rep.evaluate_embedding()
-            elif run_mode == "evaluate attention":
+            elif hp.run_mode == "tuning":
+                rep.run(train_dataloader, valid_dataloader, "valid")
+                rep.evaluate_attention(valid_dataloader)
+                rep.evaluate_embedding()
+            else: # evaluate only
                 rep.evaluate_attention(test_dataloader)
-            else: # evaluate embedding only
                 rep.evaluate_embedding()
 
 
 # a function that loads audio dataset, initializes audio model for each run of each condition
-def audio(trial_num, lang_name, conditions, runs, run_mode="train and evaluate", device="cuda", resume_model_file=None):
+def audio(trial_num, runs, resume_model_file=None):
 
-    os.makedirs(os.path.join("Results", trial_num + "_" + lang_name + "_aud"),
+    os.makedirs(os.path.join("Results", trial_num + "_" + hp.lang_name + "_aud"),
                 exist_ok=True)
 
-    for condition in conditions:
+    for condition in hp.conditions:
         print(" - Instantiating language pattern:")
-        language = languages[lang_name]
+        language = languages[hp.lang_name]
 
         print(" - Loading dataset:")
-        annotations_file = os.path.join("Dataset", lang_name + "_" + condition + ".csv")
-        audio_dir = os.path.join(hp.audio_root, lang_name.split("_")[0])
+        annotations_file = os.path.join("Dataset", hp.lang_name + "_" + condition + ".csv")
+        audio_dir = os.path.join(hp.audio_root, hp.lang_name.split("_")[0])
         dataset = AudioDataset(annotations_file, audio_dir, hp.special_tokens,
-                               wav2mel=True, power2db=True, device=device)
+                               wav2mel=True, power2db=True, device=hp.device)
 
         for run_num in runs:
             _set_seed(hp.base_seed + run_num)
@@ -168,36 +174,28 @@ def audio(trial_num, lang_name, conditions, runs, run_mode="train and evaluate",
 
             # model initialization
             seq2seq = AudioSeq2Seq(encoder_input_dim, decoder_input_dim, synthsizer_input_dim,
-                                   text_output_dim, audio_output_dim, device=device)
+                                   text_output_dim, audio_output_dim, device=hp.device)
 
             print(" - Preparing data recorder:")
             recorder = AudioRecorder(dataset, trial_num, language, "aud", condition, run_num)
 
             print(" - Training and evaluating model:")
             rep = AudioRun(seq2seq, recorder, resume_model_file=resume_model_file)
-            if run_mode == "train and evaluate":
-                rep.run(train_dataloader, valid_dataloader, test_dataloader)
+            if hp.run_mode == "train and evaluate":
+                rep.run(train_dataloader, test_dataloader, "test")
                 rep.evaluate_attention(test_dataloader)
                 rep.evaluate_embedding()
-            elif run_mode == "evaluate attention":
+            elif hp.run_mode == "tuning":
+                rep.run(train_dataloader, valid_dataloader, "valid")
+                rep.evaluate_attention(valid_dataloader)
+                rep.evaluate_embedding()
+            else: # evaluate only
                 rep.evaluate_attention(test_dataloader)
-            else: # evaluate embedding only
                 rep.evaluate_embedding()
 
 
 if __name__ == "__main__":
-    """
-    import argparse
-
-    parser = argparse.ArgumentParser(description='argparse')
-    parser.add_argument('--gpu', '-gpu', type=int, default=0, help="Choose the GPU to work on")
-    parser.add_argument('--run', '-r', type=int, default=1, help="Number of runs to conduct")
-
-    args = parser.parse_args()
-    """
 
     trial_num = "2512072030_partial_consonant"  # time stamp
-    lang_name = "EnglishBH_shortened"
-    conditions = ["harmony", "disharmony"]
     runs = range(2)
-    audio(trial_num, lang_name, conditions, runs)
+    audio(trial_num, runs)

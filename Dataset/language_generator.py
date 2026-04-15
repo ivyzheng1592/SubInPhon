@@ -6,20 +6,21 @@
 
 import csv
 import itertools
+import os
 
 
 class LanguagePattern:
-    def __init__(self, onset, coda, vowel, syll_struct, lang_name,
-                 allowed_templates=None):
+    def __init__(self, onset, coda, vowel, syll_struct, word_struct, lang_name):
         self.lang_name = lang_name
         self.syll_struct = syll_struct
+        self.word_struct = word_struct
         self.onset = onset
         self.coda = coda
         self.vowel = vowel
+        self.variants = {}
         self.focus = {}  # different focus for different language pattern
-        self.allowed_templates = allowed_templates
 
-    def generate_stimuli(self, onset=None, coda=None, vowel=None, syll_struct=None, property=""):
+    def generate_stimuli(self, property="", variant=None):
         pass
 
     def decompose_stimuli(self, word_list):
@@ -27,153 +28,170 @@ class LanguagePattern:
 
 
 class BacknessHarmony(LanguagePattern):
-    def __init__(self, onset, coda, vowel, syll_struct, lang_name,
-                 allowed_templates=None):
-        super().__init__(onset, coda, vowel, syll_struct, lang_name,
-                         allowed_templates=allowed_templates)
+    def __init__(self, onset, coda, vowel, syll_struct, word_struct, lang_name):
+        super().__init__(onset, coda, vowel, syll_struct, word_struct, lang_name)
         self.focus = self.vowel
 
     # function to generate vowel harmony stimuli with specified phoneme inventory and syllable structure
-    def generate_stimuli(self, onset=None, coda=None, vowel=None, syll_struct=None, property=""):
-        # check if there is override of phoneme inventory
-        if onset is None:
-            onset = self.onset
-        if coda is None:
-            coda = self.coda
-        if vowel is None:
-            vowel = self.vowel
-        if syll_struct is None:
-            syll_struct = self.syll_struct
+    def generate_stimuli(self, property="full", directionality="l2r", variant=None):
+        variant_vowel = self.variants.get(variant)
 
         print(" - Generating stimuli:")
-        # identify possible stem-suffix vowel combinations for each condition
-        h_v_combinations = []
-        dh_v_combinations = []
-        for stem_v in vowel:
-            for ur_suffix_v in vowel:
-                # disallowing identical vowels, i.e. vowels w/ identical height and tenseness
-                # only when generating nonidentical datasets
-                if (property != "nonidentical" or
-                        (property == "nonidentical" and
-                        not (vowel[ur_suffix_v][1] == vowel[stem_v][1]
-                        and vowel[ur_suffix_v][2] == vowel[stem_v][2]))):
-                    for sr_suffix_v in vowel:
-                        # harmomny
-                        if (vowel[sr_suffix_v][1] == vowel[ur_suffix_v][1]
-                            and vowel[sr_suffix_v][2] == vowel[ur_suffix_v][2]
-                            and vowel[sr_suffix_v][0] == vowel[stem_v][0]):
-                            h_v_combinations.append([stem_v, ur_suffix_v, sr_suffix_v])
-                        # disharmony
-                        if (vowel[sr_suffix_v][1] == vowel[ur_suffix_v][1]
-                            and vowel[sr_suffix_v][2] == vowel[ur_suffix_v][2]
-                            and vowel[sr_suffix_v][0] != vowel[stem_v][0]):
-                            dh_v_combinations.append([stem_v, ur_suffix_v, sr_suffix_v])
+        def build_syll(parts):
+            o, v, c = parts
+            return f"{o}{v}{c}"
 
-        # create a dictionary with all kinds of syllables for each vowel
-        syll_dict = {
-            v: {key: [] for key in ["V", "CV", "VC", "CVC"]}
-            for v in vowel
-        }
+        def match_vowel(trigger_vowel, agree):
+            t_height = self.vowel[trigger_vowel][1]
+            t_tense = self.vowel[trigger_vowel][2]
+            t_backness = self.vowel[trigger_vowel][0]
+            for target_vowel, feats in self.vowel.items():
+                if agree == "vh":
+                    is_match = feats[0] == t_backness and feats[1] == t_height and feats[2] == t_tense
+                else:
+                    is_match = feats[0] != t_backness and feats[1] == t_height and feats[2] == t_tense
+                if is_match:
+                    return target_vowel
+            raise RuntimeError(f"No vowel matches {agree} for {trigger_vowel}")
 
-        # infer class from vowel features (e.g., "tense"/"lax")
-        vowel_to_class = {}
-        for phone, feats in vowel.items():
-            if len(feats) < 3:
-                raise RuntimeError(f"Vowel '{phone}' missing quality for class inference")
-            vowel_to_class[phone] = feats[2]
+        def map_variant_vowel(base_vowel):
+            # map base vowel to its variant counterpart with the same features
+            if not variant_vowel:
+                return base_vowel
+            if base_vowel not in self.vowel:
+                return base_vowel
+            b_height = self.vowel[base_vowel][1]
+            b_tense = self.vowel[base_vowel][2]
+            b_backness = self.vowel[base_vowel][0]
+            for v2, feats in variant_vowel.items():
+                if feats[0] == b_backness and feats[1] == b_height and feats[2] == b_tense:
+                    return v2
+            return base_vowel
 
-        if self.allowed_templates is None:
-            raise RuntimeError(f"allowed_templates must be specified for {self.lang_name} in the language config")
+        # build syllable inventories per template (C/V slots tracked)
+        syll_templates = {t: [] for t in self.syll_struct.keys()}
+        for v, feats in self.vowel.items():
+            v_class = feats[2]
+            for template_bits, template_class in self.syll_struct.items():
+                if v_class != template_class:
+                    continue
+                onset_list = self.onset if template_bits[0] == "1" else [""]
+                coda_list = self.coda if template_bits[2] == "1" else [""]
+                syll_templates[template_bits].extend(
+                    (o, v, c) for o, c in itertools.product(onset_list, coda_list)
+                )
 
-        allowed_templates = self.allowed_templates
-        for v, v_dict in syll_dict.items():
-            v_class = vowel_to_class.get(v)
-            if v_class is None:
-                raise RuntimeError(f"Vowel '{v}' missing class for {self.lang_name}")
-            allowed = allowed_templates.get(v_class, [])
-            if "V" in allowed:
-                v_dict["V"] = [v]
-            if "CV" in allowed:
-                v_dict["CV"] = [o + v for o in onset]
-            if "VC" in allowed:
-                v_dict["VC"] = [v + c for c in coda]
-            if "CVC" in allowed:
-                v_dict["CVC"] = [o + v + c for o, c in itertools.product(onset, coda)]
+        vh_list = []
+        dh_list = []
+        for struct in self.word_struct:
+            # expand each word template into all UR/SR pairs
+            word_templates = struct.split("-")
+            # collect syllables for each slot
+            syll_lists = [syll_templates[t] for t in word_templates]
 
-        # generate all possible vowel combinations for each syllable structure
-        harmony_list = []
-        disharmony_list = []
-        for struct in syll_struct:
-            # separate stem and suffix
-            # assume monosyllabic stem
-            stem_struct = struct.split("-")[0]
-            suffix_struct = struct.split("-")[1]
+            for parts_tuple in itertools.product(*syll_lists):
+                # build UR word
+                ur_syll = ".".join(build_syll(parts) for parts in parts_tuple)
+                ur_string = ur_syll.replace(".", "")
 
-            for [stem_v, ur_suffix_v, sr_suffix_v] in h_v_combinations:
-                # if the syllable structure exist for the current vowel
-                if (syll_dict[stem_v][stem_struct]
-                    and syll_dict[ur_suffix_v][suffix_struct]):
+                # extract vowel sequence for harmony
+                vowels_in_word = [parts[1] for parts in parts_tuple]
+                if directionality == "l2r":
+                    # rightward harmony: match all later vowels to the first vowel
+                    vh_vowels = [vowels_in_word[0]] + [
+                        match_vowel(v, "vh") for v in vowels_in_word[1:]
+                    ]
+                    dh_vowels = [vowels_in_word[0]] + [
+                        match_vowel(v, "dh") for v in vowels_in_word[1:]
+                    ]
+                else:  # r2l
+                    # leftward harmony: match all earlier vowels to the last vowel
+                    vh_vowels = [
+                        match_vowel(v, "vh") for v in vowels_in_word[:-1]
+                    ] + [vowels_in_word[-1]]
+                    dh_vowels = [
+                        match_vowel(v, "dh") for v in vowels_in_word[:-1]
+                    ] + [vowels_in_word[-1]]
 
-                    # combine stem and suffixes
-                    stems = syll_dict[stem_v][stem_struct]
-                    ur_suffixes = syll_dict[ur_suffix_v][suffix_struct]
-                    sr_suffixes = syll_dict[sr_suffix_v][suffix_struct]
+                if property == "nonidentical":
+                    # skip if any identical vowels appear in the harmonized form
+                    if len(set(vh_vowels)) < len(vh_vowels):
+                        continue
 
-                    harmony_list.extend([stem, stem + ur_suffix, stem + sr_suffix]
-                                        for stem, (ur_suffix, sr_suffix) in
-                                        itertools.product(stems, zip(ur_suffixes, sr_suffixes)))
+                # rebuild SR word with harmonized vowels
+                vh_parts = [
+                    (parts[0], vh_vowels[i], parts[2]) for i, parts in enumerate(parts_tuple)
+                ]
+                vh_sr_syll = ".".join(build_syll(parts) for parts in vh_parts)
+                vh_sr_string = vh_sr_syll.replace(".", "")
 
-            for [stem_v, ur_suffix_v, sr_suffix_v] in dh_v_combinations:
-                # if the syllable structure exist for the current vowel
-                if (syll_dict[stem_v][stem_struct]
-                        and syll_dict[ur_suffix_v][suffix_struct]):
-                    # combine stem and suffixes
-                    stems = syll_dict[stem_v][stem_struct]
-                    ur_suffixes = syll_dict[ur_suffix_v][suffix_struct]
-                    sr_suffixes = syll_dict[sr_suffix_v][suffix_struct]
+                if variant is not None:
+                    # create variant forms by swapping only vowels
+                    ur_var_syll = ".".join(f"{o}{map_variant_vowel(v)}{c}" for o, v, c in parts_tuple)
+                    ur_var = ur_var_syll.replace(".", "")
+                    vh_var_syll = ".".join(f"{o}{map_variant_vowel(v)}{c}" for o, v, c in vh_parts)
+                    vh_var = vh_var_syll.replace(".", "")
+                    vh_list.append([ur_syll, vh_sr_syll, ur_string, vh_sr_string, ur_var, vh_var])
+                else:
+                    vh_list.append([ur_syll, vh_sr_syll, ur_string, vh_sr_string])
 
-                    disharmony_list.extend([stem, stem + ur_suffix, stem + sr_suffix]
-                                           for stem, (ur_suffix, sr_suffix) in
-                                           itertools.product(stems, zip(ur_suffixes, sr_suffixes)))
+                # rebuild SR word with disharmonized vowels
+                dh_parts = [
+                    (parts[0], dh_vowels[i], parts[2]) for i, parts in enumerate(parts_tuple)
+                ]
+                dh_sr_syll = ".".join(build_syll(parts) for parts in dh_parts)
+                dh_sr_string = dh_sr_syll.replace(".", "")
+                
+                if variant is not None:
+                    # variant disharmony uses the same vowel mapping
+                    dh_var_syll = ".".join(f"{o}{map_variant_vowel(v)}{c}" for o, v, c in dh_parts)
+                    dh_var = dh_var_syll.replace(".", "")
+                    dh_list.append([ur_syll, dh_sr_syll, ur_string, dh_sr_string, ur_var, dh_var])
+                else:
+                    dh_list.append([ur_syll, dh_sr_syll, ur_string, dh_sr_string])
 
-            print(f"Now generating syllable structure {struct}, accumulating to {len(harmony_list)} pairs")
-            print(f"Example {struct} harmony pair: {harmony_list[len(harmony_list) - 1]}")
-            print(f"Example {struct} disharmony pair: {disharmony_list[len(disharmony_list) - 1]}")
+            print(f"Now generating syllable structure {struct}, accumulating to {len(vh_list)} pairs")
 
         print(" - Writing to file:")
-        harmony_file = self.lang_name + "_" + property + "_harmony.csv"
-        disharmony_file = self.lang_name + "_" + property + "_disharmony.csv"
+        name_parts = [self.lang_name]
+        if property:
+            name_parts.append(property)
+        name_parts.append(directionality)
+        prefix = "_".join(name_parts)
+        harmony_file = os.path.join(
+            "Dataset", self.lang_name + "_" + directionality + "_" + property + "_harmony.csv"
+        )
+        disharmony_file = os.path.join(
+            "Dataset", self.lang_name + "_" + directionality + "_" + property + "_disharmony.csv"
+        )
 
         with open(harmony_file, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
             # write header
-            header = ['stem', 'ur', 'sr']
+            header = ['ur_syll', 'sr_syll', 'ur_string', 'sr_string']
+            if variant is not None:
+                header += ['ur_var', 'sr_var']
             writer.writerow(header)
             # write stimuli list
-            writer.writerows(harmony_list)
+            writer.writerows(vh_list)
         print("Harmony file ready.")
 
         with open(disharmony_file, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
             # write header
-            header = ['stem', 'ur', 'sr']
+            header = ['ur_syll', 'sr_syll', 'ur_string', 'sr_string']
+            if variant is not None:
+                header += ['ur_var', 'sr_var']
             writer.writerow(header)
             # write stimuli list
-            writer.writerows(disharmony_list)
+            writer.writerows(dh_list)
         print("Disharmony file ready.")
 
-        return harmony_list, disharmony_list
+        return vh_list, dh_list
 
     # function to decompose vowel harmony stimuli with specified phoneme inventory
     def decompose_stimuli(self, word_list):
-        # separate tense and lax vowels
-        vowel_tense = [v for v in self.vowel if self.vowel[v][2] == "tense"]
-        vowel_lax = [v for v in self.vowel if self.vowel[v][2] == "lax"]
-
         word_copy = word_list.copy()  # copy of word for token removal
-        syll1 = [None, None, None]  # C, V, C
-        syll2 = [None, None, None]  # C, V ,C
-        sylls = [syll1, syll2]
 
         # remove SOS token in word
         if word_copy and word_copy[0] == "<SOS>":
@@ -185,164 +203,57 @@ class BacknessHarmony(LanguagePattern):
         while word_copy and word_copy[-1] == "<EOS>":
             word_copy.pop()
 
-        # get possible syllable structures combining stem and suffix
-        syll_struct = [struct.replace("-", "") for struct in self.syll_struct]
-        syll_struct = list(set(syll_struct))  # remove duplicates
+        sylls = []
+        pos = 0
 
-        # check syllable structure of word
-        word_struct = ""
-        for char in word_copy:
-            if char in self.onset or char in self.coda:
-                word_struct = word_struct + "C"
-            elif char in self.vowel:
-                word_struct = word_struct + "V"
+        # parse left-to-right using tense/lax to decide open vs closed syllables
+        while pos < len(word_copy):
+            syll = [None, None, None]
+
+            # optional onset
+            if word_copy[pos] in self.onset:
+                syll[0] = word_copy[pos]
+                pos += 1
+
+            # vowel is required for a syllable
+            if pos >= len(word_copy) or word_copy[pos] not in self.vowel:
+                return [[False, False, False]]
+            syll[1] = word_copy[pos]
+            pos += 1
+
+            # decide coda vs next onset based on vowel class
+            v_class = self.vowel[syll[1]][2]
+            if v_class == "lax":
+                # lax vowels must be closed
+                if pos >= len(word_copy) or word_copy[pos] not in self.coda:
+                    return [[False, False, False]]
+                syll[2] = word_copy[pos]
+                pos += 1
             else:
-                word_struct = "False"
-        if word_struct not in syll_struct:
-            syll1[0] = False
-            syll2[0] = False
-            return sylls
+                # tense vowels must be open
+                if pos < len(word_copy) and word_copy[pos] in self.coda and word_copy[pos] not in self.onset:
+                    return [[False, False, False]]
 
-        # if first syllable has onset
-        if word_copy and (word_copy[0] in self.coda or word_copy[0] in self.onset):
-            syll1[0] = word_copy[0]
-            word_copy.pop(0)
+            sylls.append(syll)
 
-        # if first syllable has close vowel
-        if word_copy and word_copy[0] in vowel_lax:
-            syll1[1] = word_copy[0]
-            word_copy.pop(0)
-            # the following consonant should be coda
-            if word_copy and word_copy[0] in self.coda:
-                syll1[2] = word_copy[0]
-                word_copy.pop(0)
-            elif word_copy and word_copy[0] in self.onset:
-                syll2[0] = word_copy[0]
-                word_copy.pop(0)
-            else:
-                raise RuntimeError(f"Problem with output recording {word_list}")
-        # if first syllable has open vowel
-        elif word_copy and word_copy[0] in vowel_tense:
-            syll1[1] = word_copy[0]
-            word_copy.pop(0)
-            # the following consonant should be onset
-            if word_copy and word_copy[0] in self.onset:
-                syll2[0] = word_copy[0]
-                word_copy.pop(0)
-            elif word_copy and word_copy[0] in self.coda:
-                syll1[2] = word_copy[0]
-                word_copy.pop(0)
-            else:
-                raise RuntimeError(f"Problem with output recording {word_list}")
-        else:
-            raise RuntimeError(f"Problem with output recording {word_list}")
-
-        # the second syllable should have vowel
-        if word_copy and (word_copy[0] in self.vowel):
-            syll2[1] = word_copy[0]
-            word_copy.pop(0)
-        else:
-            raise RuntimeError(f"Problem with output recording {word_list}")
-
-        # the following consonant should be coda
-        if word_copy and (word_copy[0] in self.coda or word_copy[0] in self.onset):
-            syll2[2] = word_copy[0]
-            word_copy.pop(0)
-        elif word_copy:
-            raise RuntimeError(f"Problem with output recording {word_list}")
+        # build template bits from parsed syllables and validate against word_struct
+        bits = []
+        for o, v, c in sylls:
+            bits.append(("1" if o else "0") + "1" + ("1" if c else "0"))
+        if "-".join(bits) not in self.word_struct:
+            return [[False, False, False]]
 
         return sylls
 
 
 class FinalDevoicing(LanguagePattern):
-    def __init__(self, onset, coda, vowel, syll_struct, lang_name):
-        super().__init__(onset, coda, vowel, syll_struct, lang_name)
+    def __init__(self, onset, coda, vowel, syll_struct, word_struct, lang_name):
+        super().__init__(onset, coda, vowel, syll_struct, word_struct, lang_name)
         self.focus = self.coda
 
     # function to generate final devoicing stimuli with specified phoneme inventory and syllable structure
-    def generate_stimuli(self, onset=None, coda=None, vowel=None, syll_struct=None, property=""):
-        print(" - Generating stimuli:")
-        # separate voiceless and voiced codas
-        coda_voiceless = [c for c in self.coda if self.coda[c] == "voiceless"]
-        coda_voiced = [c for c in self.coda if self.coda[c] == "voiced"]
-
-        devoice_list = []
-        voice_list = []
-        previous_devoice = []
-        previous_voice = []
-
-        # generate all possible syllables for current syllable structure
-        # based on the list of syllables from previous syllable structure
-        # VC -> CVC -> VCVC -> CVCVC
-        for struct in self.syll_struct:
-            if len(struct) == 2:  # VC
-                devoice_list.extend([v + c1, v + c2] for v, (c1, c2) in
-                                    itertools.product(self.vowel, zip(coda_voiceless, coda_voiceless)))
-                devoice_list.extend([v + c1, v + c2] for v, (c1, c2) in
-                                    itertools.product(self.vowel, zip(coda_voiced, coda_voiceless)))
-                voice_list.extend([v + c1, v + c2] for v, (c1, c2) in
-                                  itertools.product(self.vowel, zip(coda_voiceless, coda_voiced)))
-                voice_list.extend([v + c1, v + c2] for v, (c1, c2) in
-                                  itertools.product(self.vowel, zip(coda_voiced, coda_voiced)))
-
-                previous_devoice.extend([v + c1, v + c2] for v, (c1, c2) in
-                                        itertools.product(self.vowel, zip(coda_voiceless, coda_voiceless)))
-                previous_devoice.extend([v + c1, v + c2] for v, (c1, c2) in
-                                        itertools.product(self.vowel, zip(coda_voiced, coda_voiceless)))
-                previous_voice.extend([v + c1, v + c2] for v, (c1, c2) in
-                                      itertools.product(self.vowel, zip(coda_voiceless, coda_voiced)))
-                previous_voice.extend([v + c1, v + c2] for v, (c1, c2) in
-                                      itertools.product(self.vowel, zip(coda_voiced, coda_voiced)))
-            elif struct[0] == 'V':  # VCVC
-                current_devoice = [[v + ur, v + sr] for v, [ur, sr] in
-                                   itertools.product(self.vowel, previous_devoice)]
-                current_voice = [[v + ur, v + sr] for v, [ur, sr] in
-                                 itertools.product(self.vowel, previous_voice)]
-
-                devoice_list.extend(current_devoice)
-                voice_list.extend(current_voice)
-
-                previous_devoice = current_devoice
-                previous_voice = current_voice
-            else:  # CVC, CVCVC
-                current_devoice = [[c + ur, c + sr] for c, [ur, sr] in
-                                   itertools.product(self.onset, previous_devoice)]
-                current_voice = [[c + ur, c + sr] for c, [ur, sr] in
-                                 itertools.product(self.onset, previous_voice)]
-
-                devoice_list.extend(current_devoice)
-                voice_list.extend(current_voice)
-
-                previous_devoice = current_devoice
-                previous_voice = current_voice
-
-            print(f"Now generating syllable structure {struct}, accumulating to {len(devoice_list)} pairs")
-            print(f"Example {struct} devoicing pair: {devoice_list[len(devoice_list) - 1]}")
-            print(f"Example {struct} voicing pair: {voice_list[len(voice_list) - 1]}")
-
-        print(" - Writing to file:")
-        devoice_file = self.lang_name + "_devoicing.csv"
-        voice_file = self.lang_name + "_voicing.csv"
-
-        with open(devoice_file, 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            # write header
-            header = ['ur', 'sr']
-            writer.writerow(header)
-            # write stimuli list
-            writer.writerows(devoice_list)
-        print("Devoicing file ready.")
-
-        with open(voice_file, 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            # write header
-            header = ['ur', 'sr']
-            writer.writerow(header)
-            # write stimuli list
-            writer.writerows(voice_list)
-        print("Voicing file ready.")
-
-        return devoice_list, voice_list
+    def generate_stimuli(self, property="", variant=None):
+        pass
 
     # function to decompose final devoicing stimuli with specified phoneme inventory
     def decompose_stimuli(self, word_list):

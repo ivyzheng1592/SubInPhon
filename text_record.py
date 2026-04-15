@@ -15,9 +15,6 @@ class TextRecorder:
         self.modality = modality
         self.condition = condition
         self.run_num = run_num
-        self.pred_log = hp.pred_log
-        if self.pred_log not in ["vowel_only_error", "consonant_vowel_error", "all_correct_syll"]:
-            raise RuntimeError(f"Invalid pred_log: {self.pred_log}")
 
         self.ur_alphabet = self.dataset.ur_alphabet
         self.sr_alphabet = self.dataset.sr_alphabet
@@ -33,16 +30,16 @@ class TextRecorder:
             'trial_num': [], 'language': [], 'modality': [],
             'condition': [], 'run_num': [], 'epoch': [], 'record_type': [],
             'ur': [], 'sr': [], 'pred_sr': [],
-            'v1_error': [], 'v2_error': [],
-            'sr_v1': [], 'sr_v2': [], 'pred_sr_v1': [], 'pred_sr_v2': []
+            'v1_error': [], 'v2_error': [], #'v3_error': [],
+            'sr_v1': [], 'sr_v2': [], #'sr_v3': [],
+            'pred_sr_v1': [], 'pred_sr_v2': [], #'pred_sr_v3': [],
+            #'o1_error': [], 'o2_error': [], 'o3_error': [],
+            #'sr_o1': [], 'sr_o2': [], 'sr_o3': [],
+            #'pred_sr_o1': [], 'pred_sr_o2': [], 'pred_sr_o3': [],
+            #'c1_error': [], 'c2_error': [], 'c3_error': [],
+            #'sr_c1': [], 'sr_c2': [], 'sr_c3': [],
+            #'pred_sr_c1': [], 'pred_sr_c2': [], 'pred_sr_c3': []
         }
-        if self.pred_log != "vowel_only_error":
-            self.pred_store.update({
-                'o1_error': [], 'o2_error': [],
-                'sr_o1': [], 'sr_o2': [], 'pred_sr_o1': [], 'pred_sr_o2': [],
-                'c1_error': [], 'c2_error': [],
-                'sr_c1': [], 'sr_c2': [], 'pred_sr_c1': [], 'pred_sr_c2': [],
-            })
 
         # results files and directories
         self.acc_file = os.path.join("Results", trial_num + "_" + self.lang_name + "_" + modality,
@@ -162,82 +159,78 @@ class TextRecorder:
                 # record prediction correctness
                 if sr_string == pred_sr_string:
                     epoch_correct.append(1)
-                    if self.pred_log != "all_correct_syll":
-                        continue
+                if hp.pred_log != "all_correct_syll":
+                    continue
                 else:
                     epoch_correct.append(0)
 
                 # skip this recording if the prediction has wrong syllable structure
-                if False in pred_sr_sylls[0] or False in pred_sr_sylls[1]:
+                if any(False in syll for syll in pred_sr_sylls):
                     continue
 
-                # compare the actual and predicted target surface form
-                # assume no error and change error from 0 to 1
-                if self.pred_log != "vowel_only_error":
-                    o1_error = 0
-                    o2_error = 0
-                    c1_error = 0
-                    c2_error = 0
-                v1_error = 0
-                v2_error = 0
+                syll_count = len(sr_sylls)
 
-                sr_o1 = sr_sylls[0][0]
-                sr_o2 = sr_sylls[1][0]
-                sr_v1 = sr_sylls[0][1]
-                sr_v2 = sr_sylls[1][1]
-                sr_c1 = sr_sylls[0][2]
-                sr_c2 = sr_sylls[1][2]
+                sr_o = [s[0] for s in sr_sylls]
+                sr_v = [s[1] for s in sr_sylls]
+                sr_c = [s[2] for s in sr_sylls]
+                pred_o = [s[0] for s in pred_sr_sylls]
+                pred_v = [s[1] for s in pred_sr_sylls]
+                pred_c = [s[2] for s in pred_sr_sylls]
 
-                pred_sr_o1 = pred_sr_sylls[0][0]
-                pred_sr_o2 = pred_sr_sylls[1][0]
-                pred_sr_v1 = pred_sr_sylls[0][1]
-                pred_sr_v2 = pred_sr_sylls[1][1]
-                pred_sr_c1 = pred_sr_sylls[0][2]
-                pred_sr_c2 = pred_sr_sylls[1][2]
+                # in vowel-only mode, skip if any consonant mismatch
+                if hp.pred_log == "vowel_only_error":
+                    if any(sr_o[i] != pred_o[i] or sr_c[i] != pred_c[i] for i in range(syll_count)):
+                        continue
 
-                if self.pred_log != "vowel_only_error":
-                    if sr_o1 != pred_sr_o1:
-                        o1_error = 1
-                    if sr_o2 != pred_sr_o2:
-                        o2_error = 1
-                    if sr_c1 != pred_sr_c1:
-                        c1_error = 1
-                    if sr_c2 != pred_sr_c2:
-                        c2_error = 1
-                elif self.pred_log == "vowel_only_error" and (
-                    sr_o1 != pred_sr_o1 or sr_o2 != pred_sr_o2 or
-                    sr_c1 != pred_sr_c1 or sr_c2 != pred_sr_c2
-                ):
-                    continue
-                if sr_v1 != pred_sr_v1:
-                    v1_error = 1
-                if sr_v2 != pred_sr_v2:
-                    v2_error = 1
+                # compute per-syllable error flags
+                v_errors = [1 if sr_v[i] != pred_v[i] else 0 for i in range(syll_count)]
+                if hp.pred_log != "vowel_only_error":
+                    o_errors = [1 if sr_o[i] != pred_o[i] else 0 for i in range(syll_count)]
+                    c_errors = [1 if sr_c[i] != pred_c[i] else 0 for i in range(syll_count)]
+
+                # append only if the column exists (you may comment out columns)
+                def _append_if(key, value):
+                    if key in self.pred_store:
+                        self.pred_store[key].append(value)
 
                 self._append_base_fields(self.pred_store, epoch, record_type)
                 self.pred_store['ur'].append(ur_string)
                 self.pred_store['sr'].append(sr_string)
                 self.pred_store['pred_sr'].append(pred_sr_string)
 
-                if self.pred_log != "vowel_only_error":
-                    self.pred_store['o1_error'].append(o1_error)
-                    self.pred_store['o2_error'].append(o2_error)
-                    self.pred_store['sr_o1'].append(sr_o1)
-                    self.pred_store['sr_o2'].append(sr_o2)
-                    self.pred_store['pred_sr_o1'].append(pred_sr_o1)
-                    self.pred_store['pred_sr_o2'].append(pred_sr_o2)
-                    self.pred_store['c1_error'].append(c1_error)
-                    self.pred_store['c2_error'].append(c2_error)
-                    self.pred_store['sr_c1'].append(sr_c1)
-                    self.pred_store['sr_c2'].append(sr_c2)
-                    self.pred_store['pred_sr_c1'].append(pred_sr_c1)
-                    self.pred_store['pred_sr_c2'].append(pred_sr_c2)
-                self.pred_store['v1_error'].append(v1_error)
-                self.pred_store['v2_error'].append(v2_error)
-                self.pred_store['sr_v1'].append(sr_v1)
-                self.pred_store['sr_v2'].append(sr_v2)
-                self.pred_store['pred_sr_v1'].append(pred_sr_v1)
-                self.pred_store['pred_sr_v2'].append(pred_sr_v2)
+                # record consonant errors only when enabled
+                if hp.pred_log != "vowel_only_error":
+                    _append_if('o1_error', o_errors[0])
+                    _append_if('o2_error', o_errors[1])
+                    _append_if('sr_o1', sr_o[0])
+                    _append_if('sr_o2', sr_o[1])
+                    _append_if('pred_sr_o1', pred_o[0])
+                    _append_if('pred_sr_o2', pred_o[1])
+                    _append_if('c1_error', c_errors[0])
+                    _append_if('c2_error', c_errors[1])
+                    _append_if('sr_c1', sr_c[0])
+                    _append_if('sr_c2', sr_c[1])
+                    _append_if('pred_sr_c1', pred_c[0])
+                    _append_if('pred_sr_c2', pred_c[1])
+                _append_if('v1_error', v_errors[0])
+                _append_if('v2_error', v_errors[1])
+                _append_if('sr_v1', sr_v[0])
+                _append_if('sr_v2', sr_v[1])
+                _append_if('pred_sr_v1', pred_v[0])
+                _append_if('pred_sr_v2', pred_v[1])
+
+                # record third-syllable fields only for 3-syllable outputs
+                if syll_count == 3:
+                    if hp.pred_log != "vowel_only_error":
+                        _append_if('o3_error', o_errors[2])
+                        _append_if('sr_o3', sr_o[2])
+                        _append_if('pred_sr_o3', pred_o[2])
+                        _append_if('c3_error', c_errors[2])
+                        _append_if('sr_c3', sr_c[2])
+                        _append_if('pred_sr_c3', pred_c[2])
+                    _append_if('v3_error', v_errors[2])
+                    _append_if('sr_v3', sr_v[2])
+                    _append_if('pred_sr_v3', pred_v[2])
 
         if len(epoch_correct) == 0:
             raise RuntimeError(f"No predictions recorded for epoch {epoch} ({record_type})")

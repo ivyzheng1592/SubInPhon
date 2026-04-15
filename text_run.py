@@ -33,7 +33,7 @@ class TextRun:
         self.criterion = nn.CrossEntropyLoss(ignore_index=hp.special_tokens.index(hp.pad_token))
 
     # a function that completes one repetition of training and evaluation
-    def run(self, train_dataloader, valid_dataloader, test_dataloader):
+    def run(self, train_dataloader, eval_dataloader, eval_record_type):
         if self.start_epoch == 0:
             # save untrained model
             model_file = os.path.join(self.recorder.model_dir,
@@ -50,24 +50,20 @@ class TextRun:
             train_loss, train_src, train_trg, train_pred = self.train_one_epoch(
                 train_dataloader, hp.text_teacher_forcing
             )
-            valid_loss, valid_src, valid_trg, valid_pred = self.evaluate_one_epoch(valid_dataloader)
-            test_loss, test_src, test_trg, test_pred = self.evaluate_one_epoch(test_dataloader)
+            eval_loss, eval_src, eval_trg, eval_pred = self.evaluate_one_epoch(eval_dataloader)
 
             # record predictions and prediction correctness
             train_acc = self.recorder.record_pred(epoch, "train", train_src, train_trg, train_pred)
-            valid_acc = self.recorder.record_pred(epoch, "valid", valid_src, valid_trg, valid_pred)
+            eval_acc = self.recorder.record_pred(epoch, eval_record_type, eval_src, eval_trg, eval_pred)
             # record accuracy
             self.recorder.record_acc(epoch, "train", train_loss, train_acc)
-            self.recorder.record_acc(epoch, "valid", valid_loss, valid_acc)
-            test_acc = self.recorder.record_pred(epoch, "test", test_src, test_trg, test_pred)
-            self.recorder.record_acc(epoch, "test", test_loss, test_acc)
+            self.recorder.record_acc(epoch, eval_record_type, eval_loss, eval_acc)
 
             print(f"Epoch {epoch} Train Loss: {train_loss:7.3f} | Train PPL: {np.exp(train_loss):7.3f} "
                   f"| Train Acc: {train_acc:7.3f}")
-            print(f"Epoch {epoch} Valid Loss: {valid_loss:7.3f} | Valid PPL: {np.exp(valid_loss):7.3f} "
-                  f"| Valid Acc: {valid_acc:7.3f}")
-            print(f"Epoch {epoch} Test Loss: {test_loss:7.3f} | Test PPL: {np.exp(test_loss):7.3f} "
-                  f"| Test Acc: {test_acc:7.3f}")
+            print(f"Epoch {epoch} {eval_record_type.capitalize()} Loss: {eval_loss:7.3f} | "
+                  f"{eval_record_type.capitalize()} PPL: {np.exp(eval_loss):7.3f} | "
+                  f"{eval_record_type.capitalize()} Acc: {eval_acc:7.3f}")
 
             # save model every other save_epochs
             if epoch % hp.save_epochs == 0 or epoch == hp.n_epochs-1:

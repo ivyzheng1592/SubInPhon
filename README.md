@@ -29,6 +29,11 @@ pip install torch==2.0.0 torchaudio==2.0.1 torchinfo==1.8.0
 python main.py
 ```
 
+## Run Modes
+- `train and evaluate`: train on train set; evaluate on test set; then attention + embedding on test
+- `tuning`: train on train set; evaluate on valid set; then attention + embedding on valid
+- `evaluate only`: attention + embedding on test (no training)
+
 ## Typical Experiment Flow
 1. Choose a language and property (e.g., `EnglishBH` + `shortened`).
 2. Load the dataset from `Dataset/*.csv`.

@@ -1,7 +1,7 @@
 {
-  "EnglishBH_full": {
+  "EnglishBH": {
     "type": "BacknessHarmony",
-    "lang_name": "EnglishBH_full",
+    "lang_name": "EnglishBH",
     "onset": ["m", "n", "p", "t", "k", "b", "d", "g", "f", "s", "v", "z", "ʃ", "ʒ", "θ", "ð", "h"],
     "coda": ["m", "n", "ŋ", "p", "t", "k", "b", "d", "g", "f", "s", "v", "z", "ʃ", "ʒ", "θ", "ð"],
     "vowel": {
@@ -14,29 +14,34 @@
       "ʊ": ["back", "high", "lax"],
       "ɔ": ["back", "mid", "lax"]
     },
-    "allowed_templates": {
-      "tense": ["V", "CV"],
-      "lax": ["VC", "CVC"]
+    "syll_struct": {
+      "V": "tense",
+      "CV": "tense",
+      "VC": "lax",
+      "CVC": "lax"
     },
-    "syll_struct": ["V-CV", "V-CVC", "CV-CV", "CV-CVC", "VC-V", "VC-VC", "CVC-V", "CVC-VC"],
+    "word_struct": [
+      "V-CV", "V-VC", "V-CVC",
+      "CV-V", "CV-CV", "CV-VC", "CV-CVC",
+      "VC-V", "VC-CV", "VC-VC", "VC-CVC",
+      "CVC-V", "CVC-CV", "CVC-VC", "CVC-CVC"
+    ],
     "variants": {
-      "auditory": {
-        "vowel": {
-          "i": ["front", "high", "tense"],
-          "eɪ": ["front", "mid", "tense"],
-          "u": ["back", "high", "tense"],
-          "oʊ": ["back", "mid", "tense"],
-          "ɪ": ["front", "high", "lax"],
-          "ɛ": ["front", "mid", "lax"],
-          "ʊ": ["back", "high", "lax"],
-          "ɔ": ["back", "mid", "lax"]
-        }
+      "aud_vowel": {
+        "i": ["front", "high", "tense"],
+        "eɪ": ["front", "mid", "tense"],
+        "u": ["back", "high", "tense"],
+        "oʊ": ["back", "mid", "tense"],
+        "ɪ": ["front", "high", "lax"],
+        "ɛ": ["front", "mid", "lax"],
+        "ʊ": ["back", "high", "lax"],
+        "ɔ": ["back", "mid", "lax"]
       }
     }
   },
   "EnglishBH_shortened": {
     "type": "BacknessHarmony",
-    "lang_name": "EnglishBH_shortened",
+    "lang_name": "EnglishBH",
     "onset": ["m", "n", "p", "t", "k", "b", "d", "g", "f", "s", "v", "z", "ʃ", "ʒ", "θ", "ð", "h"],
     "coda": ["m", "n", "ŋ", "p", "t", "k", "b", "d", "g", "f", "s", "v", "z", "ʃ", "ʒ", "θ", "ð"],
     "vowel": {
@@ -49,15 +54,18 @@
       "ʊ": ["back", "high", "lax"],
       "ɔ": ["back", "mid", "lax"]
     },
-    "allowed_templates": {
-      "tense": ["V", "CV"],
-      "lax": ["VC", "CVC"]
+    "syll_struct": {
+      "V": "tense",
+      "CV": "tense",
+      "VC": "lax",
+      "CVC": "lax"
     },
-    "syll_struct": ["V-CV", "V-CVC", "CV-CV", "VC-V", "VC-VC", "CVC-V"]
+    "word_struct": ["V-CV", "V-CVC", "CV-CV", "VC-V", "VC-VC", "CVC-V"],
+    "variants": {}
   },
-  "EnglishBH_nonidentical": {
+  "EnglishBH_expanded": {
     "type": "BacknessHarmony",
-    "lang_name": "EnglishBH_nonidentical",
+    "lang_name": "EnglishBH",
     "onset": ["m", "n", "p", "t", "k", "b", "d", "g", "f", "s", "v", "z", "ʃ", "ʒ", "θ", "ð", "h"],
     "coda": ["m", "n", "ŋ", "p", "t", "k", "b", "d", "g", "f", "s", "v", "z", "ʃ", "ʒ", "θ", "ð"],
     "vowel": {
@@ -70,11 +78,31 @@
       "ʊ": ["back", "high", "lax"],
       "ɔ": ["back", "mid", "lax"]
     },
-    "allowed_templates": {
-      "tense": ["V", "CV"],
-      "lax": ["VC", "CVC"]
+    "syll_struct": {
+      "V": "tense",
+      "CV": "tense",
+      "VC": "lax",
+      "CVC": "lax"
     },
-    "syll_struct": ["V-CV", "V-CVC", "CV-CV", "CV-CVC", "VC-V", "VC-VC", "CVC-V", "CVC-VC"]
+    "word_struct": [
+      "V-V-CV", "V-V-VC", "V-V-CVC",
+      "V-CV-V", "V-CV-CV", "V-CV-VC", "V-CV-CVC",
+      "V-VC-V", "V-VC-CV", "V-VC-VC", "V-VC-CVC",
+      "V-CVC-V", "V-CVC-CV", "V-CVC-VC", "V-CVC-CVC",
+      "CV-V-V", "CV-V-CV", "CV-V-VC", "CV-V-CVC",
+      "CV-CV-V", "CV-CV-CV", "CV-CV-VC", "CV-CV-CVC",
+      "CV-VC-V", "CV-VC-CV", "CV-VC-VC", "CV-VC-CVC",
+      "CV-CVC-V", "CV-CVC-CV", "CV-CVC-VC", "CV-CVC-CVC",
+      "VC-V-V", "VC-V-CV", "VC-V-VC", "VC-V-CVC",
+      "VC-CV-V", "VC-CV-CV", "VC-CV-VC", "VC-CV-CVC",
+      "VC-VC-V", "VC-VC-CV", "VC-VC-VC", "VC-VC-CVC",
+      "VC-CVC-V", "VC-CVC-CV", "VC-CVC-VC", "VC-CVC-CVC",
+      "CVC-V-V", "CVC-V-CV", "CVC-V-VC", "CVC-V-CVC",
+      "CVC-CV-V", "CVC-CV-CV", "CVC-CV-VC", "CVC-CV-CVC",
+      "CVC-VC-V", "CVC-VC-CV", "CVC-VC-VC", "CVC-VC-CVC",
+      "CVC-CVC-V", "CVC-CVC-CV", "CVC-CVC-VC", "CVC-CVC-CVC"
+    ],
+    "variants": {}
   },
   "EnglishFD": {
     "type": "FinalDevoicing",
@@ -85,6 +113,13 @@
       "voiced": ["b", "d", "g", "v", "z", "ʒ", "ð"]
     },
     "vowel": ["i", "e", "u", "o", "ɪ", "ɛ", "ʊ", "ɔ"],
-    "syll_struct": ["VC", "CVC", "VCVC", "CVCVC"]
+    "syll_struct": {
+      "V": "tense",
+      "CV": "tense",
+      "VC": "lax",
+      "CVC": "lax"
+    },
+    "word_struct": ["V-CV", "V-CVC", "CV-CV", "CV-CVC", "VC-V", "VC-VC", "CVC-V", "CVC-VC"],
+    "variants": {}
   }
 }
