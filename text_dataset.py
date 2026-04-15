@@ -89,8 +89,8 @@ class TextDataset(Dataset):
 
         # get the list of ur and sr words
         self.annotations = pd.read_csv(annotations_file)
-        self.ur_words = self.annotations["ur"]
-        self.sr_words = self.annotations["sr"]
+        self.ur_words = self.annotations["ur_string"]
+        self.sr_words = self.annotations["sr_string"]
 
         # define special characters
         self.specials = special_tokens
@@ -149,7 +149,11 @@ if __name__ == "__main__":
     import hyper_params as hp
 
     print(" - Loading dataset:")
-    annotations_file = "Dataset/EnglishBH_full_harmony.csv"
+    annotations_file = (
+        "Dataset/" + "_".join(
+            part for part in [hp.lang_name, hp.directionality[0], hp.property, hp.conditions[0]] if part
+        ) + ".csv"
+    )
     annotations = pd.read_csv(annotations_file)
     print(f"Dataset size: {len(annotations)}")
     print(f"Sample data token: {annotations.iloc[0]}")

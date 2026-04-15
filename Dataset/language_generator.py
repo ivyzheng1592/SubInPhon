@@ -11,6 +11,9 @@ import os
 
 class LanguagePattern:
     def __init__(self, onset, coda, vowel, syll_struct, word_struct, lang_name):
+        # lang_name is the internal/base language label from the config.
+        # The registry key used for dataset file naming is attached later as registry_name.
+        # Example: for the "EnglishBH_shortened" entry, lang_name may still be "EnglishBH".
         self.lang_name = lang_name
         self.syll_struct = syll_struct
         self.word_struct = word_struct
@@ -19,6 +22,7 @@ class LanguagePattern:
         self.vowel = vowel
         self.variants = {}
         self.focus = {}  # different focus for different language pattern
+        self.registry_name = lang_name
 
     def generate_stimuli(self, property="", variant=None):
         pass
@@ -33,7 +37,7 @@ class BacknessHarmony(LanguagePattern):
         self.focus = self.vowel
 
     # function to generate vowel harmony stimuli with specified phoneme inventory and syllable structure
-    def generate_stimuli(self, property="full", directionality="l2r", variant=None):
+    def generate_stimuli(self, property="", directionality="l2r", variant=None):
         variant_vowel = self.variants.get(variant)
 
         print(" - Generating stimuli:")
@@ -153,17 +157,11 @@ class BacknessHarmony(LanguagePattern):
             print(f"Now generating syllable structure {struct}, accumulating to {len(vh_list)} pairs")
 
         print(" - Writing to file:")
-        name_parts = [self.lang_name]
-        if property:
-            name_parts.append(property)
-        name_parts.append(directionality)
-        prefix = "_".join(name_parts)
-        harmony_file = os.path.join(
-            "Dataset", self.lang_name + "_" + directionality + "_" + property + "_harmony.csv"
+        file_prefix = "_".join(
+            part for part in [self.registry_name, directionality, property] if part
         )
-        disharmony_file = os.path.join(
-            "Dataset", self.lang_name + "_" + directionality + "_" + property + "_disharmony.csv"
-        )
+        harmony_file = os.path.join("Dataset", f"{file_prefix}_harmony.csv")
+        disharmony_file = os.path.join("Dataset", f"{file_prefix}_disharmony.csv")
 
         with open(harmony_file, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)

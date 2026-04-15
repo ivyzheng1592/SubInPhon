@@ -241,11 +241,17 @@ def plot_embed_updated(embed_store, focus_list, embed_plot, focus_embed_plot):
     # combine lists of dataframes
     combined_df = pd.concat(dfs, ignore_index=True)
 
-    # analyze file name
-    combined_df[['language', 'property', 'modality', 'condition', 'run_num', 'epoch', 'none']] = \
-        combined_df['file_name'].str.split("_", expand=True)
-    combined_df['run_num'] = combined_df['run_num'].str.replace('run', '').astype(int)
-    combined_df['epoch'] = combined_df['epoch'].str.replace('epoch', '').astype(int)
+    # Parse metadata from filenames like:
+    # EnglishBH_shortened_txt_l2r_harmony_run0_epoch10_embedding.csv
+    metadata = combined_df['file_name'].str.extract(
+        r'^(?P<language>.+)_(?P<modality>txt|fea|aud)_(?P<directionality>[^_]+)_(?P<condition>[^_]+)_run(?P<run_num>\d+)_epoch(?P<epoch>-?\d+)_(?P<suffix>.+)$'
+    )
+    if metadata.isnull().any().any():
+        bad_files = combined_df.loc[metadata.isnull().any(axis=1), 'file_name'].tolist()
+        raise RuntimeError(f"Could not parse embedding metadata from file names: {bad_files}")
+    metadata['run_num'] = metadata['run_num'].astype(int)
+    metadata['epoch'] = metadata['epoch'].astype(int)
+    combined_df = pd.concat([combined_df, metadata], axis=1)
 
     # extract focus embeddings
     focus_combined_df = combined_df[combined_df['phoneme'].isin(focus_list)]

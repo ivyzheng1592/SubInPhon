@@ -25,7 +25,11 @@ if __name__ == "__main__":
     import hyper_params as hp
 
     print(" - Loading dataset:")
-    annotations_file = "Dataset/EnglishBH_txt_harmony.csv"
+    annotations_file = (
+        "Dataset/" + "_".join(
+            part for part in [hp.lang_name, hp.directionality[0], hp.property, hp.conditions[0]] if part
+        ) + ".csv"
+    )
     feature_file = "Dataset/EnglishBH_features.xlsx"
     annotations = pd.read_csv(annotations_file)
     print(f"Dataset size: {len(annotations)}")

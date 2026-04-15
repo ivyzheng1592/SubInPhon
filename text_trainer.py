@@ -13,7 +13,7 @@ import re
 import hyper_params as hp
 
 
-class TextRun:
+class TextTrainer:
     def __init__(self, seq2seq, recorder, resume_model_file=None):
         # condition hyperparameters
         self.seq2seq = seq2seq
@@ -38,7 +38,8 @@ class TextRun:
             # save untrained model
             model_file = os.path.join(self.recorder.model_dir,
                                       self.recorder.lang_name + "_" +
-                                      self.recorder.modality + "_" + self.recorder.condition +
+                                      self.recorder.modality + "_" + self.recorder.directionality + "_" +
+                                      self.recorder.condition +
                                       "_run" + str(self.recorder.run_num) + "_epoch-1_seq2seq.pth")
 
             torch.save(self.seq2seq.state_dict(), model_file)
@@ -69,7 +70,8 @@ class TextRun:
             if epoch % hp.save_epochs == 0 or epoch == hp.n_epochs-1:
                 model_file = os.path.join(self.recorder.model_dir,
                                           self.recorder.lang_name + "_" +
-                                          self.recorder.modality + "_" + self.recorder.condition +
+                                          self.recorder.modality + "_" + self.recorder.directionality + "_" +
+                                          self.recorder.condition +
                                           "_run" + str(self.recorder.run_num) + "_epoch" + str(epoch) +
                                           "_seq2seq.pth")
                 torch.save(self.seq2seq.state_dict(), model_file)
@@ -77,6 +79,8 @@ class TextRun:
 
         # plot accuracy at the end of training
         utils.plot_txt_acc(self.recorder.acc_store, self.recorder.acc_plot)
+        utils.save_to_file(self.recorder.acc_store, self.recorder.acc_file)
+        utils.save_to_file(self.recorder.pred_store, self.recorder.pred_file)
         print(f"Run {self.recorder.run_num} training loss, accuracy, and predicted results are saved")
 
 
@@ -173,7 +177,8 @@ class TextRun:
         # load model
         model_file = os.path.join(self.recorder.model_dir,
                                   self.recorder.lang_name + "_" +
-                                  self.recorder.modality + "_" + self.recorder.condition +
+                                  self.recorder.modality + "_" + self.recorder.directionality + "_" +
+                                  self.recorder.condition +
                                   "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
                                   "_seq2seq.pth")
         self.seq2seq.load_state_dict(torch.load(model_file))
@@ -204,7 +209,8 @@ class TextRun:
                 # plot attention
                 att_plot = os.path.join(self.recorder.att_plot_dir,
                                         self.recorder.lang_name + "_" +
-                                        self.recorder.modality + "_" + self.recorder.condition +
+                                        self.recorder.modality + "_" + self.recorder.directionality + "_" +
+                                        self.recorder.condition +
                                         "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
                                         ur_string + "_" + pred_sr_string + ".png")
                 utils.plot_txt_att(ur_list, pred_sr_list, word_att, att_plot)

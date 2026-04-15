@@ -21,10 +21,10 @@ class AudioDataset(Dataset):
         self.device = device
         self.audio_dir = audio_dir
         self.annotations = pd.read_csv(annotations_file)
-        self.ur_words = self.annotations["ur"]
-        self.sr_words = self.annotations["sr"]
-        self.ur_refs = self.annotations["ur_ref"]
-        self.sr_refs = self.annotations["sr_ref"]
+        self.ur_words = self.annotations["ur_string"]
+        self.sr_words = self.annotations["sr_string"]
+        self.ur_refs = self.annotations["ur_var"]
+        self.sr_refs = self.annotations["sr_var"]
 
         # define special characters
         self.specials = special_tokens
@@ -181,8 +181,12 @@ if __name__ == "__main__":
     import utils
 
     print(" - Loading dataset:")
-    audio_dir = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/EnglishBH"
-    annotations_file = "Dataset/EnglishBH_shortened_harmony.csv"
+    audio_dir = os.path.join(hp.audio_root, hp.lang_name)
+    annotations_file = (
+        "Dataset/" + "_".join(
+            part for part in [hp.lang_name, hp.directionality[0], hp.property, hp.conditions[0]] if part
+        ) + ".csv"
+    )
     annotations = pd.read_csv(annotations_file)
     print(f"Dataset size: {len(annotations)}")
     print(f"Sample data token: {annotations.iloc[0]}")

@@ -1,18 +1,19 @@
 # created 2025/06/04
 # A class that handles data recording of multiple runs in dictionaries
-# Dictionary data are saved to file using utils in TextRun
+# Dictionary data are saved to file using utils in TextTrainer
 
 import os
 import hyper_params as hp
 
 
 class TextRecorder:
-    def __init__(self, dataset, trial_num, language, modality, condition, run_num):
+    def __init__(self, dataset, trial_num, language, modality, directionality, condition, run_num):
         self.dataset = dataset
         self.trial_num = trial_num
         self.language = language
-        self.lang_name = language.lang_name
+        self.lang_name = hp.lang_name
         self.modality = modality
+        self.directionality = directionality
         self.condition = condition
         self.run_num = run_num
 
@@ -22,24 +23,42 @@ class TextRecorder:
         # result storages
         self.acc_store = {
             'trial_num': [], 'language': [], 'modality': [],
-            'condition': [], 'run_num': [], 'epoch': [], 'record_type': [],
+            'directionality': [], 'condition': [], 'run_num': [], 'epoch': [], 'record_type': [],
             'loss': [], 'acc': []
         }
 
         self.pred_store = {
             'trial_num': [], 'language': [], 'modality': [],
-            'condition': [], 'run_num': [], 'epoch': [], 'record_type': [],
+            'directionality': [], 'condition': [], 'run_num': [], 'epoch': [], 'record_type': [],
             'ur': [], 'sr': [], 'pred_sr': [],
-            'v1_error': [], 'v2_error': [], #'v3_error': [],
-            'sr_v1': [], 'sr_v2': [], #'sr_v3': [],
-            'pred_sr_v1': [], 'pred_sr_v2': [], #'pred_sr_v3': [],
-            #'o1_error': [], 'o2_error': [], 'o3_error': [],
-            #'sr_o1': [], 'sr_o2': [], 'sr_o3': [],
-            #'pred_sr_o1': [], 'pred_sr_o2': [], 'pred_sr_o3': [],
-            #'c1_error': [], 'c2_error': [], 'c3_error': [],
-            #'sr_c1': [], 'sr_c2': [], 'sr_c3': [],
-            #'pred_sr_c1': [], 'pred_sr_c2': [], 'pred_sr_c3': []
+            'v1_error': [], 'v2_error': [],
+            'sr_v1': [], 'sr_v2': [],
+            'pred_sr_v1': [], 'pred_sr_v2': [],
         }
+        if hp.lang_name.endswith("_expanded"):
+            self.pred_store.update({
+                'v3_error': [],
+                'sr_v3': [],
+                'pred_sr_v3': [],
+            })
+        if hp.pred_log != "vowel_only_error":
+            self.pred_store.update({
+                'o1_error': [], 'o2_error': [],
+                'sr_o1': [], 'sr_o2': [],
+                'pred_sr_o1': [], 'pred_sr_o2': [],
+                'c1_error': [], 'c2_error': [],
+                'sr_c1': [], 'sr_c2': [],
+                'pred_sr_c1': [], 'pred_sr_c2': [],
+            })
+            if hp.lang_name.endswith("_expanded"):
+                self.pred_store.update({
+                    'o3_error': [],
+                    'sr_o3': [],
+                    'pred_sr_o3': [],
+                    'c3_error': [],
+                    'sr_c3': [],
+                    'pred_sr_c3': [],
+                })
 
         # results files and directories
         self.acc_file = os.path.join("Results", trial_num + "_" + self.lang_name + "_" + modality,
@@ -51,18 +70,18 @@ class TextRecorder:
                                          self.lang_name + "_" + modality + "_acc_plots")
         os.makedirs(self.acc_plot_dir, exist_ok=True)
         self.acc_plot = os.path.join(self.acc_plot_dir,
-                                     self.lang_name + "_" + modality + "_" + self.condition +
+                                     self.lang_name + "_" + modality + "_" + self.directionality + "_" + self.condition +
                                      "_run" + str(self.run_num) + "_acc_plot.png")
 
         self.model_dir = os.path.join("Results", trial_num + "_" + self.lang_name + "_" + modality,
                                       self.lang_name + "_" + modality + "_model_files",
-                                      self.lang_name + "_" + modality + "_" + self.condition +
+                                      self.lang_name + "_" + modality + "_" + self.directionality + "_" + self.condition +
                                       "_run" + str(self.run_num) + "_model_files")
         os.makedirs(self.model_dir, exist_ok=True)
 
         self.att_plot_dir = os.path.join("Results", trial_num + "_" + self.lang_name + "_" + modality,
                                          self.lang_name + "_" + modality + "_att_plots",
-                                         self.lang_name + "_" + modality + "_" + self.condition +
+                                         self.lang_name + "_" + modality + "_" + self.directionality + "_" + self.condition +
                                          "_run" + str(self.run_num) + "_att_plots")
         os.makedirs(self.att_plot_dir, exist_ok=True)
 
@@ -70,16 +89,17 @@ class TextRecorder:
                                            self.lang_name + "_" + modality + "_embed_plots")
         os.makedirs(self.embed_plot_dir, exist_ok=True)
         self.embed_plot = os.path.join(self.embed_plot_dir,
-                                       self.lang_name + "_" + modality + "_" + self.condition +
+                                       self.lang_name + "_" + modality + "_" + self.directionality + "_" + self.condition +
                                        "_run" + str(self.run_num) + "_embedding.html")
         self.focus_embed_plot = os.path.join(self.embed_plot_dir,
-                                             self.lang_name + "_" + modality + "_" + self.condition +
+                                             self.lang_name + "_" + modality + "_" + self.directionality + "_" + self.condition +
                                              "_run" + str(self.run_num) + "_focus_embedding.html")
 
     def _append_base_fields(self, store, epoch, record_type):
         store['trial_num'].append(self.trial_num)
         store['language'].append(self.lang_name)
         store['modality'].append(self.modality)
+        store['directionality'].append(self.directionality)
         store['condition'].append(self.condition)
         store['run_num'].append(self.run_num)
         store['epoch'].append(epoch)
@@ -159,8 +179,8 @@ class TextRecorder:
                 # record prediction correctness
                 if sr_string == pred_sr_string:
                     epoch_correct.append(1)
-                if hp.pred_log != "all_correct_syll":
-                    continue
+                    if hp.pred_log != "all_correct_syll":
+                        continue
                 else:
                     epoch_correct.append(0)
 
@@ -188,11 +208,6 @@ class TextRecorder:
                     o_errors = [1 if sr_o[i] != pred_o[i] else 0 for i in range(syll_count)]
                     c_errors = [1 if sr_c[i] != pred_c[i] else 0 for i in range(syll_count)]
 
-                # append only if the column exists (you may comment out columns)
-                def _append_if(key, value):
-                    if key in self.pred_store:
-                        self.pred_store[key].append(value)
-
                 self._append_base_fields(self.pred_store, epoch, record_type)
                 self.pred_store['ur'].append(ur_string)
                 self.pred_store['sr'].append(sr_string)
@@ -200,37 +215,37 @@ class TextRecorder:
 
                 # record consonant errors only when enabled
                 if hp.pred_log != "vowel_only_error":
-                    _append_if('o1_error', o_errors[0])
-                    _append_if('o2_error', o_errors[1])
-                    _append_if('sr_o1', sr_o[0])
-                    _append_if('sr_o2', sr_o[1])
-                    _append_if('pred_sr_o1', pred_o[0])
-                    _append_if('pred_sr_o2', pred_o[1])
-                    _append_if('c1_error', c_errors[0])
-                    _append_if('c2_error', c_errors[1])
-                    _append_if('sr_c1', sr_c[0])
-                    _append_if('sr_c2', sr_c[1])
-                    _append_if('pred_sr_c1', pred_c[0])
-                    _append_if('pred_sr_c2', pred_c[1])
-                _append_if('v1_error', v_errors[0])
-                _append_if('v2_error', v_errors[1])
-                _append_if('sr_v1', sr_v[0])
-                _append_if('sr_v2', sr_v[1])
-                _append_if('pred_sr_v1', pred_v[0])
-                _append_if('pred_sr_v2', pred_v[1])
+                    self.pred_store['o1_error'].append(o_errors[0])
+                    self.pred_store['o2_error'].append(o_errors[1])
+                    self.pred_store['sr_o1'].append(sr_o[0])
+                    self.pred_store['sr_o2'].append(sr_o[1])
+                    self.pred_store['pred_sr_o1'].append(pred_o[0])
+                    self.pred_store['pred_sr_o2'].append(pred_o[1])
+                    self.pred_store['c1_error'].append(c_errors[0])
+                    self.pred_store['c2_error'].append(c_errors[1])
+                    self.pred_store['sr_c1'].append(sr_c[0])
+                    self.pred_store['sr_c2'].append(sr_c[1])
+                    self.pred_store['pred_sr_c1'].append(pred_c[0])
+                    self.pred_store['pred_sr_c2'].append(pred_c[1])
+                self.pred_store['v1_error'].append(v_errors[0])
+                self.pred_store['v2_error'].append(v_errors[1])
+                self.pred_store['sr_v1'].append(sr_v[0])
+                self.pred_store['sr_v2'].append(sr_v[1])
+                self.pred_store['pred_sr_v1'].append(pred_v[0])
+                self.pred_store['pred_sr_v2'].append(pred_v[1])
 
                 # record third-syllable fields only for 3-syllable outputs
                 if syll_count == 3:
                     if hp.pred_log != "vowel_only_error":
-                        _append_if('o3_error', o_errors[2])
-                        _append_if('sr_o3', sr_o[2])
-                        _append_if('pred_sr_o3', pred_o[2])
-                        _append_if('c3_error', c_errors[2])
-                        _append_if('sr_c3', sr_c[2])
-                        _append_if('pred_sr_c3', pred_c[2])
-                    _append_if('v3_error', v_errors[2])
-                    _append_if('sr_v3', sr_v[2])
-                    _append_if('pred_sr_v3', pred_v[2])
+                        self.pred_store['o3_error'].append(o_errors[2])
+                        self.pred_store['sr_o3'].append(sr_o[2])
+                        self.pred_store['pred_sr_o3'].append(pred_o[2])
+                        self.pred_store['c3_error'].append(c_errors[2])
+                        self.pred_store['sr_c3'].append(sr_c[2])
+                        self.pred_store['pred_sr_c3'].append(pred_c[2])
+                    self.pred_store['v3_error'].append(v_errors[2])
+                    self.pred_store['sr_v3'].append(sr_v[2])
+                    self.pred_store['pred_sr_v3'].append(pred_v[2])
 
         if len(epoch_correct) == 0:
             raise RuntimeError(f"No predictions recorded for epoch {epoch} ({record_type})")

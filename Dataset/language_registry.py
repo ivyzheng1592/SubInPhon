@@ -98,6 +98,10 @@ def _build_language(name, spec, variant=None):
         raise ValueError(f"Unknown language type: {lang_type}")
 
     lang.variants = spec.get("variants", {})
+    # Keep the registry key separately from lang.lang_name so generated dataset
+    # filenames can follow the selected experiment entry (e.g. EnglishBH_shortened).
+    # Example: lang.lang_name == "EnglishBH", but lang.registry_name == "EnglishBH_shortened".
+    lang.registry_name = name
     return lang
 
 
@@ -106,21 +110,13 @@ registry = LanguageRegistry()
 languages = registry.build()
 
 if __name__ == "__main__":
-    """
-    languages["EnglishBH"].generate_stimuli(property="nonidentical", 
-                                            directionality="l2r",
-                                            variant="aud_vowel")
-    languages["EnglishBH"].generate_stimuli(property="nonidentical", 
-                                            directionality="r2l",
-                                            variant="aud_vowel")
-    languages["EnglishBH"].generate_stimuli(property="full",
-                                            directionality="l2r",
-                                            variant="aud_vowel")
-    languages["EnglishBH"].generate_stimuli(property="full",
-                                            directionality="r2l",
-                                            variant="aud_vowel")
-    """
-    languages["EnglishBH_shortened"].generate_stimuli(property="shortened",
-                                                      directionality="l2r")
-    languages["EnglishBH_shortened"].generate_stimuli(property="shortened",
-                                                      directionality="r2l")
+    import hyper_params as hp
+
+    language = languages[hp.lang_name]
+    variant = "aud_vowel" if "aud_vowel" in language.variants else None
+    for directionality in hp.directionality:
+        language.generate_stimuli(
+            property=hp.property,
+            directionality=directionality,
+            variant=variant,
+        )

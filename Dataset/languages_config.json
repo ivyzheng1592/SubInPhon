@@ -26,18 +26,7 @@
       "VC-V", "VC-CV", "VC-VC", "VC-CVC",
       "CVC-V", "CVC-CV", "CVC-VC", "CVC-CVC"
     ],
-    "variants": {
-      "aud_vowel": {
-        "i": ["front", "high", "tense"],
-        "eɪ": ["front", "mid", "tense"],
-        "u": ["back", "high", "tense"],
-        "oʊ": ["back", "mid", "tense"],
-        "ɪ": ["front", "high", "lax"],
-        "ɛ": ["front", "mid", "lax"],
-        "ʊ": ["back", "high", "lax"],
-        "ɔ": ["back", "mid", "lax"]
-      }
-    }
+    "variants": {}
   },
   "EnglishBH_shortened": {
     "type": "BacknessHarmony",
@@ -61,7 +50,18 @@
       "CVC": "lax"
     },
     "word_struct": ["V-CV", "V-CVC", "CV-CV", "VC-V", "VC-VC", "CVC-V"],
-    "variants": {}
+    "variants": {
+      "aud_vowel": {
+        "i": ["front", "high", "tense"],
+        "eɪ": ["front", "mid", "tense"],
+        "u": ["back", "high", "tense"],
+        "oʊ": ["back", "mid", "tense"],
+        "ɪ": ["front", "high", "lax"],
+        "ɛ": ["front", "mid", "lax"],
+        "ʊ": ["back", "high", "lax"],
+        "ɔ": ["back", "mid", "lax"]
+      }
+    }
   },
   "EnglishBH_expanded": {
     "type": "BacknessHarmony",
