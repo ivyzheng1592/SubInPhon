@@ -11,7 +11,7 @@ Command-line arguments:
 - --trial-num TRIAL_ID
 - --runs N | START:STOP[:STEP]
 - --lang-name LANGUAGE_KEY
-- --run-mode {"train and evaluate","tuning","evaluate only"}
+- --run-mode {"train and evaluate","tuning","inspection"}
 - --pred-log {vowel_only_error,consonant_vowel_error,all_correct_syll}
 - --device {cpu,cuda}
 - --resume-model-file PATH_TO_CHECKPOINT
@@ -73,7 +73,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--lang-name", default=None, help="Override hp.lang_name.")
     parser.add_argument(
         "--run-mode",
-        choices=("train and evaluate", "tuning", "evaluate only"),
+        choices=("train and evaluate", "tuning", "inspection"),
         default=None,
         help="Override hp.run_mode.",
     )

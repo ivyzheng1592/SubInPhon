@@ -49,11 +49,25 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
                 print(" - Splitting dataset:")
                 sampled_dataset = dataset.sample_dataset(hp.data_percentage)
                 train_data, valid_data, test_data = random_split(sampled_dataset, hp.text_data_split_ratio)
+                gen_test_dataloader = None
+                if hp.gen_eval:
+                    gen_lang_name = hp.lang_name if hp.lang_name.endswith("_expanded") else hp.lang_name + "_expanded"
+                    gen_annotations_file = os.path.join(
+                        "Dataset",
+                        "_".join(part for part in [gen_lang_name, directionality, hp.property, condition] if part) + ".csv",
+                    )
+                    gen_dataset = TextDataset(gen_annotations_file, hp.special_tokens, device=hp.device)
+                    gen_dataset.ur_alphabet = dataset.ur_alphabet
+                    gen_dataset.sr_alphabet = dataset.sr_alphabet
+                    gen_sampled_dataset = gen_dataset.sample_dataset(hp.gen_data_percentage)
+                    _, _, gen_test_data = random_split(gen_sampled_dataset, hp.text_data_split_ratio)
 
                 print(" - Creating dataloader:")
                 train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
                 valid_dataloader = dataset.get_dataloader(valid_data, hp.batch_size)
                 test_dataloader = dataset.get_dataloader(test_data, hp.batch_size)
+                if hp.gen_eval:
+                    gen_test_dataloader = gen_dataset.get_dataloader(gen_test_data, hp.batch_size)
 
                 print(" - Initializing model:")
                 encoder_input_dim = len(dataset.ur_alphabet)
@@ -71,8 +85,10 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
                 print(" - Training and evaluating model:")
                 rep = TextTrainer(seq2seq, recorder, resume_model_file=resume_model_file)
                 if hp.run_mode == "train and evaluate":
-                    rep.run(train_dataloader, test_dataloader, "test")
+                    rep.run(train_dataloader, test_dataloader, "test", gen_eval_dataloader=gen_test_dataloader)
                     rep.evaluate_attention(test_dataloader)
+                    if hp.gen_eval:
+                        rep.evaluate_attention(gen_test_dataloader, gen_eval=True)
                     rep.evaluate_embedding()
                 elif hp.run_mode == "tuning":
                     rep.run(train_dataloader, valid_dataloader, "valid")
@@ -80,6 +96,8 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
                     rep.evaluate_embedding()
                 else:
                     rep.evaluate_attention(test_dataloader)
+                    if hp.gen_eval:
+                        rep.evaluate_attention(gen_test_dataloader, gen_eval=True)
                     rep.evaluate_embedding()
 
 
@@ -104,11 +122,25 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
                 print(" - Splitting dataset:")
                 sampled_dataset = dataset.sample_dataset(hp.data_percentage)
                 train_data, valid_data, test_data = random_split(sampled_dataset, hp.text_data_split_ratio)
+                gen_test_dataloader = None
+                if hp.gen_eval:
+                    gen_lang_name = hp.lang_name if hp.lang_name.endswith("_expanded") else hp.lang_name + "_expanded"
+                    gen_annotations_file = os.path.join(
+                        "Dataset",
+                        "_".join(part for part in [gen_lang_name, directionality, hp.property, condition] if part) + ".csv",
+                    )
+                    gen_dataset = FeatureDataset(gen_annotations_file, feature_file, hp.special_tokens, device=hp.device)
+                    gen_dataset.ur_alphabet = dataset.ur_alphabet
+                    gen_dataset.sr_alphabet = dataset.sr_alphabet
+                    gen_sampled_dataset = gen_dataset.sample_dataset(hp.gen_data_percentage)
+                    _, _, gen_test_data = random_split(gen_sampled_dataset, hp.text_data_split_ratio)
 
                 print(" - Creating dataloader:")
                 train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
                 valid_dataloader = dataset.get_dataloader(valid_data, hp.batch_size)
                 test_dataloader = dataset.get_dataloader(test_data, hp.batch_size)
+                if hp.gen_eval:
+                    gen_test_dataloader = gen_dataset.get_dataloader(gen_test_data, hp.batch_size)
 
                 print(" - Initializing model:")
                 encoder_input_dim = len(dataset.ur_alphabet)
@@ -133,8 +165,10 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
                 print(" - Training and evaluating model:")
                 rep = TextTrainer(seq2seq, recorder, resume_model_file=resume_model_file)
                 if hp.run_mode == "train and evaluate":
-                    rep.run(train_dataloader, test_dataloader, "test")
+                    rep.run(train_dataloader, test_dataloader, "test", gen_eval_dataloader=gen_test_dataloader)
                     rep.evaluate_attention(test_dataloader)
+                    if hp.gen_eval:
+                        rep.evaluate_attention(gen_test_dataloader, gen_eval=True)
                     rep.evaluate_embedding()
                 elif hp.run_mode == "tuning":
                     rep.run(train_dataloader, valid_dataloader, "valid")
@@ -142,6 +176,8 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
                     rep.evaluate_embedding()
                 else:
                     rep.evaluate_attention(test_dataloader)
+                    if hp.gen_eval:
+                        rep.evaluate_attention(gen_test_dataloader, gen_eval=True)
                     rep.evaluate_embedding()
 
 
@@ -173,11 +209,33 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                 print(" - Splitting dataset:")
                 sampled_dataset = dataset.sample_dataset(hp.data_percentage)
                 train_data, valid_data, test_data = random_split(sampled_dataset, hp.audio_data_split_ratio)
+                gen_test_dataloader = None
+                if hp.gen_eval:
+                    gen_lang_name = hp.lang_name if hp.lang_name.endswith("_expanded") else hp.lang_name + "_expanded"
+                    gen_annotations_file = os.path.join(
+                        "Dataset",
+                        "_".join(part for part in [gen_lang_name, directionality, hp.property, condition] if part) + ".csv",
+                    )
+                    gen_audio_dir = os.path.join(hp.audio_root, gen_lang_name)
+                    gen_dataset = AudioDataset(
+                        gen_annotations_file,
+                        gen_audio_dir,
+                        hp.special_tokens,
+                        wav2mel=True,
+                        power2db=True,
+                        device=hp.device,
+                    )
+                    gen_dataset.ur_alphabet = dataset.ur_alphabet
+                    gen_dataset.sr_alphabet = dataset.sr_alphabet
+                    gen_sampled_dataset = gen_dataset.sample_dataset(hp.gen_data_percentage)
+                    _, _, gen_test_data = random_split(gen_sampled_dataset, hp.audio_data_split_ratio)
 
                 print(" - Creating dataloader:")
                 train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
                 valid_dataloader = dataset.get_dataloader(valid_data, hp.batch_size)
                 test_dataloader = dataset.get_dataloader(test_data, hp.batch_size)
+                if hp.gen_eval:
+                    gen_test_dataloader = gen_dataset.get_dataloader(gen_test_data, hp.batch_size)
 
                 print(" - Initializing model:")
                 encoder_input_dim = hp.n_mels
@@ -201,8 +259,10 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                 print(" - Training and evaluating model:")
                 rep = AudioTrainer(seq2seq, recorder, resume_model_file=resume_model_file)
                 if hp.run_mode == "train and evaluate":
-                    rep.run(train_dataloader, test_dataloader, "test")
+                    rep.run(train_dataloader, test_dataloader, "test", gen_eval_dataloader=gen_test_dataloader)
                     rep.evaluate_attention(test_dataloader)
+                    if hp.gen_eval:
+                        rep.evaluate_attention(gen_test_dataloader, gen_eval=True)
                     rep.evaluate_embedding()
                 elif hp.run_mode == "tuning":
                     rep.run(train_dataloader, valid_dataloader, "valid")
@@ -210,6 +270,8 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                     rep.evaluate_embedding()
                 else:
                     rep.evaluate_attention(test_dataloader)
+                    if hp.gen_eval:
+                        rep.evaluate_attention(gen_test_dataloader, gen_eval=True)
                     rep.evaluate_embedding()
 
 

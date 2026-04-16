@@ -41,6 +41,7 @@ n_mels = 128
 
 # Dataset hyperparameters
 data_percentage = 1.0
+gen_data_percentage = 0.0001
 text_data_split_ratio = [0.6, 0.2, 0.2]
 audio_data_split_ratio = [0.8, 0.1, 0.1]
 
@@ -77,12 +78,13 @@ base_seed = 1234
 audio_root = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon"
 
 # Experiment settings
-lang_name = "EnglishBH"
+lang_name = "EnglishBH_expanded"
 property = ""
 directionality = ["l2r", "r2l"]
 conditions = ["harmony", "disharmony"]
-# Run mode options: "train and evaluate", "tuning", "evaluate only"
+# Run mode options: "train and evaluate", "tuning", "inspection"
 run_mode = "train and evaluate"
+gen_eval = False
 # Prediction logging mode options: "vowel_only_error", "consonant_vowel_error", "all_correct_syll"
 pred_log = "vowel_only_error"
 device = "cuda"

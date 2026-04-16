@@ -34,7 +34,13 @@ class TextTrainer:
         self.criterion = nn.CrossEntropyLoss(ignore_index=hp.special_tokens.index(hp.pad_token))
 
     # a function that completes one repetition of training and evaluation
-    def run(self, train_dataloader: Any, eval_dataloader: Any, eval_record_type: str) -> None:
+    def run(
+        self,
+        train_dataloader: Any,
+        eval_dataloader: Any,
+        eval_record_type: str,
+        gen_eval_dataloader: Any = None,
+    ) -> None:
         if self.start_epoch == 0:
             # save untrained model
             model_file = os.path.join(self.recorder.model_dir,
@@ -60,12 +66,22 @@ class TextTrainer:
             # record accuracy
             self.recorder.record_acc(epoch, "train", train_loss, train_acc)
             self.recorder.record_acc(epoch, eval_record_type, eval_loss, eval_acc)
+            if gen_eval_dataloader is not None:
+                gen_eval_loss, gen_eval_src, gen_eval_trg, gen_eval_pred = self.evaluate_one_epoch(gen_eval_dataloader)
+                gen_eval_acc = self.recorder.record_pred(
+                    epoch, "generalization", gen_eval_src, gen_eval_trg, gen_eval_pred
+                )
+                self.recorder.record_acc(epoch, "generalization", gen_eval_loss, gen_eval_acc)
 
             print(f"Epoch {epoch} Train Loss: {train_loss:7.3f} | Train PPL: {np.exp(train_loss):7.3f} "
                   f"| Train Acc: {train_acc:7.3f}")
             print(f"Epoch {epoch} {eval_record_type.capitalize()} Loss: {eval_loss:7.3f} | "
                   f"{eval_record_type.capitalize()} PPL: {np.exp(eval_loss):7.3f} | "
                   f"{eval_record_type.capitalize()} Acc: {eval_acc:7.3f}")
+            if gen_eval_dataloader is not None:
+                print(f"Epoch {epoch} Generalization Loss: {gen_eval_loss:7.3f} | "
+                      f"Generalization PPL: {np.exp(gen_eval_loss):7.3f} | "
+                      f"Generalization Acc: {gen_eval_acc:7.3f}")
 
             # save model every other save_epochs
             if epoch % hp.save_epochs == 0 or epoch == hp.n_epochs-1:
@@ -168,7 +184,12 @@ class TextTrainer:
         return epoch_loss, srcs, trgs, preds
 
     # a function that manages evaluation of one random batch
-    def evaluate_attention(self, test_dataloader: Any, eval_epoch: int = hp.n_epochs-1) -> None:
+    def evaluate_attention(
+        self,
+        test_dataloader: Any,
+        eval_epoch: int = hp.n_epochs-1,
+        gen_eval: bool = False,
+    ) -> None:
         # get one random batch of test data
         dataiter = iter(test_dataloader)
         src, trg = next(dataiter)
@@ -208,14 +229,29 @@ class TextTrainer:
                 # word_att = [trg_len, src_len]
 
                 # plot attention
-                att_plot = os.path.join(self.recorder.att_plot_dir,
-                                        self.recorder.lang_name + "_" +
-                                        self.recorder.modality + "_" + self.recorder.directionality + "_" +
-                                        self.recorder.condition +
-                                        "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
-                                        ur_string + "_" + pred_sr_string + ".png")
+                if gen_eval:
+                    att_plot = os.path.join(
+                        self.recorder.att_plot_dir,
+                        self.recorder.lang_name + "_gen_" +
+                        self.recorder.modality + "_" + self.recorder.directionality + "_" +
+                        self.recorder.condition +
+                        "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
+                        ur_string + "_" + pred_sr_string + ".png"
+                    )
+                else:
+                    att_plot = os.path.join(
+                        self.recorder.att_plot_dir,
+                        self.recorder.lang_name + "_" +
+                        self.recorder.modality + "_" + self.recorder.directionality + "_" +
+                        self.recorder.condition +
+                        "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
+                        ur_string + "_" + pred_sr_string + ".png"
+                    )
                 utils.plot_txt_att(ur_list, pred_sr_list, word_att, att_plot)
-            print(f"Run {self.recorder.run_num} attention plots are saved for investigation")
+            if gen_eval:
+                print(f"Run {self.recorder.run_num} generalization attention plots are saved for investigation")
+            else:
+                print(f"Run {self.recorder.run_num} attention plots are saved for investigation")
 
     def evaluate_embedding(self) -> None:
         # a dictionary of dictionaries to store all embeddings

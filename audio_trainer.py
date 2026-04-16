@@ -57,7 +57,13 @@ class AudioTrainer:
         return rec_loss, pred_loss
 
     # a function that completes one repetition of training and evaluation
-    def run(self, train_dataloader: Any, eval_dataloader: Any, eval_record_type: str) -> None:
+    def run(
+        self,
+        train_dataloader: Any,
+        eval_dataloader: Any,
+        eval_record_type: str,
+        gen_eval_dataloader: Any = None,
+    ) -> None:
         if self.start_epoch == 0:
             # save untrained model
             model_file = os.path.join(self.recorder.model_dir,
@@ -82,6 +88,16 @@ class AudioTrainer:
             # record accuracy
             self.recorder.record_acc(epoch, "train", train_rec_loss, train_pred_loss, train_acc)
             self.recorder.record_acc(epoch, eval_record_type, eval_rec_loss, eval_pred_loss, eval_acc)
+            if gen_eval_dataloader is not None:
+                gen_eval_rec_loss, gen_eval_pred_loss, gen_eval_src, gen_eval_trg, gen_eval_pred = (
+                    self.evaluate_one_epoch(gen_eval_dataloader)
+                )
+                gen_eval_acc = self.recorder.record_pred(
+                    epoch, "generalization", gen_eval_src, gen_eval_trg, gen_eval_pred
+                )
+                self.recorder.record_acc(
+                    epoch, "generalization", gen_eval_rec_loss, gen_eval_pred_loss, gen_eval_acc
+                )
 
             print(f"Epoch {epoch} Train Reconstruction Task Loss: {train_rec_loss:7.3f} "
                   f"| Train Prediction Task Loss: {train_pred_loss:7.3f} "
@@ -89,6 +105,10 @@ class AudioTrainer:
             print(f"Epoch {epoch} {eval_record_type.capitalize()} Reconstruction Task Loss: {eval_rec_loss:7.3f} "
                   f"| {eval_record_type.capitalize()} Prediction Task Loss: {eval_pred_loss:7.3f} "
                   f"| {eval_record_type.capitalize()} Prediction Acc: {eval_acc:7.3f}")
+            if gen_eval_dataloader is not None:
+                print(f"Epoch {epoch} Generalization Reconstruction Task Loss: {gen_eval_rec_loss:7.3f} "
+                      f"| Generalization Prediction Task Loss: {gen_eval_pred_loss:7.3f} "
+                      f"| Generalization Prediction Acc: {gen_eval_acc:7.3f}")
 
             # save model every other save_epochs
             if epoch % hp.save_epochs == 0 or epoch == hp.n_epochs-1:
@@ -197,7 +217,12 @@ class AudioTrainer:
         return epoch_rec_loss, epoch_pred_loss, src_txts, trg_txts, pred_txts
 
     # a function that manages evaluation of one random batch
-    def evaluate_attention(self, test_dataloader: Any, eval_epoch: int = hp.n_epochs-1) -> None:
+    def evaluate_attention(
+        self,
+        test_dataloader: Any,
+        eval_epoch: int = hp.n_epochs-1,
+        gen_eval: bool = False,
+    ) -> None:
         # get one random batch of test data
         dataiter = iter(test_dataloader)
         input = next(dataiter)
@@ -254,21 +279,46 @@ class AudioTrainer:
                 aud_att = aud_att[non_zeros, :][:, non_zeros]
 
                 # plot attention
-                txt_att_plot = os.path.join(self.recorder.att_plot_dir,
-                                            self.recorder.lang_name + "_" +
-                                            self.recorder.modality + "_" + self.recorder.directionality + "_" +
-                                            self.recorder.condition +
-                                            "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
-                                            ur_string + "_" + pred_sr_string + "_txt.png")
-                aud_att_plot = os.path.join(self.recorder.att_plot_dir,
-                                            self.recorder.lang_name + "_" +
-                                            self.recorder.modality + "_" + self.recorder.directionality + "_" +
-                                            self.recorder.condition +
-                                            "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
-                                            ur_string + "_" + pred_sr_string + "_aud.png")
+                if gen_eval:
+                    txt_att_plot = os.path.join(
+                        self.recorder.att_plot_dir,
+                        self.recorder.lang_name + "_gen_" +
+                        self.recorder.modality + "_" + self.recorder.directionality + "_" +
+                        self.recorder.condition +
+                        "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
+                        ur_string + "_" + pred_sr_string + "_txt.png"
+                    )
+                    aud_att_plot = os.path.join(
+                        self.recorder.att_plot_dir,
+                        self.recorder.lang_name + "_gen_" +
+                        self.recorder.modality + "_" + self.recorder.directionality + "_" +
+                        self.recorder.condition +
+                        "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
+                        ur_string + "_" + pred_sr_string + "_aud.png"
+                    )
+                else:
+                    txt_att_plot = os.path.join(
+                        self.recorder.att_plot_dir,
+                        self.recorder.lang_name + "_" +
+                        self.recorder.modality + "_" + self.recorder.directionality + "_" +
+                        self.recorder.condition +
+                        "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
+                        ur_string + "_" + pred_sr_string + "_txt.png"
+                    )
+                    aud_att_plot = os.path.join(
+                        self.recorder.att_plot_dir,
+                        self.recorder.lang_name + "_" +
+                        self.recorder.modality + "_" + self.recorder.directionality + "_" +
+                        self.recorder.condition +
+                        "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
+                        ur_string + "_" + pred_sr_string + "_aud.png"
+                    )
                 utils.plot_aud_att(ur_spec, pred_sr_list, pred_sr_spec, txt_att, aud_att,
                                    txt_att_plot, aud_att_plot)
-            print(f"Run {self.recorder.run_num} attention plots are saved for investigation")
+            if gen_eval:
+                print(f"Run {self.recorder.run_num} generalization attention plots are saved for investigation")
+            else:
+                print(f"Run {self.recorder.run_num} attention plots are saved for investigation")
 
     def evaluate_embedding(self) -> None:
         # a dictionary of dictionaries to store all embeddings
