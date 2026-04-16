@@ -78,7 +78,7 @@ base_seed = 1234
 audio_root = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon"
 
 # Experiment settings
-lang_name = "EnglishBH_expanded"
+lang_name = "EnglishBH_shortened"
 property = ""
 directionality = ["l2r", "r2l"]
 conditions = ["harmony", "disharmony"]
