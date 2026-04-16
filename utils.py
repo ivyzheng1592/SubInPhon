@@ -235,6 +235,13 @@ def plot_audio_embedding(embedding_store: Mapping[str, Sequence[Any]], embed_plo
     embed_df = pd.DataFrame(embedding_store)
     feature_cols = [col for col in embed_df.columns if col.startswith("mel_")]
     if len(embed_df) == 0 or len(feature_cols) < 2:
+        fig, ax = plt.subplots(figsize=(7, 6))
+        ax.text(0.5, 0.5, "No vowel tokens extracted", ha="center", va="center")
+        ax.set_axis_off()
+        ax.set_title(title)
+        plt.tight_layout()
+        plt.savefig(embed_plot, dpi=300)
+        plt.close()
         return
 
     reduced = PCA(n_components=2).fit_transform(embed_df[feature_cols])

@@ -408,6 +408,9 @@ class AudioTrainer:
             subset_indices = [base_dataset.indices[i] for i in subset_indices]
             base_dataset = base_dataset.dataset
         vowel_labels = list(self.recorder.language.focus.keys())
+        if "aud_vowel" in self.recorder.language.variants:
+            vowel_labels += list(self.recorder.language.variants["aud_vowel"].keys())
+        vowel_labels = list(dict.fromkeys(vowel_labels))
         source_store = {"word_ref": [], "batch_item": [], "vowel_index": [], "vowel_label": []}
         target_store = {"word_ref": [], "batch_item": [], "vowel_index": [], "vowel_label": []}
         pred_store = {"word_ref": [], "batch_item": [], "vowel_index": [], "vowel_label": []}
@@ -468,4 +471,8 @@ class AudioTrainer:
             self.recorder.pred_audio_embed_plot,
             f"{self.recorder.lang_name} {eval_record_type} predicted vowel audio embeddings",
         )
-        print(f"Run {self.recorder.run_num} source, target, and predicted audio embedding plots are saved")
+        print(
+            f"Run {self.recorder.run_num} source, target, and predicted audio embedding plots are saved "
+            f"({len(source_store['vowel_label'])}, {len(target_store['vowel_label'])}, "
+            f"{len(pred_store['vowel_label'])} vowel tokens)"
+        )
