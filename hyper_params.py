@@ -76,9 +76,11 @@ base_seed = 1234
 
 # Audio data root (per-language subfolders live here)
 audio_root = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon"
+# TextGrid subfolder for audio embedding inspection (under audio_root)
+textgrid_folder = "EnglishBH_shortened_segmented"
 
 # Experiment settings
-lang_name = "EnglishBH_expanded"
+lang_name = "EnglishBH_shortened"
 property = ""
 directionality = ["l2r", "r2l"]
 conditions = ["harmony", "disharmony"]

@@ -1,5 +1,5 @@
 import os
-from typing import Any, Mapping, Sequence
+from typing import Any, List, Mapping, Sequence, Tuple
 import torch
 import numpy as np
 import pandas as pd
@@ -165,17 +165,93 @@ def plot_aud_att(
     plt.close()
     #plt.show()
 
-    fig = plt.figure(figsize=(12, 8))
-    ax3 = fig.add_subplot(224)
-    ax3.imshow(aud_attention)
-    ax1 = fig.add_subplot(221, sharey=ax3)
-    ax1.imshow(ur_aud, origin='lower', aspect='auto')
-    ax2 = fig.add_subplot(223, sharex=ax3)
-    ax2.imshow(np.rot90(sr_aud), origin='lower', aspect='auto')
+def read_vowel_intervals(textgrid_file: str, vowel_labels: Sequence[str]) -> List[Tuple[float, float, str]]:
+    vowel_label_set = set(vowel_labels)
+    tiers = []
+    current_tier = None
+    current_interval = {}
+    in_interval = False
+
+    with open(textgrid_file, "r", encoding="utf-8") as f:
+        for raw_line in f:
+            line = raw_line.strip()
+            if line.startswith("class = ") and '"IntervalTier"' in line:
+                if current_tier is not None:
+                    tiers.append(current_tier)
+                current_tier = {"name": "", "intervals": []}
+                current_interval = {}
+                in_interval = False
+            elif current_tier is not None and line.startswith("name = "):
+                current_tier["name"] = line.split("=", 1)[1].strip().strip('"')
+            elif current_tier is not None and line.startswith("intervals ["):
+                current_interval = {}
+                in_interval = True
+            elif current_tier is not None and in_interval and line.startswith("xmin = "):
+                value = float(line.split("=", 1)[1].strip())
+                if "xmin" not in current_interval:
+                    current_interval["xmin"] = value
+            elif current_tier is not None and in_interval and line.startswith("xmax = "):
+                value = float(line.split("=", 1)[1].strip())
+                if "xmin" in current_interval and "xmax" not in current_interval:
+                    current_interval["xmax"] = value
+            elif current_tier is not None and in_interval and line.startswith("text = "):
+                current_interval["text"] = line.split("=", 1)[1].strip().strip('"')
+                if {"xmin", "xmax", "text"} <= current_interval.keys():
+                    current_tier["intervals"].append(
+                        (current_interval["xmin"], current_interval["xmax"], current_interval["text"])
+                    )
+                    current_interval = {}
+                    in_interval = False
+
+    if current_tier is not None:
+        tiers.append(current_tier)
+
+    best_intervals = []
+    best_match_count = -1
+    for tier in tiers:
+        matched = [interval for interval in tier["intervals"] if interval[2] in vowel_label_set]
+        if len(matched) > best_match_count:
+            best_match_count = len(matched)
+            best_intervals = matched
+    return best_intervals
+
+
+def interval_to_frame_span(
+    start_time: float,
+    end_time: float,
+    max_frames: int,
+    sample_rate: int,
+    hop_length: int,
+    start_frame_offset: int = 1,
+) -> Tuple[int, int]:
+    start_frame = int(round(start_time * sample_rate / hop_length)) + start_frame_offset
+    end_frame = int(round(end_time * sample_rate / hop_length)) + start_frame_offset
+    start_frame = max(0, min(start_frame, max_frames - 1))
+    end_frame = max(start_frame + 1, min(end_frame, max_frames))
+    return start_frame, end_frame
+
+
+def plot_audio_embedding(embedding_store: Mapping[str, Sequence[Any]], embed_plot: str, title: str) -> None:
+    embed_df = pd.DataFrame(embedding_store)
+    feature_cols = [col for col in embed_df.columns if col.startswith("mel_")]
+    if len(embed_df) == 0 or len(feature_cols) < 2:
+        return
+
+    reduced = PCA(n_components=2).fit_transform(embed_df[feature_cols])
+    embed_df["pc1"] = reduced[:, 0]
+    embed_df["pc2"] = reduced[:, 1]
+
+    fig, ax = plt.subplots(figsize=(7, 6))
+    for vowel_label in sorted(embed_df["vowel_label"].unique()):
+        vowel_data = embed_df[embed_df["vowel_label"] == vowel_label]
+        ax.scatter(vowel_data["pc1"], vowel_data["pc2"], s=15, alpha=0.7, label=vowel_label)
+    ax.set_xlabel("pc1")
+    ax.set_ylabel("pc2")
+    ax.set_title(title)
+    ax.legend(ncols=2, fontsize=7)
     plt.tight_layout()
-    plt.savefig(aud_att_plot)
+    plt.savefig(embed_plot, dpi=300)
     plt.close()
-    #plt.show()
 
 def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_plot: str) -> None:
     # convert dictionary to pandas dataframe

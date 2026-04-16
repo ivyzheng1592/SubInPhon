@@ -350,3 +350,122 @@ class AudioTrainer:
         # plot embedding
         utils.plot_embed_updated(phone_spaces, focus, self.recorder.embed_plot, self.recorder.focus_embed_plot)
         print(f"Run {self.recorder.run_num} embedding plots and files are saved for investigation")
+
+    def _append_audio_embedding_rows(
+        self,
+        store: dict,
+        spectrogram: torch.Tensor,
+        intervals: List[Tuple[float, float, str]],
+        word_ref: str,
+        batch_item: int,
+    ) -> None:
+        max_frames = spectrogram.shape[1]
+        for vowel_index, (start_time, end_time, vowel_label) in enumerate(intervals):
+            start_frame, end_frame = utils.interval_to_frame_span(
+                start_time,
+                end_time,
+                max_frames,
+                hp.sample_rate,
+                256,
+            )
+            vowel_slice = spectrogram[:, start_frame:end_frame]
+            if vowel_slice.shape[1] == 0:
+                continue
+            vowel_embed = vowel_slice.mean(dim=1).cpu().tolist()
+            store["word_ref"].append(word_ref)
+            store["batch_item"].append(batch_item)
+            store["vowel_index"].append(vowel_index)
+            store["vowel_label"].append(vowel_label)
+            for mel_idx, value in enumerate(vowel_embed):
+                store[f"mel_{mel_idx}"].append(value)
+
+    def evaluate_audio_embedding(
+        self,
+        eval_dataloader: Any,
+        eval_record_type: str,
+        num_batches: int = 3,
+        eval_epoch: int = hp.n_epochs - 1,
+    ) -> None:
+        model_file = os.path.join(
+            self.recorder.model_dir,
+            self.recorder.lang_name + "_" +
+            self.recorder.modality + "_" + self.recorder.directionality + "_" +
+            self.recorder.condition +
+            "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
+            "_seq2seq.pth"
+        )
+        self.seq2seq.load_state_dict(torch.load(model_file))
+        self.seq2seq.eval()
+
+        audio_embed_dataloader = self.recorder.dataset.get_dataloader(
+            eval_dataloader.dataset,
+            hp.batch_size,
+            shuffle=False,
+        )
+        base_dataset = eval_dataloader.dataset
+        subset_indices = list(range(len(base_dataset)))
+        while hasattr(base_dataset, "dataset") and hasattr(base_dataset, "indices"):
+            subset_indices = [base_dataset.indices[i] for i in subset_indices]
+            base_dataset = base_dataset.dataset
+        vowel_labels = list(self.recorder.language.focus.keys())
+        source_store = {"word_ref": [], "batch_item": [], "vowel_index": [], "vowel_label": []}
+        target_store = {"word_ref": [], "batch_item": [], "vowel_index": [], "vowel_label": []}
+        pred_store = {"word_ref": [], "batch_item": [], "vowel_index": [], "vowel_label": []}
+        for mel_idx in range(hp.n_mels):
+            source_store[f"mel_{mel_idx}"] = []
+            target_store[f"mel_{mel_idx}"] = []
+            pred_store[f"mel_{mel_idx}"] = []
+
+        with torch.no_grad():
+            for batch_num, input in enumerate(audio_embed_dataloader):
+                if batch_num >= num_batches:
+                    break
+                src_txt, src_aud, trg_txt, trg_aud = input
+                _, _, pred_spec, _, _ = self.seq2seq(input, 0, 0)
+
+                batch_start = batch_num * hp.batch_size
+                batch_indices = subset_indices[batch_start: batch_start + hp.batch_size]
+                for item_idx, dataset_idx in enumerate(batch_indices):
+                    ur_ref = base_dataset.ur_refs.iloc[dataset_idx]
+                    sr_ref = base_dataset.sr_refs.iloc[dataset_idx]
+                    textgrid_dir = os.path.join(hp.audio_root, hp.textgrid_folder)
+                    src_textgrid = os.path.join(textgrid_dir, ur_ref + ".TextGrid")
+                    trg_textgrid = os.path.join(textgrid_dir, sr_ref + ".TextGrid")
+                    if not os.path.exists(src_textgrid):
+                        src_textgrid = os.path.join(textgrid_dir, ur_ref + ".textgrid")
+                    if not os.path.exists(trg_textgrid):
+                        trg_textgrid = os.path.join(textgrid_dir, sr_ref + ".textgrid")
+                    if not os.path.exists(src_textgrid):
+                        raise FileNotFoundError(f"Could not find TextGrid for {ur_ref} in {textgrid_dir}")
+                    if not os.path.exists(trg_textgrid):
+                        raise FileNotFoundError(f"Could not find TextGrid for {sr_ref} in {textgrid_dir}")
+                    src_intervals = utils.read_vowel_intervals(src_textgrid, vowel_labels)
+                    trg_intervals = utils.read_vowel_intervals(trg_textgrid, vowel_labels)
+
+                    src_spec = src_aud[item_idx, 0]
+                    trg_spec = trg_aud[item_idx, 0]
+                    pred_item_spec = pred_spec[item_idx, 0]
+
+                    self._append_audio_embedding_rows(source_store, src_spec, src_intervals, ur_ref, item_idx)
+                    self._append_audio_embedding_rows(target_store, trg_spec, trg_intervals, sr_ref, item_idx)
+                    self._append_audio_embedding_rows(pred_store, pred_item_spec, trg_intervals, sr_ref, item_idx)
+
+        utils.save_to_file(source_store, self.recorder.source_audio_embed_file)
+        utils.save_to_file(target_store, self.recorder.target_audio_embed_file)
+        utils.save_to_file(pred_store, self.recorder.pred_audio_embed_file)
+        utils.plot_audio_embedding(
+            source_store,
+            self.recorder.source_audio_embed_plot,
+            f"{self.recorder.lang_name} {eval_record_type} source vowel audio embeddings",
+        )
+        utils.plot_audio_embedding(
+            target_store,
+            self.recorder.target_audio_embed_plot,
+            f"{self.recorder.lang_name} {eval_record_type} target vowel audio embeddings",
+        )
+        utils.plot_audio_embedding(
+            pred_store,
+            self.recorder.pred_audio_embed_plot,
+            f"{self.recorder.lang_name} {eval_record_type} predicted vowel audio embeddings",
+        )
+        print(f"Run {self.recorder.run_num} source, target, and predicted audio embedding plots are saved")
