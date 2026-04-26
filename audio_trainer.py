@@ -23,7 +23,7 @@ class AudioTrainer:
 
         if resume_model_file:
             self.seq2seq.load_state_dict(torch.load(resume_model_file))
-            match = re.search(r"_epoch(-?\\d+)_seq2seq\\.pth$", resume_model_file)
+            match = re.search(r"_epoch(-?\d+)_seq2seq\.pth$", resume_model_file)
             if not match:
                 raise RuntimeError(f"Cannot parse epoch from model file: {resume_model_file}")
             self.start_epoch = int(match.group(1)) + 1

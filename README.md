@@ -20,7 +20,7 @@ It supports text-based learning (UR -> SR), feature-embedded text learning, and 
 2. Install requirements:
 
 ```bash
-pip install torch==2.0.0 torchaudio==2.0.1 torchinfo==1.8.0
+pip install -r requirements.txt
 ```
 
 3. Run a default experiment:

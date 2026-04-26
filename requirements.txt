@@ -2,3 +2,10 @@ python>=3.8,<=3.11
 torch==2.0.0
 torchaudio==2.0.1
 torchinfo==1.8.0
+numpy>=1.23,<3
+pandas>=1.5,<3
+matplotlib>=3.6,<4
+plotly>=5,<6
+scikit-learn>=1.2,<2
+openpyxl>=3.1,<4
+nooverlap>=0.1
