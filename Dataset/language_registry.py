@@ -116,9 +116,16 @@ if __name__ == "__main__":
 
     language = languages[hp.lang_name]
     variant = "aud_vowel" if "aud_vowel" in language.variants else None
-    for directionality in hp.directionality:
-        language.generate_stimuli(
-            property=hp.property,
-            directionality=directionality,
-            variant=variant,
-        )
+
+    # Example: generate a standalone sampled dataset outside the experiment loop.
+    # This writes harmony/disharmony CSVs plus a template-count Excel report to a custom folder.
+    example_output_dir = os.path.join("Results", "standalone_generation_example")
+    sampled_files = language.generate_stimuli(
+        seed=hp.base_seed,
+        sample_proportion=hp.data_proportion,
+        property=hp.property,
+        directionality=hp.directionality[0],
+        variant=variant,
+        output_dir=example_output_dir,
+    )
+    print(f"Standalone sampled files written to {example_output_dir}: {sampled_files}")

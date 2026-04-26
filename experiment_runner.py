@@ -29,6 +29,33 @@ def set_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
+def prepare_annotations_file(
+    language,
+    trial_num: str,
+    run_num: int,
+    directionality: str,
+    condition: str,
+    gen_eval: bool = False,
+) -> str:
+    output_dir = os.path.join(
+        "Results",
+        trial_num + "_" + hp.lang_name + "_generated_data",
+        "run_" + str(run_num),
+        "expanded" if gen_eval else "full",
+    )
+    os.makedirs(output_dir, exist_ok=True)
+    variant = "aud_vowel" if "aud_vowel" in language.variants else None
+    sample_proportion = hp.gen_data_proportion if gen_eval else hp.data_proportion
+    return language.generate_stimuli(
+        seed=hp.base_seed + run_num,
+        sample_proportion=sample_proportion,
+        property=hp.property,
+        directionality=directionality,
+        variant=variant,
+        output_dir=output_dir,
+    )[condition]
+
+
 def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -> None:
     os.makedirs(os.path.join("Results", trial_num + "_" + hp.lang_name + "_txt"), exist_ok=True)
 
@@ -37,37 +64,41 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
             print(" - Instantiating language pattern:")
             language = languages[hp.lang_name]
 
-            print(" - Loading dataset:")
-            annotations_file = os.path.join(
-                "Dataset",
-                "_".join(part for part in [hp.lang_name, directionality, hp.property, condition] if part) + ".csv",
-            )
-            dataset = TextDataset(annotations_file, hp.special_tokens, device=hp.device)
-
             for run_num in runs:
                 set_seed(hp.base_seed + run_num)
+                print(" - Loading dataset:")
+                annotations_file = prepare_annotations_file(
+                    language,
+                    trial_num,
+                    run_num,
+                    directionality,
+                    condition,
+                )
+                dataset = TextDataset(annotations_file, hp.special_tokens, device=hp.device)
                 print(" - Splitting dataset:")
-                sampled_dataset = dataset.sample_dataset(hp.data_percentage)
-                train_data, valid_data, test_data = random_split(sampled_dataset, hp.text_data_split_ratio)
+                train_data, valid_data, test_data = random_split(dataset, hp.text_data_split_ratio)
                 gen_test_dataloader = None
                 if hp.gen_eval:
                     gen_lang_name = hp.lang_name if hp.lang_name.endswith("_expanded") else hp.lang_name + "_expanded"
-                    gen_annotations_file = os.path.join(
-                        "Dataset",
-                        "_".join(part for part in [gen_lang_name, directionality, hp.property, condition] if part) + ".csv",
+                    gen_language = languages[gen_lang_name]
+                    gen_annotations_file = prepare_annotations_file(
+                        gen_language,
+                        trial_num,
+                        run_num,
+                        directionality,
+                        condition,
+                        gen_eval=True,
                     )
                     gen_dataset = TextDataset(gen_annotations_file, hp.special_tokens, device=hp.device)
                     gen_dataset.ur_alphabet = dataset.ur_alphabet
                     gen_dataset.sr_alphabet = dataset.sr_alphabet
-                    gen_sampled_dataset = gen_dataset.sample_dataset(hp.gen_data_percentage)
-                    _, _, gen_test_data = random_split(gen_sampled_dataset, hp.text_data_split_ratio)
 
                 print(" - Creating dataloader:")
                 train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
                 valid_dataloader = dataset.get_dataloader(valid_data, hp.batch_size)
                 test_dataloader = dataset.get_dataloader(test_data, hp.batch_size)
                 if hp.gen_eval:
-                    gen_test_dataloader = gen_dataset.get_dataloader(gen_test_data, hp.batch_size)
+                    gen_test_dataloader = gen_dataset.get_dataloader(gen_dataset, hp.batch_size, shuffle=False)
 
                 print(" - Initializing model:")
                 encoder_input_dim = len(dataset.ur_alphabet)
@@ -108,39 +139,43 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
         for condition in hp.conditions:
             print(" - Instantiating language pattern:")
             language = languages[hp.lang_name]
-
-            print(" - Loading dataset:")
-            annotations_file = os.path.join(
-                "Dataset",
-                "_".join(part for part in [hp.lang_name, directionality, hp.property, condition] if part) + ".csv",
-            )
             feature_file = os.path.join("Dataset", "EnglishBH_features.xlsx")
-            dataset = FeatureDataset(annotations_file, feature_file, hp.special_tokens, device=hp.device)
 
             for run_num in runs:
                 set_seed(hp.base_seed + run_num)
+                print(" - Loading dataset:")
+                annotations_file = prepare_annotations_file(
+                    language,
+                    trial_num,
+                    run_num,
+                    directionality,
+                    condition,
+                )
+                dataset = FeatureDataset(annotations_file, feature_file, hp.special_tokens, device=hp.device)
                 print(" - Splitting dataset:")
-                sampled_dataset = dataset.sample_dataset(hp.data_percentage)
-                train_data, valid_data, test_data = random_split(sampled_dataset, hp.text_data_split_ratio)
+                train_data, valid_data, test_data = random_split(dataset, hp.text_data_split_ratio)
                 gen_test_dataloader = None
                 if hp.gen_eval:
                     gen_lang_name = hp.lang_name if hp.lang_name.endswith("_expanded") else hp.lang_name + "_expanded"
-                    gen_annotations_file = os.path.join(
-                        "Dataset",
-                        "_".join(part for part in [gen_lang_name, directionality, hp.property, condition] if part) + ".csv",
+                    gen_language = languages[gen_lang_name]
+                    gen_annotations_file = prepare_annotations_file(
+                        gen_language,
+                        trial_num,
+                        run_num,
+                        directionality,
+                        condition,
+                        gen_eval=True,
                     )
                     gen_dataset = FeatureDataset(gen_annotations_file, feature_file, hp.special_tokens, device=hp.device)
                     gen_dataset.ur_alphabet = dataset.ur_alphabet
                     gen_dataset.sr_alphabet = dataset.sr_alphabet
-                    gen_sampled_dataset = gen_dataset.sample_dataset(hp.gen_data_percentage)
-                    _, _, gen_test_data = random_split(gen_sampled_dataset, hp.text_data_split_ratio)
 
                 print(" - Creating dataloader:")
                 train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
                 valid_dataloader = dataset.get_dataloader(valid_data, hp.batch_size)
                 test_dataloader = dataset.get_dataloader(test_data, hp.batch_size)
                 if hp.gen_eval:
-                    gen_test_dataloader = gen_dataset.get_dataloader(gen_test_data, hp.batch_size)
+                    gen_test_dataloader = gen_dataset.get_dataloader(gen_dataset, hp.batch_size, shuffle=False)
 
                 print(" - Initializing model:")
                 encoder_input_dim = len(dataset.ur_alphabet)
@@ -188,33 +223,39 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
         for condition in hp.conditions:
             print(" - Instantiating language pattern:")
             language = languages[hp.lang_name]
-
-            print(" - Loading dataset:")
-            annotations_file = os.path.join(
-                "Dataset",
-                "_".join(part for part in [hp.lang_name, directionality, hp.property, condition] if part) + ".csv",
-            )
             audio_dir = os.path.join(hp.audio_root, hp.lang_name)
-            dataset = AudioDataset(
-                annotations_file,
-                audio_dir,
-                hp.special_tokens,
-                wav2mel=True,
-                power2db=True,
-                device=hp.device,
-            )
 
             for run_num in runs:
                 set_seed(hp.base_seed + run_num)
+                print(" - Loading dataset:")
+                annotations_file = prepare_annotations_file(
+                    language,
+                    trial_num,
+                    run_num,
+                    directionality,
+                    condition,
+                )
+                dataset = AudioDataset(
+                    annotations_file,
+                    audio_dir,
+                    hp.special_tokens,
+                    wav2mel=True,
+                    power2db=True,
+                    device=hp.device,
+                )
                 print(" - Splitting dataset:")
-                sampled_dataset = dataset.sample_dataset(hp.data_percentage)
-                train_data, valid_data, test_data = random_split(sampled_dataset, hp.audio_data_split_ratio)
+                train_data, valid_data, test_data = random_split(dataset, hp.audio_data_split_ratio)
                 gen_test_dataloader = None
                 if hp.gen_eval:
                     gen_lang_name = hp.lang_name if hp.lang_name.endswith("_expanded") else hp.lang_name + "_expanded"
-                    gen_annotations_file = os.path.join(
-                        "Dataset",
-                        "_".join(part for part in [gen_lang_name, directionality, hp.property, condition] if part) + ".csv",
+                    gen_language = languages[gen_lang_name]
+                    gen_annotations_file = prepare_annotations_file(
+                        gen_language,
+                        trial_num,
+                        run_num,
+                        directionality,
+                        condition,
+                        gen_eval=True,
                     )
                     gen_audio_dir = os.path.join(hp.audio_root, gen_lang_name)
                     gen_dataset = AudioDataset(
@@ -227,15 +268,13 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                     )
                     gen_dataset.ur_alphabet = dataset.ur_alphabet
                     gen_dataset.sr_alphabet = dataset.sr_alphabet
-                    gen_sampled_dataset = gen_dataset.sample_dataset(hp.gen_data_percentage)
-                    _, _, gen_test_data = random_split(gen_sampled_dataset, hp.audio_data_split_ratio)
 
                 print(" - Creating dataloader:")
                 train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
                 valid_dataloader = dataset.get_dataloader(valid_data, hp.batch_size)
                 test_dataloader = dataset.get_dataloader(test_data, hp.batch_size)
                 if hp.gen_eval:
-                    gen_test_dataloader = gen_dataset.get_dataloader(gen_test_data, hp.batch_size)
+                    gen_test_dataloader = gen_dataset.get_dataloader(gen_dataset, hp.batch_size, shuffle=False)
 
                 print(" - Initializing model:")
                 encoder_input_dim = hp.n_mels

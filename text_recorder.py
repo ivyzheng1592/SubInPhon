@@ -5,6 +5,7 @@
 import os
 from typing import Any, Dict, List, Tuple
 import hyper_params as hp
+from Dataset.language_registry import languages
 
 
 class TextRecorder:
@@ -29,6 +30,8 @@ class TextRecorder:
 
         self.ur_alphabet = self.dataset.ur_alphabet
         self.sr_alphabet = self.dataset.sr_alphabet
+        gen_lang_name = hp.lang_name if hp.lang_name.endswith("_expanded") else hp.lang_name + "_expanded"
+        self.has_expanded_eval = hp.lang_name.endswith("_expanded") or gen_lang_name in languages
 
         # result storages
         self.acc_store = {
@@ -45,7 +48,7 @@ class TextRecorder:
             'sr_v1': [], 'sr_v2': [],
             'pred_sr_v1': [], 'pred_sr_v2': [],
         }
-        if hp.lang_name.endswith("_expanded") or hp.gen_eval:
+        if self.has_expanded_eval:
             self.pred_store.update({
                 'v3_error': [],
                 'sr_v3': [],
@@ -60,7 +63,7 @@ class TextRecorder:
                 'sr_c1': [], 'sr_c2': [],
                 'pred_sr_c1': [], 'pred_sr_c2': [],
             })
-            if hp.lang_name.endswith("_expanded") or hp.gen_eval:
+            if self.has_expanded_eval:
                 self.pred_store.update({
                     'o3_error': [],
                     'sr_o3': [],
@@ -206,8 +209,8 @@ class TextRecorder:
                 else:
                     epoch_correct.append(0)
 
-                # skip this recording if the prediction has wrong syllable structure
-                if any(False in syll for syll in pred_sr_sylls):
+                # Skip this recording if the prediction cannot be parsed into legal syllables.
+                if pred_sr_sylls == [False, False, False]:
                     continue
 
                 syll_count = len(sr_sylls)
