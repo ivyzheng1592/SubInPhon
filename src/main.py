@@ -18,6 +18,7 @@ Command-line arguments:
 - --save-epochs INT
 - --base-seed SEED
 - --lang-name LANGUAGE_KEY
+- --property PROPERTY_LABEL
 - --run-mode {"train and evaluate","tuning","inspection"}
 - --pred-log {vowel_only_error,consonant_vowel_error,all_correct_syll}
 - --device {cpu,cuda}
@@ -28,6 +29,7 @@ Typical examples:
 - python3 src/main.py --modality text --lang-name EnglishBH_shortened --runs 0:2 --device cpu
 - python3 src/main.py --base-seed 2026
 - python3 src/main.py --data-proportion 0.2 --gen-data-proportion 0.001 --n-epochs 20 --save-epochs 5
+- python3 src/main.py --lang-name EnglishBH_expanded --property nonidentical
 - python3 src/main.py --modality audio --resume-model-file /path/to/model_seq2seq.pth
 
 Set these directly in hyper_params.py:
@@ -111,6 +113,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--lang-name", default=None, help="Override hp.lang_name.")
     parser.add_argument(
+        "--property",
+        default=None,
+        help="Override hp.property for this run.",
+    )
+    parser.add_argument(
         "--run-mode",
         choices=("train and evaluate", "tuning", "inspection"),
         default=None,
@@ -180,6 +187,8 @@ def main() -> None:
         hp.base_seed = args.base_seed
     if args.lang_name is not None:
         hp.lang_name = args.lang_name
+    if args.property is not None:
+        hp.property = args.property
     if args.run_mode is not None:
         hp.run_mode = args.run_mode
     if args.pred_log is not None:
@@ -195,7 +204,7 @@ def main() -> None:
         f"Run mode={hp.run_mode} pred_log={hp.pred_log} device={hp.device} "
         f"data_proportion={hp.data_proportion} gen_data_proportion={hp.gen_data_proportion} "
         f"n_epochs={hp.n_epochs} save_epochs={hp.save_epochs} "
-        f"base_seed={hp.base_seed} "
+        f"base_seed={hp.base_seed} lang_name={hp.lang_name} property={hp.property} "
         f"runs={list(runs)} trial_num={trial_num}"
     )
 
