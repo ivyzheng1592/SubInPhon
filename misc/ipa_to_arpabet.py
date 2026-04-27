@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Script to process EnglishBH_shortened_l2r_harmony.csv and generate a two-column text file:
-- Column 1: ur_string
+- Column 1: ur_string converted to English letters
 - Column 2: ur_var converted to ARPABET with spaces between phones
 """
 
@@ -11,12 +11,12 @@ import os
 # IPA to ARPABET mapping based on common phonetic correspondences
 IPA_TO_ARPABET = {
     # Vowels (standalone only - diphthongs handled separately)
-    'i': 'IY',   # high front tense
-    'u': 'UW',   # high back tense
-    'ɪ': 'IH',   # high front lax
-    'ɛ': 'EH',   # mid front lax
-    'ʊ': 'UH',   # high back lax
-    'ɔ': 'AO',   # mid back lax
+    'i': 'IY1',   # high front tense
+    'u': 'UW1',   # high back tense
+    'ɪ': 'IH1',   # high front lax
+    'ɛ': 'EH1',   # mid front lax
+    'ʊ': 'UH1',   # high back lax
+    'ɔ': 'AO1',   # mid back lax
 
     # Consonants
     'm': 'M',    # bilabial nasal
@@ -39,11 +39,64 @@ IPA_TO_ARPABET = {
     'h': 'HH',   # voiceless glottal fricative
 }
 
+# IPA to English letters mapping for ur_string
+IPA_TO_ENGLISH = {
+    # Vowels (doubled to distinguish from consonants)
+    'i': 'ii',   # high front tense
+    'u': 'uu',   # high back tense
+    'e': 'ee',   # mid front tense
+    'o': 'oo',   # mid back tense
+    'ɪ': 'i',   # high front lax
+    'ɛ': 'e',   # mid front lax
+    'ʊ': 'u',   # high back lax
+    'ɔ': 'o',   # mid back lax
+
+    # Consonants
+    'm': 'm',    # bilabial nasal
+    'n': 'n',    # alveolar nasal
+    'ŋ': 'ng',   # velar nasal
+    'p': 'p',    # voiceless bilabial plosive
+    't': 't',    # voiceless alveolar plosive
+    'k': 'k',    # voiceless velar plosive
+    'b': 'b',    # voiced bilabial plosive
+    'd': 'd',    # voiced alveolar plosive
+    'g': 'g',    # voiced velar plosive
+    'f': 'f',    # voiceless labiodental fricative
+    's': 's',    # voiceless alveolar fricative
+    'v': 'v',    # voiced labiodental fricative
+    'z': 'z',    # voiced alveolar fricative
+    'ʃ': 'sh',   # voiceless postalveolar fricative
+    'ʒ': 'zh',   # voiced postalveolar fricative
+    'θ': 'th',   # voiceless dental fricative
+    'ð': 'dh',   # voiced dental fricative
+    'h': 'h',    # voiceless glottal fricative
+}
+
 # Diphthong mappings (processed before individual characters)
 DIPHTHONGS = {
-    'eɪ': 'EY',  # mid front tense + high front lax -> EY
-    'oʊ': 'OW',  # mid back tense + high back lax -> OW
+    'eɪ': 'EY1',  # mid front tense + high front lax -> EY
+    'oʊ': 'OW1',  # mid back tense + high back lax -> OW
 }
+
+
+def ipa_to_english(ipa_string):
+    """
+    Convert IPA phonetic string to English letters.
+
+    Args:
+        ipa_string (str): String in IPA notation
+
+    Returns:
+        str: English letter representation
+    """
+    english_string = ""
+    for char in ipa_string:
+        if char in IPA_TO_ENGLISH:
+            english_string += IPA_TO_ENGLISH[char]
+        else:
+            # If character not in mapping, keep as is
+            english_string += char
+    return english_string
 
 
 def ipa_to_arpabet(ipa_string):
@@ -91,8 +144,10 @@ def ipa_to_arpabet(ipa_string):
 
 def main():
     # File paths
-    csv_file = os.path.join('..', 'Dataset', 'EnglishBH_shortened_l2r_harmony.csv')
-    output_file = 'englishbh_arpabet.txt'
+    data_dir = '/mnt/data/Projects/subinphon/dataset'
+    csv_file = os.path.join(data_dir, 'EnglishBH_shortened_l2r_harmony.csv')
+    wordlist_file = os.path.join(data_dir, 'EnglishBH_wordlist.txt')
+    textgrid_file = os.path.join(data_dir, 'EnglishBH_textgrid.txt')
 
     # Check if CSV file exists
     if not os.path.exists(csv_file):
@@ -100,10 +155,12 @@ def main():
         return
 
     print(f"Reading from: {csv_file}")
-    print(f"Writing to: {output_file}")
+    print(f"Writing wordlist to: {wordlist_file}")
+    print(f"Writing textgrid to: {textgrid_file}")
 
     with open(csv_file, 'r', encoding='utf-8') as infile, \
-         open(output_file, 'w', encoding='utf-8') as outfile:
+         open(wordlist_file, 'w', encoding='utf-8') as wordlist_out, \
+         open(textgrid_file, 'w', encoding='utf-8') as textgrid_out:
 
         reader = csv.DictReader(infile)
 
@@ -111,17 +168,19 @@ def main():
             ur_string = row['ur_string']
             ur_var = row['ur_var']
 
-            # Column 1: ur_string (not duplicated)
-            col1 = ur_string
+            # Wordlist output: ur_string converted to English letters, ur_var converted to ARPABET
+            wordlist_col1 = ipa_to_english(ur_string)
+            wordlist_col2 = ipa_to_arpabet(ur_var)
+            wordlist_out.write(f"{wordlist_col1}\t{wordlist_col2}\n")
 
-            # Column 2: ur_var converted to ARPABET with spaces
-            col2 = ipa_to_arpabet(ur_var)
+            # Textgrid output: original ur_var, English-letter version of ur_string
+            textgrid_col1 = ur_var
+            textgrid_col2 = ipa_to_english(ur_string)
+            textgrid_out.write(f"{textgrid_col1}\t{textgrid_col2}\n")
 
-            # Write tab-separated line
-            outfile.write(f"{col1}\t{col2}\n")
-
-    print(f"Processing complete. Output written to {output_file}")
-    print(f"Total lines processed: {sum(1 for _ in open(csv_file)) - 1}")  # -1 for header
+    total_lines = sum(1 for _ in open(csv_file, 'r', encoding='utf-8')) - 1
+    print(f"Processing complete. Output written to {wordlist_file} and {textgrid_file}")
+    print(f"Total lines processed: {total_lines}")  # -1 for header
 
 
 if __name__ == "__main__":
