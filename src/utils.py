@@ -357,8 +357,9 @@ def plot_embed_updated(
 
     # Parse metadata from filenames like:
     # EnglishBH_shortened_txt_l2r_harmony_run0_epoch10_embedding.csv
+    # EnglishBH_shortened_txt_l2r_nonidentical_harmony_run0_epoch10_embedding.csv
     metadata = combined_df['file_name'].str.extract(
-        r'^(?P<language>.+)_(?P<modality>txt|fea|aud)_(?P<directionality>[^_]+)_(?P<condition>[^_]+)_run(?P<run_num>\d+)_epoch(?P<epoch>-?\d+)_(?P<suffix>.+)$'
+        r'^(?P<language>.+)_(?P<modality>txt|fea|aud)_(?P<directionality>[^_]+)(?:_(?P<property>[^_]+))?_(?P<condition>[^_]+)_run(?P<run_num>\d+)_epoch(?P<epoch>-?\d+)_(?P<suffix>.+)$'
     )
     if metadata.isnull().any().any():
         bad_files = combined_df.loc[metadata.isnull().any(axis=1), 'file_name'].tolist()

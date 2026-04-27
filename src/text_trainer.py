@@ -43,11 +43,7 @@ class TextTrainer:
     ) -> None:
         if self.start_epoch == 0:
             # save untrained model
-            model_file = os.path.join(self.recorder.model_dir,
-                                      self.recorder.lang_name + "_" +
-                                      self.recorder.modality + "_" + self.recorder.directionality + "_" +
-                                      self.recorder.condition +
-                                      "_run" + str(self.recorder.run_num) + "_epoch-1_seq2seq.pth")
+            model_file = os.path.join(self.recorder.model_dir, self.recorder.run_root + "_epoch-1_seq2seq.pth")
 
             torch.save(self.seq2seq.state_dict(), model_file)
             print(f"Untrained model stored at {model_file}")
@@ -85,12 +81,10 @@ class TextTrainer:
 
             # save model every other save_epochs
             if epoch % hp.save_epochs == 0 or epoch == hp.n_epochs-1:
-                model_file = os.path.join(self.recorder.model_dir,
-                                          self.recorder.lang_name + "_" +
-                                          self.recorder.modality + "_" + self.recorder.directionality + "_" +
-                                          self.recorder.condition +
-                                          "_run" + str(self.recorder.run_num) + "_epoch" + str(epoch) +
-                                          "_seq2seq.pth")
+                model_file = os.path.join(
+                    self.recorder.model_dir,
+                    self.recorder.run_root + "_epoch" + str(epoch) + "_seq2seq.pth",
+                )
                 torch.save(self.seq2seq.state_dict(), model_file)
                 print(f"Epoch {epoch} model trained and stored at {model_file}")
 
@@ -188,7 +182,6 @@ class TextTrainer:
         self,
         test_dataloader: Any,
         eval_epoch: int = hp.n_epochs-1,
-        gen_eval: bool = False,
     ) -> None:
         # get one random batch of test data
         dataiter = iter(test_dataloader)
@@ -197,12 +190,10 @@ class TextTrainer:
         # trg = [trg_len, batch_size]
 
         # load model
-        model_file = os.path.join(self.recorder.model_dir,
-                                  self.recorder.lang_name + "_" +
-                                  self.recorder.modality + "_" + self.recorder.directionality + "_" +
-                                  self.recorder.condition +
-                                  "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
-                                  "_seq2seq.pth")
+        model_file = os.path.join(
+            self.recorder.model_dir,
+            self.recorder.run_root + "_epoch" + str(eval_epoch) + "_seq2seq.pth",
+        )
         self.seq2seq.load_state_dict(torch.load(model_file))
         self.seq2seq.eval()  # disable dropout in evaluation
 
@@ -229,29 +220,12 @@ class TextTrainer:
                 # word_att = [trg_len, src_len]
 
                 # plot attention
-                if gen_eval:
-                    att_plot = os.path.join(
-                        self.recorder.att_plot_dir,
-                        self.recorder.lang_name + "_gen_" +
-                        self.recorder.modality + "_" + self.recorder.directionality + "_" +
-                        self.recorder.condition +
-                        "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
-                        ur_string + "_" + pred_sr_string + ".png"
-                    )
-                else:
-                    att_plot = os.path.join(
-                        self.recorder.att_plot_dir,
-                        self.recorder.lang_name + "_" +
-                        self.recorder.modality + "_" + self.recorder.directionality + "_" +
-                        self.recorder.condition +
-                        "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
-                        ur_string + "_" + pred_sr_string + ".png"
-                    )
+                att_plot = os.path.join(
+                    self.recorder.att_plot_dir,
+                    self.recorder.run_root + "_epoch" + str(eval_epoch) + "_" + ur_string + "_" + pred_sr_string + ".png"
+                )
                 utils.plot_txt_att(ur_list, pred_sr_list, word_att, att_plot)
-            if gen_eval:
-                print(f"Run {self.recorder.run_num} generalization attention plots are saved for investigation")
-            else:
-                print(f"Run {self.recorder.run_num} attention plots are saved for investigation")
+            print(f"Run {self.recorder.run_num} attention plots are saved for investigation")
 
     def evaluate_embedding(self) -> None:
         # a dictionary of dictionaries to store all embeddings

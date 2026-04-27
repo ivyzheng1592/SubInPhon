@@ -198,14 +198,20 @@ class AudioDataset(Dataset):
 
 if __name__ == "__main__":
     import utils
+    from language_registry import languages
 
     print(" - Loading dataset:")
+    language = languages[hp.lang_name]
     audio_dir = os.path.join(hp.audio_root, hp.lang_name)
-    annotations_file = (
-        "data/" + "_".join(
-            part for part in [hp.lang_name, hp.directionality[0], hp.property, hp.conditions[0]] if part
-        ) + ".csv"
-    )
+    variant = "aud_vowel" if "aud_vowel" in language.variants else None
+    annotations_file = language.generate_stimuli(
+        seed=hp.base_seed,
+        sample_proportion=hp.data_proportion,
+        property=hp.property,
+        directionality=hp.directionality[0],
+        variant=variant,
+        output_dir="data",
+    )[hp.conditions[0]]
     annotations = pd.read_csv(annotations_file)
     print(f"Dataset size: {len(annotations)}")
     print(f"Sample data token: {annotations.iloc[0]}")

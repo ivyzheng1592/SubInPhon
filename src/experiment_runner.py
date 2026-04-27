@@ -38,26 +38,27 @@ def prepare_annotations_file(
     gen_eval: bool = False,
 ) -> str:
     output_dir = os.path.join(
-        "results",
+        "data",
         trial_num + "_" + hp.lang_name + "_generated_data",
-        "run_" + str(run_num),
-        "expanded" if gen_eval else "full",
     )
     os.makedirs(output_dir, exist_ok=True)
     variant = "aud_vowel" if "aud_vowel" in language.variants else None
     sample_proportion = hp.gen_data_proportion if gen_eval else hp.data_proportion
-    return language.generate_stimuli(
+    annotations_file = language.generate_stimuli(
         seed=hp.base_seed + run_num,
         sample_proportion=sample_proportion,
         property=hp.property,
         directionality=directionality,
         variant=variant,
         output_dir=output_dir,
+        run_num=run_num,
     )[condition]
+    return annotations_file
 
 
 def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -> None:
-    os.makedirs(os.path.join("results", trial_num + "_" + hp.lang_name + "_txt"), exist_ok=True)
+    os.makedirs(os.path.join("results", trial_num + "_" + hp.lang_name + "_txt"), 
+                exist_ok=True)
 
     for directionality in hp.directionality:
         for condition in hp.conditions:
@@ -74,11 +75,16 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
                     directionality,
                     condition,
                 )
-                dataset = TextDataset(annotations_file, hp.special_tokens, device=hp.device)
+                dataset = TextDataset(
+                    annotations_file,
+                    hp.special_tokens,
+                    device=hp.device,
+                )
                 print(" - Splitting dataset:")
                 train_data, valid_data, test_data = random_split(dataset, hp.text_data_split_ratio)
-                gen_test_dataloader = None
+                gen_dataset = None
                 if hp.gen_eval:
+                    # Load the matching expanded language entry for generalization evaluation.
                     gen_lang_name = hp.lang_name if hp.lang_name.endswith("_expanded") else hp.lang_name + "_expanded"
                     gen_language = languages[gen_lang_name]
                     gen_annotations_file = prepare_annotations_file(
@@ -89,7 +95,11 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
                         condition,
                         gen_eval=True,
                     )
-                    gen_dataset = TextDataset(gen_annotations_file, hp.special_tokens, device=hp.device)
+                    gen_dataset = TextDataset(
+                        gen_annotations_file,
+                        hp.special_tokens,
+                        device=hp.device,
+                    )
                     gen_dataset.ur_alphabet = dataset.ur_alphabet
                     gen_dataset.sr_alphabet = dataset.sr_alphabet
 
@@ -97,6 +107,7 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
                 train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
                 valid_dataloader = dataset.get_dataloader(valid_data, hp.batch_size)
                 test_dataloader = dataset.get_dataloader(test_data, hp.batch_size)
+                gen_test_dataloader = None
                 if hp.gen_eval:
                     gen_test_dataloader = gen_dataset.get_dataloader(gen_dataset, hp.batch_size, shuffle=False)
 
@@ -104,22 +115,40 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
                 encoder_input_dim = len(dataset.ur_alphabet)
                 decoder_input_dim = len(dataset.sr_alphabet)
                 output_dim = len(dataset.sr_alphabet)
-                seq2seq = TextSeq2Seq(encoder_input_dim, decoder_input_dim, output_dim, device=hp.device)
+                seq2seq = TextSeq2Seq(
+                    encoder_input_dim,
+                    decoder_input_dim,
+                    output_dim,
+                    device=hp.device,
+                )
 
                 for name, param in seq2seq.named_parameters():
                     if "embedding.weight" in name:
                         nn.init.uniform_(param.data, a=hp.embedding_init_low, b=hp.embedding_init_high)
 
                 print(" - Preparing data recorder:")
-                recorder = TextRecorder(dataset, trial_num, language, "txt", directionality, condition, run_num)
+                recorder = TextRecorder(
+                    dataset,
+                    trial_num,
+                    language,
+                    "txt",
+                    directionality,
+                    condition,
+                    run_num,
+                )
 
                 print(" - Training and evaluating model:")
                 rep = TextTrainer(seq2seq, recorder, resume_model_file=resume_model_file)
                 if hp.run_mode == "train and evaluate":
-                    rep.run(train_dataloader, test_dataloader, "test", gen_eval_dataloader=gen_test_dataloader)
+                    rep.run(
+                        train_dataloader,
+                        test_dataloader,
+                        "test",
+                        gen_eval_dataloader=gen_test_dataloader,
+                    )
                     rep.evaluate_attention(test_dataloader)
                     if hp.gen_eval:
-                        rep.evaluate_attention(gen_test_dataloader, gen_eval=True)
+                        rep.evaluate_attention(gen_test_dataloader)
                     rep.evaluate_embedding()
                 elif hp.run_mode == "tuning":
                     rep.run(train_dataloader, valid_dataloader, "valid")
@@ -128,12 +157,13 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
                 else:
                     rep.evaluate_attention(test_dataloader)
                     if hp.gen_eval:
-                        rep.evaluate_attention(gen_test_dataloader, gen_eval=True)
+                        rep.evaluate_attention(gen_test_dataloader)
                     rep.evaluate_embedding()
 
 
 def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -> None:
-    os.makedirs(os.path.join("results", trial_num + "_" + hp.lang_name + "_fea"), exist_ok=True)
+    os.makedirs(os.path.join("results", trial_num + "_" + hp.lang_name + "_fea"), 
+                exist_ok=True)
 
     for directionality in hp.directionality:
         for condition in hp.conditions:
@@ -151,11 +181,17 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
                     directionality,
                     condition,
                 )
-                dataset = FeatureDataset(annotations_file, feature_file, hp.special_tokens, device=hp.device)
+                dataset = FeatureDataset(
+                    annotations_file,
+                    feature_file,
+                    hp.special_tokens,
+                    device=hp.device,
+                )
                 print(" - Splitting dataset:")
                 train_data, valid_data, test_data = random_split(dataset, hp.text_data_split_ratio)
-                gen_test_dataloader = None
+                gen_dataset = None
                 if hp.gen_eval:
+                    # Load the matching expanded language entry for generalization evaluation.
                     gen_lang_name = hp.lang_name if hp.lang_name.endswith("_expanded") else hp.lang_name + "_expanded"
                     gen_language = languages[gen_lang_name]
                     gen_annotations_file = prepare_annotations_file(
@@ -166,7 +202,12 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
                         condition,
                         gen_eval=True,
                     )
-                    gen_dataset = FeatureDataset(gen_annotations_file, feature_file, hp.special_tokens, device=hp.device)
+                    gen_dataset = FeatureDataset(
+                        gen_annotations_file,
+                        feature_file,
+                        hp.special_tokens,
+                        device=hp.device,
+                    )
                     gen_dataset.ur_alphabet = dataset.ur_alphabet
                     gen_dataset.sr_alphabet = dataset.sr_alphabet
 
@@ -174,6 +215,7 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
                 train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
                 valid_dataloader = dataset.get_dataloader(valid_data, hp.batch_size)
                 test_dataloader = dataset.get_dataloader(test_data, hp.batch_size)
+                gen_test_dataloader = None
                 if hp.gen_eval:
                     gen_test_dataloader = gen_dataset.get_dataloader(gen_dataset, hp.batch_size, shuffle=False)
 
@@ -195,15 +237,28 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
                 )
 
                 print(" - Preparing data recorder:")
-                recorder = TextRecorder(dataset, trial_num, language, "fea", directionality, condition, run_num)
+                recorder = TextRecorder(
+                    dataset,
+                    trial_num,
+                    language,
+                    "fea",
+                    directionality,
+                    condition,
+                    run_num,
+                )
 
                 print(" - Training and evaluating model:")
                 rep = TextTrainer(seq2seq, recorder, resume_model_file=resume_model_file)
                 if hp.run_mode == "train and evaluate":
-                    rep.run(train_dataloader, test_dataloader, "test", gen_eval_dataloader=gen_test_dataloader)
+                    rep.run(
+                        train_dataloader,
+                        test_dataloader,
+                        "test",
+                        gen_eval_dataloader=gen_test_dataloader,
+                    )
                     rep.evaluate_attention(test_dataloader)
                     if hp.gen_eval:
-                        rep.evaluate_attention(gen_test_dataloader, gen_eval=True)
+                        rep.evaluate_attention(gen_test_dataloader)
                     rep.evaluate_embedding()
                 elif hp.run_mode == "tuning":
                     rep.run(train_dataloader, valid_dataloader, "valid")
@@ -212,12 +267,13 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
                 else:
                     rep.evaluate_attention(test_dataloader)
                     if hp.gen_eval:
-                        rep.evaluate_attention(gen_test_dataloader, gen_eval=True)
+                        rep.evaluate_attention(gen_test_dataloader)
                     rep.evaluate_embedding()
 
 
 def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -> None:
-    os.makedirs(os.path.join("results", trial_num + "_" + hp.lang_name + "_aud"), exist_ok=True)
+    os.makedirs(os.path.join("results", trial_num + "_" + hp.lang_name + "_aud"), 
+                exist_ok=True)
 
     for directionality in hp.directionality:
         for condition in hp.conditions:
@@ -245,8 +301,9 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                 )
                 print(" - Splitting dataset:")
                 train_data, valid_data, test_data = random_split(dataset, hp.audio_data_split_ratio)
-                gen_test_dataloader = None
+                gen_dataset = None
                 if hp.gen_eval:
+                    # Load the matching expanded language entry for generalization evaluation.
                     gen_lang_name = hp.lang_name if hp.lang_name.endswith("_expanded") else hp.lang_name + "_expanded"
                     gen_language = languages[gen_lang_name]
                     gen_annotations_file = prepare_annotations_file(
@@ -273,6 +330,7 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                 train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
                 valid_dataloader = dataset.get_dataloader(valid_data, hp.batch_size)
                 test_dataloader = dataset.get_dataloader(test_data, hp.batch_size)
+                gen_test_dataloader = None
                 if hp.gen_eval:
                     gen_test_dataloader = gen_dataset.get_dataloader(gen_dataset, hp.batch_size, shuffle=False)
 
@@ -293,15 +351,28 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                 )
 
                 print(" - Preparing data recorder:")
-                recorder = AudioRecorder(dataset, trial_num, language, "aud", directionality, condition, run_num)
+                recorder = AudioRecorder(
+                    dataset,
+                    trial_num,
+                    language,
+                    "aud",
+                    directionality,
+                    condition,
+                    run_num,
+                )
 
                 print(" - Training and evaluating model:")
                 rep = AudioTrainer(seq2seq, recorder, resume_model_file=resume_model_file)
                 if hp.run_mode == "train and evaluate":
-                    rep.run(train_dataloader, test_dataloader, "test", gen_eval_dataloader=gen_test_dataloader)
+                    rep.run(
+                        train_dataloader,
+                        test_dataloader,
+                        "test",
+                        gen_eval_dataloader=gen_test_dataloader,
+                    )
                     rep.evaluate_attention(test_dataloader)
                     if hp.gen_eval:
-                        rep.evaluate_attention(gen_test_dataloader, gen_eval=True)
+                        rep.evaluate_attention(gen_test_dataloader)
                     rep.evaluate_embedding()
                     rep.evaluate_audio_embedding(test_dataloader, "test")
                 elif hp.run_mode == "tuning":
@@ -312,7 +383,7 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                 else:
                     rep.evaluate_attention(test_dataloader)
                     if hp.gen_eval:
-                        rep.evaluate_attention(gen_test_dataloader, gen_eval=True)
+                        rep.evaluate_attention(gen_test_dataloader)
                     rep.evaluate_embedding()
                     rep.evaluate_audio_embedding(test_dataloader, "test")
 

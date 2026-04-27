@@ -66,11 +66,7 @@ class AudioTrainer:
     ) -> None:
         if self.start_epoch == 0:
             # save untrained model
-            model_file = os.path.join(self.recorder.model_dir,
-                                      self.recorder.lang_name + "_" +
-                                      self.recorder.modality + "_" + self.recorder.directionality + "_" +
-                                      self.recorder.condition +
-                                      "_run" + str(self.recorder.run_num) + "_epoch-1_seq2seq.pth")
+            model_file = os.path.join(self.recorder.model_dir, self.recorder.run_root + "_epoch-1_seq2seq.pth")
             torch.save(self.seq2seq.state_dict(), model_file)
             print(f"Untrained model stored at {model_file}")
 
@@ -112,12 +108,10 @@ class AudioTrainer:
 
             # save model every other save_epochs
             if epoch % hp.save_epochs == 0 or epoch == hp.n_epochs-1:
-                model_file = os.path.join(self.recorder.model_dir,
-                                          self.recorder.lang_name + "_" +
-                                          self.recorder.modality + "_" + self.recorder.directionality + "_" +
-                                          self.recorder.condition +
-                                          "_run" + str(self.recorder.run_num) + "_epoch" + str(epoch) +
-                                          "_seq2seq.pth")
+                model_file = os.path.join(
+                    self.recorder.model_dir,
+                    self.recorder.run_root + "_epoch" + str(epoch) + "_seq2seq.pth",
+                )
                 torch.save(self.seq2seq.state_dict(), model_file)
                 print(f"Epoch {epoch} model trained and stored at {model_file}")
 
@@ -221,19 +215,16 @@ class AudioTrainer:
         self,
         test_dataloader: Any,
         eval_epoch: int = hp.n_epochs-1,
-        gen_eval: bool = False,
     ) -> None:
         # get one random batch of test data
         dataiter = iter(test_dataloader)
         input = next(dataiter)
 
         # load model
-        model_file = os.path.join(self.recorder.model_dir,
-                                  self.recorder.lang_name + "_" +
-                                  self.recorder.modality + "_" + self.recorder.directionality + "_" +
-                                  self.recorder.condition +
-                                  "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
-                                  "_seq2seq.pth")
+        model_file = os.path.join(
+            self.recorder.model_dir,
+            self.recorder.run_root + "_epoch" + str(eval_epoch) + "_seq2seq.pth",
+        )
         self.seq2seq.load_state_dict(torch.load(model_file))
         self.seq2seq.eval()  # disable dropout in evaluation
 
@@ -279,46 +270,17 @@ class AudioTrainer:
                 aud_att = aud_att[non_zeros, :][:, non_zeros]
 
                 # plot attention
-                if gen_eval:
-                    txt_att_plot = os.path.join(
-                        self.recorder.att_plot_dir,
-                        self.recorder.lang_name + "_gen_" +
-                        self.recorder.modality + "_" + self.recorder.directionality + "_" +
-                        self.recorder.condition +
-                        "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
-                        ur_string + "_" + pred_sr_string + "_txt.png"
-                    )
-                    aud_att_plot = os.path.join(
-                        self.recorder.att_plot_dir,
-                        self.recorder.lang_name + "_gen_" +
-                        self.recorder.modality + "_" + self.recorder.directionality + "_" +
-                        self.recorder.condition +
-                        "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
-                        ur_string + "_" + pred_sr_string + "_aud.png"
-                    )
-                else:
-                    txt_att_plot = os.path.join(
-                        self.recorder.att_plot_dir,
-                        self.recorder.lang_name + "_" +
-                        self.recorder.modality + "_" + self.recorder.directionality + "_" +
-                        self.recorder.condition +
-                        "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
-                        ur_string + "_" + pred_sr_string + "_txt.png"
-                    )
-                    aud_att_plot = os.path.join(
-                        self.recorder.att_plot_dir,
-                        self.recorder.lang_name + "_" +
-                        self.recorder.modality + "_" + self.recorder.directionality + "_" +
-                        self.recorder.condition +
-                        "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) + "_" +
-                        ur_string + "_" + pred_sr_string + "_aud.png"
-                    )
+                txt_att_plot = os.path.join(
+                    self.recorder.att_plot_dir,
+                    self.recorder.run_root + "_epoch" + str(eval_epoch) + "_" + ur_string + "_" + pred_sr_string + "_txt.png"
+                )
+                aud_att_plot = os.path.join(
+                    self.recorder.att_plot_dir,
+                    self.recorder.run_root + "_epoch" + str(eval_epoch) + "_" + ur_string + "_" + pred_sr_string + "_aud.png"
+                )
                 utils.plot_aud_att(ur_spec, pred_sr_list, pred_sr_spec, txt_att, aud_att,
                                    txt_att_plot, aud_att_plot)
-            if gen_eval:
-                print(f"Run {self.recorder.run_num} generalization attention plots are saved for investigation")
-            else:
-                print(f"Run {self.recorder.run_num} attention plots are saved for investigation")
+            print(f"Run {self.recorder.run_num} attention plots are saved for investigation")
 
     def evaluate_embedding(self) -> None:
         # a dictionary of dictionaries to store all embeddings
@@ -388,11 +350,7 @@ class AudioTrainer:
     ) -> None:
         model_file = os.path.join(
             self.recorder.model_dir,
-            self.recorder.lang_name + "_" +
-            self.recorder.modality + "_" + self.recorder.directionality + "_" +
-            self.recorder.condition +
-            "_run" + str(self.recorder.run_num) + "_epoch" + str(eval_epoch) +
-            "_seq2seq.pth"
+            self.recorder.run_root + "_epoch" + str(eval_epoch) + "_seq2seq.pth"
         )
         self.seq2seq.load_state_dict(torch.load(model_file))
         self.seq2seq.eval()

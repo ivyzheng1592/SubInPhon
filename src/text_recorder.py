@@ -5,7 +5,6 @@
 import os
 from typing import Any, Dict, List, Tuple
 import hyper_params as hp
-from language_registry import languages
 
 
 class TextRecorder:
@@ -19,36 +18,53 @@ class TextRecorder:
         condition: str,
         run_num: int,
     ) -> None:
+        # Store the core run metadata used across all recorder outputs.
         self.dataset = dataset
         self.trial_num = trial_num
         self.language = language
         self.lang_name = hp.lang_name
         self.modality = modality
         self.directionality = directionality
+        self.property = hp.property
         self.condition = condition
         self.run_num = run_num
 
+        # Store the dataset alphabets used for tensor/string conversion.
         self.ur_alphabet = self.dataset.ur_alphabet
         self.sr_alphabet = self.dataset.sr_alphabet
-        gen_lang_name = hp.lang_name if hp.lang_name.endswith("_expanded") else hp.lang_name + "_expanded"
-        self.has_expanded_eval = hp.lang_name.endswith("_expanded") or gen_lang_name in languages
 
-        # result storages
+        # Build the shared filename roots for this run.
+        self.result_root = "_".join(part for part in [self.lang_name, self.modality] if part)
+        self.run_root = "_".join(
+            part for part in [
+                self.result_root,
+                self.directionality,
+                self.property,
+                self.condition,
+                "run" + str(self.run_num),
+            ]
+            if part
+        )
+
+        # Create the accuracy recorder store.
         self.acc_store = {
             'trial_num': [], 'language': [], 'modality': [],
-            'directionality': [], 'condition': [], 'run_num': [], 'epoch': [], 'record_type': [],
+            'directionality': [], 'property': [], 'condition': [], 
+            'run_num': [], 'epoch': [], 'record_type': [],
             'loss': [], 'acc': []
         }
 
+        # Create the prediction recorder store.
         self.pred_store = {
             'trial_num': [], 'language': [], 'modality': [],
-            'directionality': [], 'condition': [], 'run_num': [], 'epoch': [], 'record_type': [],
+            'directionality': [], 'property': [], 'condition': [], 
+            'run_num': [], 'epoch': [], 'record_type': [],
             'ur': [], 'sr': [], 'pred_sr': [],
             'v1_error': [], 'v2_error': [],
             'sr_v1': [], 'sr_v2': [],
             'pred_sr_v1': [], 'pred_sr_v2': [],
         }
-        if self.has_expanded_eval:
+        if hp.gen_eval:
             self.pred_store.update({
                 'v3_error': [],
                 'sr_v3': [],
@@ -63,7 +79,7 @@ class TextRecorder:
                 'sr_c1': [], 'sr_c2': [],
                 'pred_sr_c1': [], 'pred_sr_c2': [],
             })
-            if self.has_expanded_eval:
+            if hp.gen_eval:
                 self.pred_store.update({
                     'o3_error': [],
                     'sr_o3': [],
@@ -73,46 +89,40 @@ class TextRecorder:
                     'pred_sr_c3': [],
                 })
 
-        # results files and directories
+        # Build the result files and directories for this run.
         self.acc_file = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
-                                     self.lang_name + "_" + modality + "_acc.csv")
+                                     self.result_root + "_acc.csv")
         self.pred_file = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
-                                      self.lang_name + "_" + modality + "_pred.csv")
+                                      self.result_root + "_pred.csv")
 
         self.acc_plot_dir = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
-                                         self.lang_name + "_" + modality + "_acc_plots")
+                                         self.result_root + "_acc_plots")
         os.makedirs(self.acc_plot_dir, exist_ok=True)
-        self.acc_plot = os.path.join(self.acc_plot_dir,
-                                     self.lang_name + "_" + modality + "_" + self.directionality + "_" + self.condition +
-                                     "_run" + str(self.run_num) + "_acc_plot.png")
+        self.acc_plot = os.path.join(self.acc_plot_dir, self.run_root + "_acc_plot.png")
 
         self.model_dir = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
-                                      self.lang_name + "_" + modality + "_model_files",
-                                      self.lang_name + "_" + modality + "_" + self.directionality + "_" + self.condition +
-                                      "_run" + str(self.run_num) + "_model_files")
+                                      self.result_root + "_model_files",
+                                      self.run_root + "_model_files")
         os.makedirs(self.model_dir, exist_ok=True)
 
         self.att_plot_dir = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
-                                         self.lang_name + "_" + modality + "_att_plots",
-                                         self.lang_name + "_" + modality + "_" + self.directionality + "_" + self.condition +
-                                         "_run" + str(self.run_num) + "_att_plots")
+                                         self.result_root + "_att_plots",
+                                         self.run_root + "_att_plots")
         os.makedirs(self.att_plot_dir, exist_ok=True)
 
         self.embed_plot_dir = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
-                                           self.lang_name + "_" + modality + "_embed_plots")
+                                           self.result_root + "_embed_plots")
         os.makedirs(self.embed_plot_dir, exist_ok=True)
-        self.embed_plot = os.path.join(self.embed_plot_dir,
-                                       self.lang_name + "_" + modality + "_" + self.directionality + "_" + self.condition +
-                                       "_run" + str(self.run_num) + "_embedding.html")
-        self.focus_embed_plot = os.path.join(self.embed_plot_dir,
-                                             self.lang_name + "_" + modality + "_" + self.directionality + "_" + self.condition +
-                                             "_run" + str(self.run_num) + "_focus_embedding.html")
+        self.embed_plot = os.path.join(self.embed_plot_dir, self.run_root + "_embedding.html")
+        self.focus_embed_plot = os.path.join(self.embed_plot_dir, self.run_root + "_focus_embedding.html")
 
+    # Add the shared run metadata fields to one recorder store.
     def _append_base_fields(self, store: Dict[str, List[Any]], epoch: int, record_type: str) -> None:
         store['trial_num'].append(self.trial_num)
         store['language'].append(self.lang_name)
         store['modality'].append(self.modality)
         store['directionality'].append(self.directionality)
+        store['property'].append(self.property)
         store['condition'].append(self.condition)
         store['run_num'].append(self.run_num)
         store['epoch'].append(epoch)

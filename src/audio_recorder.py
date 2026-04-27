@@ -20,30 +20,27 @@ class AudioRecorder(TextRecorder):
     ) -> None:
         super().__init__(dataset, trial_num, language, modality, directionality, condition, run_num)
 
-        # result storages
+        # Create the audio accuracy recorder store.
         self.acc_store = {
             'trial_num': [], 'language': [], 'modality': [],
-            'directionality': [], 'condition': [], 'run_num': [], 'epoch': [], 'record_type': [],
+            'directionality': [], 'property': [], 'condition': [], 
+            'run_num': [], 'epoch': [], 'record_type': [],
             'rec_loss': [], 'pred_loss': [], 'pred_acc': []
         }
 
+        # Build the audio embedding files and directories for this run.
         self.audio_embed_dir = os.path.join(
             "results",
             trial_num + "_" + self.lang_name + "_" + modality,
-            self.lang_name + "_" + modality + "_audio_embed_plots",
+            self.result_root + "_audio_embed_plots",
         )
         os.makedirs(self.audio_embed_dir, exist_ok=True)
-        base_name = (
-            self.lang_name + "_" + modality + "_" + self.directionality + "_" +
-            self.condition + "_run" + str(self.run_num)
-        )
-        self.source_audio_embed_file = os.path.join(self.audio_embed_dir, base_name + "_source_audio_embedding.csv")
-        self.target_audio_embed_file = os.path.join(self.audio_embed_dir, base_name + "_target_audio_embedding.csv")
-        self.pred_audio_embed_file = os.path.join(self.audio_embed_dir, base_name + "_predicted_audio_embedding.csv")
-        self.source_audio_embed_plot = os.path.join(self.audio_embed_dir, base_name + "_source_audio_embedding.png")
-        self.target_audio_embed_plot = os.path.join(self.audio_embed_dir, base_name + "_target_audio_embedding.png")
-        self.pred_audio_embed_plot = os.path.join(self.audio_embed_dir, base_name + "_predicted_audio_embedding.png")
-
+        self.source_audio_embed_file = os.path.join(self.audio_embed_dir, self.run_root + "_source_audio_embedding.csv")
+        self.target_audio_embed_file = os.path.join(self.audio_embed_dir, self.run_root + "_target_audio_embedding.csv")
+        self.pred_audio_embed_file = os.path.join(self.audio_embed_dir, self.run_root + "_predicted_audio_embedding.csv")
+        self.source_audio_embed_plot = os.path.join(self.audio_embed_dir, self.run_root + "_source_audio_embedding.png")
+        self.target_audio_embed_plot = os.path.join(self.audio_embed_dir, self.run_root + "_target_audio_embedding.png")
+        self.pred_audio_embed_plot = os.path.join(self.audio_embed_dir, self.run_root + "_predicted_audio_embedding.png")
 
     # a function that records accuracy rates into a dictionary
     # the function is called at each training/evaluation epoch

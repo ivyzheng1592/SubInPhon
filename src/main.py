@@ -10,6 +10,7 @@ Command-line arguments:
 - --modality {text,feature,audio}
 - --trial-num TRIAL_ID
 - --runs N | START:STOP[:STEP]
+- --base-seed SEED
 - --lang-name LANGUAGE_KEY
 - --run-mode {"train and evaluate","tuning","inspection"}
 - --pred-log {vowel_only_error,consonant_vowel_error,all_correct_syll}
@@ -19,6 +20,7 @@ Command-line arguments:
 Typical examples:
 - python3 src/main.py
 - python3 src/main.py --modality text --lang-name EnglishBH_shortened --runs 0:2 --device cpu
+- python3 src/main.py --base-seed 2026
 - python3 src/main.py --modality audio --resume-model-file /path/to/model_seq2seq.pth
 
 Set these directly in hyper_params.py:
@@ -70,6 +72,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default="2",
         help="Run count or Python-range-style spec. Examples: 2, 0:2, 1:5:2.",
     )
+    parser.add_argument(
+        "--base-seed",
+        type=int,
+        default=None,
+        help="Override hp.base_seed for this run.",
+    )
     parser.add_argument("--lang-name", default=None, help="Override hp.lang_name.")
     parser.add_argument(
         "--run-mode",
@@ -102,6 +110,8 @@ def main() -> None:
 
     if args.lang_name is not None:
         hp.lang_name = args.lang_name
+    if args.base_seed is not None:
+        hp.base_seed = args.base_seed
     if args.run_mode is not None:
         hp.run_mode = args.run_mode
     if args.pred_log is not None:
@@ -115,6 +125,7 @@ def main() -> None:
     print(f"Running modality={args.modality} lang={hp.lang_name}")
     print(
         f"Run mode={hp.run_mode} pred_log={hp.pred_log} device={hp.device} "
+        f"base_seed={hp.base_seed} "
         f"runs={list(runs)} trial_num={trial_num}"
     )
 

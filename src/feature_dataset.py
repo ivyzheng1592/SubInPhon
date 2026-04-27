@@ -31,13 +31,17 @@ class FeatureDataset(TextDataset):
 
 if __name__ == "__main__":
     import hyper_params as hp
+    from language_registry import languages
 
     print(" - Loading dataset:")
-    annotations_file = (
-        "data/" + "_".join(
-            part for part in [hp.lang_name, hp.directionality[0], hp.property, hp.conditions[0]] if part
-        ) + ".csv"
-    )
+    language = languages[hp.lang_name]
+    annotations_file = language.generate_stimuli(
+        seed=hp.base_seed,
+        sample_proportion=hp.data_proportion,
+        property=hp.property,
+        directionality=hp.directionality[0],
+        output_dir="data",
+    )[hp.conditions[0]]
     feature_file = "data/EnglishBH_features.xlsx"
     annotations = pd.read_csv(annotations_file)
     print(f"Dataset size: {len(annotations)}")

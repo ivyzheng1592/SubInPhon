@@ -49,6 +49,7 @@ class LanguagePattern:
         directionality: str = "l2r",
         variant: Optional[str] = None,
         output_dir: Optional[str] = None,
+        run_num: Optional[int] = None,
     ):
         pass
 
@@ -147,6 +148,7 @@ class BacknessHarmony(LanguagePattern):
         directionality: str = "l2r",
         variant: Optional[str] = None,
         output_dir: Optional[str] = None,
+        run_num: Optional[int] = None,
     ) -> Dict[str, str]:
         # Use the default data/ folder when no custom output folder is provided.
         if output_dir is None:
@@ -154,7 +156,10 @@ class BacknessHarmony(LanguagePattern):
 
         # Build the output paths for the CSV files and the count report.
         os.makedirs(output_dir, exist_ok=True)
-        root = "_".join(part for part in [self.registry_name, directionality, property] if part)
+        root_parts = [self.registry_name, directionality, property]
+        if run_num is not None:
+            root_parts.append("run" + str(run_num))
+        root = "_".join(part for part in root_parts if part)
         harmony_file = os.path.join(output_dir, f"{root}_harmony.csv")
         disharmony_file = os.path.join(output_dir, f"{root}_disharmony.csv")
         report_file = os.path.join(output_dir, f"{root}_template_counts.xlsx")
@@ -575,6 +580,7 @@ class FinalDevoicing(LanguagePattern):
         directionality: str = "l2r",
         variant: Optional[str] = None,
         output_dir: Optional[str] = None,
+        run_num: Optional[int] = None,
     ):
         pass
 
