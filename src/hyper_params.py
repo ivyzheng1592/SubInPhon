@@ -87,18 +87,20 @@ batch_size = 32
 base_seed = 1234
 
 # Audio data root (per-language subfolders live here)
-audio_root = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon"
+audio_root = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/dataset"
 # TextGrid subfolder for audio embedding inspection (under audio_root)
 textgrid_folder = "EnglishBH_shortened_segmented"
 
 # Experiment settings
 lang_name = "EnglishBH"
+# Property options: "nonidentical," where identical surface vowels are avoided
 property = ""
 directionality = ["l2r", "r2l"]
 conditions = ["harmony", "disharmony"]
+# Whether to conduct generalization test with three syllable words
+gen_eval = True
 # Run mode options: "train and evaluate", "tuning", "inspection"
 run_mode = "train and evaluate"
-gen_eval = False
 # Prediction logging mode options: "vowel_only_error", "consonant_vowel_error", "all_correct_syll"
 pred_log = "vowel_only_error"
 device = "cuda"

@@ -9,37 +9,6 @@ import csv
 import os
 
 # IPA to ARPABET mapping based on common phonetic correspondences
-IPA_TO_ = {
-    # Vowels (standalone only - diphthongs handled separately)
-    'i': 'IY',   # high front tense
-    'u': 'UW',   # high back tense
-    'ɪ': 'IH',   # high front lax
-    'ɛ': 'EH',   # mid front lax
-    'ʊ': 'UH',   # high back lax
-    'ɔ': 'AO',   # mid back lax
-
-    # Consonants
-    'm': 'M',    # bilabial nasal
-    'n': 'N',    # alveolar nasal
-    'ŋ': 'NG',   # velar nasal
-    'p': 'P',    # voiceless bilabial plosive
-    't': 'T',    # voiceless alveolar plosive
-    'k': 'K',    # voiceless velar plosive
-    'b': 'B',    # voiced bilabial plosive
-    'd': 'D',    # voiced alveolar plosive
-    'g': 'G',    # voiced velar plosive
-    'f': 'F',    # voiceless labiodental fricative
-    's': 'S',    # voiceless alveolar fricative
-    'v': 'V',    # voiced labiodental fricative
-    'z': 'Z',    # voiced alveolar fricative
-    'ʃ': 'SH',   # voiceless postalveolar fricative
-    'ʒ': 'ZH',   # voiced postalveolar fricative
-    'θ': 'TH',   # voiceless dental fricative
-    'ð': 'DH',   # voiced dental fricative
-    'h': 'HH',   # voiceless glottal fricative
-}
-
-# IPA to ARPABET mapping based on common phonetic correspondences
 IPA_TO_ARPABET = {
     # Vowels (standalone only - diphthongs handled separately)
     'i': 'IY',   # high front tense
