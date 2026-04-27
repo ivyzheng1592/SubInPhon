@@ -17,9 +17,9 @@ Command-line arguments:
 - --resume-model-file PATH_TO_CHECKPOINT
 
 Typical examples:
-- python3 main.py
-- python3 main.py --modality text --lang-name EnglishBH_shortened --runs 0:2 --device cpu
-- python3 main.py --modality audio --resume-model-file /path/to/model_seq2seq.pth
+- python3 src/main.py
+- python3 src/main.py --modality text --lang-name EnglishBH_shortened --runs 0:2 --device cpu
+- python3 src/main.py --modality audio --resume-model-file /path/to/model_seq2seq.pth
 
 Set these directly in hyper_params.py:
 - property

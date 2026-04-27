@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import random_split
 
-from Dataset.language_registry import languages
+from language_registry import languages
 from audio_dataset import AudioDataset
 from audio_network_t1 import AudioSeq2Seq
 from audio_recorder import AudioRecorder
@@ -38,7 +38,7 @@ def prepare_annotations_file(
     gen_eval: bool = False,
 ) -> str:
     output_dir = os.path.join(
-        "Results",
+        "results",
         trial_num + "_" + hp.lang_name + "_generated_data",
         "run_" + str(run_num),
         "expanded" if gen_eval else "full",
@@ -57,7 +57,7 @@ def prepare_annotations_file(
 
 
 def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -> None:
-    os.makedirs(os.path.join("Results", trial_num + "_" + hp.lang_name + "_txt"), exist_ok=True)
+    os.makedirs(os.path.join("results", trial_num + "_" + hp.lang_name + "_txt"), exist_ok=True)
 
     for directionality in hp.directionality:
         for condition in hp.conditions:
@@ -133,13 +133,13 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
 
 
 def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -> None:
-    os.makedirs(os.path.join("Results", trial_num + "_" + hp.lang_name + "_fea"), exist_ok=True)
+    os.makedirs(os.path.join("results", trial_num + "_" + hp.lang_name + "_fea"), exist_ok=True)
 
     for directionality in hp.directionality:
         for condition in hp.conditions:
             print(" - Instantiating language pattern:")
             language = languages[hp.lang_name]
-            feature_file = os.path.join("Dataset", "EnglishBH_features.xlsx")
+            feature_file = os.path.join("data", "EnglishBH_features.xlsx")
 
             for run_num in runs:
                 set_seed(hp.base_seed + run_num)
@@ -217,7 +217,7 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
 
 
 def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -> None:
-    os.makedirs(os.path.join("Results", trial_num + "_" + hp.lang_name + "_aud"), exist_ok=True)
+    os.makedirs(os.path.join("results", trial_num + "_" + hp.lang_name + "_aud"), exist_ok=True)
 
     for directionality in hp.directionality:
         for condition in hp.conditions:

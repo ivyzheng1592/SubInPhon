@@ -5,7 +5,7 @@
 import os
 from typing import Any, Dict, List, Tuple
 import hyper_params as hp
-from Dataset.language_registry import languages
+from language_registry import languages
 
 
 class TextRecorder:
@@ -74,31 +74,31 @@ class TextRecorder:
                 })
 
         # results files and directories
-        self.acc_file = os.path.join("Results", trial_num + "_" + self.lang_name + "_" + modality,
+        self.acc_file = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
                                      self.lang_name + "_" + modality + "_acc.csv")
-        self.pred_file = os.path.join("Results", trial_num + "_" + self.lang_name + "_" + modality,
+        self.pred_file = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
                                       self.lang_name + "_" + modality + "_pred.csv")
 
-        self.acc_plot_dir = os.path.join("Results", trial_num + "_" + self.lang_name + "_" + modality,
+        self.acc_plot_dir = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
                                          self.lang_name + "_" + modality + "_acc_plots")
         os.makedirs(self.acc_plot_dir, exist_ok=True)
         self.acc_plot = os.path.join(self.acc_plot_dir,
                                      self.lang_name + "_" + modality + "_" + self.directionality + "_" + self.condition +
                                      "_run" + str(self.run_num) + "_acc_plot.png")
 
-        self.model_dir = os.path.join("Results", trial_num + "_" + self.lang_name + "_" + modality,
+        self.model_dir = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
                                       self.lang_name + "_" + modality + "_model_files",
                                       self.lang_name + "_" + modality + "_" + self.directionality + "_" + self.condition +
                                       "_run" + str(self.run_num) + "_model_files")
         os.makedirs(self.model_dir, exist_ok=True)
 
-        self.att_plot_dir = os.path.join("Results", trial_num + "_" + self.lang_name + "_" + modality,
+        self.att_plot_dir = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
                                          self.lang_name + "_" + modality + "_att_plots",
                                          self.lang_name + "_" + modality + "_" + self.directionality + "_" + self.condition +
                                          "_run" + str(self.run_num) + "_att_plots")
         os.makedirs(self.att_plot_dir, exist_ok=True)
 
-        self.embed_plot_dir = os.path.join("Results", trial_num + "_" + self.lang_name + "_" + modality,
+        self.embed_plot_dir = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
                                            self.lang_name + "_" + modality + "_embed_plots")
         os.makedirs(self.embed_plot_dir, exist_ok=True)
         self.embed_plot = os.path.join(self.embed_plot_dir,

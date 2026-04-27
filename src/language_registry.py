@@ -5,7 +5,7 @@ import json
 import os
 from typing import Any, Optional, Dict, List
 
-from Dataset.language_generator import BacknessHarmony, FinalDevoicing
+from language_generator import BacknessHarmony, FinalDevoicing
 
 
 class LanguageRegistry:
@@ -119,7 +119,7 @@ if __name__ == "__main__":
 
     # Example: generate a standalone sampled dataset outside the experiment loop.
     # This writes harmony/disharmony CSVs plus a template-count Excel report to a custom folder.
-    example_output_dir = os.path.join("Results", "standalone_generation_example")
+    example_output_dir = os.path.join("results", "standalone_generation_example")
     sampled_files = language.generate_stimuli(
         seed=hp.base_seed,
         sample_proportion=hp.data_proportion,

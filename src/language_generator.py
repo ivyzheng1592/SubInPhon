@@ -148,9 +148,9 @@ class BacknessHarmony(LanguagePattern):
         variant: Optional[str] = None,
         output_dir: Optional[str] = None,
     ) -> Dict[str, str]:
-        # Use the default Dataset/ folder when no custom output folder is provided.
+        # Use the default data/ folder when no custom output folder is provided.
         if output_dir is None:
-            output_dir = "Dataset"
+            output_dir = "data"
 
         # Build the output paths for the CSV files and the count report.
         os.makedirs(output_dir, exist_ok=True)

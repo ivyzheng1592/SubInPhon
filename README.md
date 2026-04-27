@@ -12,8 +12,9 @@ It supports text-based learning (UR -> SR), feature-embedded text learning, and 
 - `text_trainer.py`, `audio_trainer.py` : training/evaluation loops
 - `text_recorder.py`, `audio_recorder.py` : metrics + plot recording
 - `utils.py` : plotting utilities
-- `Dataset/` : data files and language definitions
-- `Results/` : model outputs, plots, and logs
+- `src/` : Python source files and language definitions
+- `data/` : static data files and generated annotation files
+- `results/` : model outputs, plots, and logs
 
 ## Quick Start
 1. Create/activate a Python environment (3.8–3.11).
@@ -58,9 +59,9 @@ python main.py --modality audio
 
 ## Typical Experiment Flow
 1. Choose a language entry, optional property, and directionality (e.g., `EnglishBH_shortened` + `""` + `l2r`).
-2. Load the dataset from `Dataset/{lang_name}_{directionality}_{condition}.csv` when `property=""`, or `Dataset/{lang_name}_{directionality}_{property}_{condition}.csv` otherwise.
+2. Load the dataset from `data/{lang_name}_{directionality}_{condition}.csv` when `property=""`, or `data/{lang_name}_{directionality}_{property}_{condition}.csv` otherwise.
 3. Train/evaluate a seq2seq model.
-4. Record accuracy, predictions, attention plots, and embeddings in `Results/`.
+4. Record accuracy, predictions, attention plots, and embeddings in `results/`.
 
 ## Notes
 - Audio experiments expect a local audio directory and WAV files referenced in the dataset CSVs.

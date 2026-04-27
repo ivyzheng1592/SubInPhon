@@ -161,7 +161,7 @@ if __name__ == "__main__":
 
     print(" - Loading dataset:")
     annotations_file = (
-        "Dataset/" + "_".join(
+        "data/" + "_".join(
             part for part in [hp.lang_name, hp.directionality[0], hp.property, hp.conditions[0]] if part
         ) + ".csv"
     )

@@ -4,9 +4,20 @@ data structure:
     - {language_root}  # e.g., EnglishBH
         - {src} + ".mp3"
         - {src} + ".wav"
-- "Dataset"
-    - "_".join(part for part in [{lang_name}, {directionality}, {property}, {condition}] if part) + ".csv"
-- "Results"
+- "data"
+    - {feature_file}.xlsx
+- "results"
+    - {trial_num} + "_" + {lang_name} + "_generated_data"
+        - "run_" + {run_num}
+            - "full"
+                - {registry_name} + "_" + {directionality} + "_" + {property} + "_harmony.csv"
+                - {registry_name} + "_" + {directionality} + "_" + {property} + "_disharmony.csv"
+                - {registry_name} + "_" + {directionality} + "_" + {property} + "_template_counts.xlsx"
+            - "expanded"
+                - {expanded_registry_name} + "_" + {directionality} + "_" + {property} + "_harmony.csv"
+                - {expanded_registry_name} + "_" + {directionality} + "_" + {property} + "_disharmony.csv"
+                - {expanded_registry_name} + "_" + {directionality} + "_" + {property} + "_template_counts.xlsx"
+- "results"
     - {trial_num} + "_" + {lang_name} + "_" + {modality}
         - {lang_name} + "_" + {modality} + "_acc.csv"
         - {lang_name} + "_" + {modality} + "_pred.csv"

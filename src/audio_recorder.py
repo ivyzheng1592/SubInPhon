@@ -28,7 +28,7 @@ class AudioRecorder(TextRecorder):
         }
 
         self.audio_embed_dir = os.path.join(
-            "Results",
+            "results",
             trial_num + "_" + self.lang_name + "_" + modality,
             self.lang_name + "_" + modality + "_audio_embed_plots",
         )
