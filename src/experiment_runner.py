@@ -68,6 +68,8 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
             for run_num in runs:
                 set_seed(hp.base_seed + run_num)
                 print(" - Loading dataset:")
+                gen_dataset = None
+                gen_language = None
                 annotations_file = prepare_annotations_file(
                     language,
                     trial_num,
@@ -80,10 +82,6 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
                     hp.special_tokens,
                     device=hp.device,
                 )
-                print(" - Splitting dataset:")
-                train_data, valid_data, test_data = random_split(dataset, hp.text_data_split_ratio)
-                gen_dataset = None
-                gen_language = None
                 if hp.gen_eval:
                     # Load the matching expanded language entry for generalization evaluation.
                     gen_lang_name = hp.lang_name if hp.lang_name.endswith("_expanded") else hp.lang_name + "_expanded"
@@ -103,6 +101,12 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
                     )
                     gen_dataset.ur_alphabet = dataset.ur_alphabet
                     gen_dataset.sr_alphabet = dataset.sr_alphabet
+                
+                print(" - Splitting dataset:")
+                train_data, valid_data, test_data = random_split(dataset, hp.text_data_split_ratio)
+                gen_test_data = None
+                if hp.gen_eval:
+                    _, _, gen_test_data = random_split(gen_dataset, hp.text_data_split_ratio)
 
                 print(" - Creating dataloader:")
                 train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
@@ -110,7 +114,7 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
                 test_dataloader = dataset.get_dataloader(test_data, hp.batch_size)
                 gen_test_dataloader = None
                 if hp.gen_eval:
-                    gen_test_dataloader = gen_dataset.get_dataloader(gen_dataset, hp.batch_size, shuffle=False)
+                    gen_test_dataloader = gen_dataset.get_dataloader(gen_test_data, hp.batch_size, shuffle=False)
 
                 print(" - Initializing model:")
                 encoder_input_dim = len(dataset.ur_alphabet)
@@ -176,6 +180,8 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
             for run_num in runs:
                 set_seed(hp.base_seed + run_num)
                 print(" - Loading dataset:")
+                gen_dataset = None
+                gen_language = None
                 annotations_file = prepare_annotations_file(
                     language,
                     trial_num,
@@ -189,10 +195,6 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
                     hp.special_tokens,
                     device=hp.device,
                 )
-                print(" - Splitting dataset:")
-                train_data, valid_data, test_data = random_split(dataset, hp.text_data_split_ratio)
-                gen_dataset = None
-                gen_language = None
                 if hp.gen_eval:
                     # Load the matching expanded language entry for generalization evaluation.
                     gen_lang_name = hp.lang_name if hp.lang_name.endswith("_expanded") else hp.lang_name + "_expanded"
@@ -213,6 +215,12 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
                     )
                     gen_dataset.ur_alphabet = dataset.ur_alphabet
                     gen_dataset.sr_alphabet = dataset.sr_alphabet
+                
+                print(" - Splitting dataset:")
+                train_data, valid_data, test_data = random_split(dataset, hp.text_data_split_ratio)
+                gen_test_data = None
+                if hp.gen_eval:
+                    _, _, gen_test_data = random_split(gen_dataset, hp.text_data_split_ratio)
 
                 print(" - Creating dataloader:")
                 train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
@@ -220,7 +228,7 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
                 test_dataloader = dataset.get_dataloader(test_data, hp.batch_size)
                 gen_test_dataloader = None
                 if hp.gen_eval:
-                    gen_test_dataloader = gen_dataset.get_dataloader(gen_dataset, hp.batch_size, shuffle=False)
+                    gen_test_dataloader = gen_dataset.get_dataloader(gen_test_data, hp.batch_size, shuffle=False)
 
                 print(" - Initializing model:")
                 encoder_input_dim = len(dataset.ur_alphabet)
@@ -288,6 +296,8 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
             for run_num in runs:
                 set_seed(hp.base_seed + run_num)
                 print(" - Loading dataset:")
+                gen_dataset = None
+                gen_language = None
                 annotations_file = prepare_annotations_file(
                     language,
                     trial_num,
@@ -303,10 +313,6 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                     power2db=True,
                     device=hp.device,
                 )
-                print(" - Splitting dataset:")
-                train_data, valid_data, test_data = random_split(dataset, hp.audio_data_split_ratio)
-                gen_dataset = None
-                gen_language = None
                 if hp.gen_eval:
                     # Load the matching expanded language entry for generalization evaluation.
                     gen_lang_name = hp.lang_name if hp.lang_name.endswith("_expanded") else hp.lang_name + "_expanded"
@@ -330,6 +336,12 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                     )
                     gen_dataset.ur_alphabet = dataset.ur_alphabet
                     gen_dataset.sr_alphabet = dataset.sr_alphabet
+                
+                print(" - Splitting dataset:")
+                train_data, valid_data, test_data = random_split(dataset, hp.audio_data_split_ratio)
+                gen_test_data = None
+                if hp.gen_eval:
+                    _, _, gen_test_data = random_split(gen_dataset, hp.audio_data_split_ratio)
 
                 print(" - Creating dataloader:")
                 train_dataloader = dataset.get_dataloader(train_data, hp.batch_size)
@@ -337,7 +349,7 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                 test_dataloader = dataset.get_dataloader(test_data, hp.batch_size)
                 gen_test_dataloader = None
                 if hp.gen_eval:
-                    gen_test_dataloader = gen_dataset.get_dataloader(gen_dataset, hp.batch_size, shuffle=False)
+                    gen_test_dataloader = gen_dataset.get_dataloader(gen_test_data, hp.batch_size, shuffle=False)
 
                 print(" - Initializing model:")
                 encoder_input_dim = hp.n_mels
