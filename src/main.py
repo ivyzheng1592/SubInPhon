@@ -144,7 +144,12 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _write_run_config(args: argparse.Namespace, trial_num: str, runs: range) -> None:
-    result_dir = os.path.join("results", trial_num + "_" + hp.lang_name + "_" + args.modality[:3])
+    modality_suffix = {
+        "text": "txt",
+        "feature": "fea",
+        "audio": "aud",
+    }[args.modality]
+    result_dir = os.path.join("results", trial_num + "_" + hp.lang_name + "_" + modality_suffix)
     os.makedirs(result_dir, exist_ok=True)
     config_file = os.path.join(result_dir, "run_config.txt")
 
