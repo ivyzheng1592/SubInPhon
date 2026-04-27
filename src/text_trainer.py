@@ -65,9 +65,18 @@ class TextTrainer:
             if gen_eval_dataloader is not None:
                 gen_eval_loss, gen_eval_src, gen_eval_trg, gen_eval_pred = self.evaluate_one_epoch(gen_eval_dataloader)
                 gen_eval_acc = self.recorder.record_pred(
-                    epoch, "generalization", gen_eval_src, gen_eval_trg, gen_eval_pred
+                    epoch,
+                    "gen",
+                    gen_eval_src,
+                    gen_eval_trg,
+                    gen_eval_pred,
                 )
-                self.recorder.record_acc(epoch, "generalization", gen_eval_loss, gen_eval_acc)
+                self.recorder.record_acc(
+                    epoch, 
+                    "gen", 
+                    gen_eval_loss, 
+                    gen_eval_acc
+                )
 
             print(f"Epoch {epoch} Train Loss: {train_loss:7.3f} | Train PPL: {np.exp(train_loss):7.3f} "
                   f"| Train Acc: {train_acc:7.3f}")
@@ -75,9 +84,9 @@ class TextTrainer:
                   f"{eval_record_type.capitalize()} PPL: {np.exp(eval_loss):7.3f} | "
                   f"{eval_record_type.capitalize()} Acc: {eval_acc:7.3f}")
             if gen_eval_dataloader is not None:
-                print(f"Epoch {epoch} Generalization Loss: {gen_eval_loss:7.3f} | "
-                      f"Generalization PPL: {np.exp(gen_eval_loss):7.3f} | "
-                      f"Generalization Acc: {gen_eval_acc:7.3f}")
+                print(f"Epoch {epoch} Gen Loss: {gen_eval_loss:7.3f} | "
+                      f"Gen PPL: {np.exp(gen_eval_loss):7.3f} | "
+                      f"Gen Acc: {gen_eval_acc:7.3f}")
 
             # save model every other save_epochs
             if epoch % hp.save_epochs == 0 or epoch == hp.n_epochs-1:

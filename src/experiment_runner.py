@@ -83,6 +83,7 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
                 print(" - Splitting dataset:")
                 train_data, valid_data, test_data = random_split(dataset, hp.text_data_split_ratio)
                 gen_dataset = None
+                gen_language = None
                 if hp.gen_eval:
                     # Load the matching expanded language entry for generalization evaluation.
                     gen_lang_name = hp.lang_name if hp.lang_name.endswith("_expanded") else hp.lang_name + "_expanded"
@@ -131,6 +132,7 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
                     dataset,
                     trial_num,
                     language,
+                    gen_language,
                     "txt",
                     directionality,
                     condition,
@@ -190,6 +192,7 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
                 print(" - Splitting dataset:")
                 train_data, valid_data, test_data = random_split(dataset, hp.text_data_split_ratio)
                 gen_dataset = None
+                gen_language = None
                 if hp.gen_eval:
                     # Load the matching expanded language entry for generalization evaluation.
                     gen_lang_name = hp.lang_name if hp.lang_name.endswith("_expanded") else hp.lang_name + "_expanded"
@@ -241,6 +244,7 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
                     dataset,
                     trial_num,
                     language,
+                    gen_language,
                     "fea",
                     directionality,
                     condition,
@@ -302,6 +306,7 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                 print(" - Splitting dataset:")
                 train_data, valid_data, test_data = random_split(dataset, hp.audio_data_split_ratio)
                 gen_dataset = None
+                gen_language = None
                 if hp.gen_eval:
                     # Load the matching expanded language entry for generalization evaluation.
                     gen_lang_name = hp.lang_name if hp.lang_name.endswith("_expanded") else hp.lang_name + "_expanded"
@@ -355,6 +360,7 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                     dataset,
                     trial_num,
                     language,
+                    gen_language,
                     "aud",
                     directionality,
                     condition,

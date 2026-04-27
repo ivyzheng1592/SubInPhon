@@ -3,7 +3,7 @@
 # Dictionary data are saved to file using utils in TextTrainer
 
 import os
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import hyper_params as hp
 
 
@@ -13,6 +13,7 @@ class TextRecorder:
         dataset: Any,
         trial_num: str,
         language: Any,
+        gen_language: Optional[Any],
         modality: str,
         directionality: str,
         condition: str,
@@ -22,6 +23,7 @@ class TextRecorder:
         self.dataset = dataset
         self.trial_num = trial_num
         self.language = language
+        self.gen_language = gen_language
         self.lang_name = hp.lang_name
         self.modality = modality
         self.directionality = directionality
@@ -162,14 +164,23 @@ class TextRecorder:
         return ur_string, sr_string, pred_sr_string
 
     # a function that converts one pair of ur, sr, and pred_sr tensor to syllables
-    def tensor2syll(self, ur: Any, sr: Any, pred_sr: Any) -> Tuple[List[List[Any]], List[List[Any]], List[List[Any]]]:
+    def tensor2syll(
+        self,
+        ur: Any,
+        sr: Any,
+        pred_sr: Any,
+        record_type: str = "",
+    ) -> Tuple[List[List[Any]], List[List[Any]], List[List[Any]]]:
         # convert tensor to word list
         ur_list, sr_list, pred_sr_list = self.tensor2list(ur, sr, pred_sr)
 
+        # Use the expanded language when recording gen predictions.
+        language = self.gen_language if record_type == "gen" and self.gen_language is not None else self.language
+
         # decompose word list into structured syllables
-        ur_sylls = self.language.decompose_stimuli(ur_list)
-        sr_sylls = self.language.decompose_stimuli(sr_list)
-        pred_sr_sylls = self.language.decompose_stimuli(pred_sr_list)
+        ur_sylls = language.decompose_stimuli(ur_list)
+        sr_sylls = language.decompose_stimuli(sr_list)
+        pred_sr_sylls = language.decompose_stimuli(pred_sr_list)
 
         return ur_sylls, sr_sylls, pred_sr_sylls
 
@@ -204,7 +215,12 @@ class TextRecorder:
 
                 # convert the pair
                 ur_string, sr_string, pred_sr_string = self.tensor2string(ur, sr, pred_sr)
-                ur_sylls, sr_sylls, pred_sr_sylls = self.tensor2syll(ur, sr, pred_sr)
+                ur_sylls, sr_sylls, pred_sr_sylls = self.tensor2syll(
+                    ur,
+                    sr,
+                    pred_sr,
+                    record_type=record_type,
+                )
 
                 # prediction log mode:
                 # - "vowel_only_error": skip if any consonant mismatch

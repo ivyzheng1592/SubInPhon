@@ -86,15 +86,30 @@ class LanguagePattern:
 
         # Write the header row for the template-count table.
         sheet.append([
-            "template",
+            "bitwise_template",
+            "syllable_template",
             "total_word_count",
             "sample_count",
         ])
+
+        # Convert one bitwise syllable template into a readable C/V/C form.
+        def to_syllable_template(struct: str) -> str:
+            syllable_templates = []
+            for syll_bits in struct.split("-"):
+                syllable_template = ""
+                if syll_bits[0] == "1":
+                    syllable_template += "C"
+                syllable_template += "V"
+                if syll_bits[2] == "1":
+                    syllable_template += "C"
+                syllable_templates.append(syllable_template)
+            return "-".join(syllable_templates)
 
         # Write one summary row per template.
         for struct in self.word_struct:
             sheet.append([
                 struct,
+                to_syllable_template(struct),
                 template_word_counts[struct],
                 template_sample_sizes[struct],
             ])
@@ -282,19 +297,19 @@ class BacknessHarmony(LanguagePattern):
         self._syllable_templates_cache = syll_templates
         return self._syllable_templates_cache
 
-    # Return the vowel that matches the trigger on height and tense.
-    def _match_vowel(self, trigger_vowel: str, agree: str) -> str:
-        t_height = self.vowel[trigger_vowel][1]
-        t_tense = self.vowel[trigger_vowel][2]
+    # Return the vowel that matches the source on height and tense and the trigger on backness.
+    def _match_vowel(self, source_vowel: str, trigger_vowel: str, agree: str) -> str:
+        s_height = self.vowel[source_vowel][1]
+        s_tense = self.vowel[source_vowel][2]
         t_backness = self.vowel[trigger_vowel][0]
         for target_vowel, feats in self.vowel.items():
             if agree == "vh":
-                is_match = feats[0] == t_backness and feats[1] == t_height and feats[2] == t_tense
+                is_match = feats[0] == t_backness and feats[1] == s_height and feats[2] == s_tense
             else:
-                is_match = feats[0] != t_backness and feats[1] == t_height and feats[2] == t_tense
+                is_match = feats[0] != t_backness and feats[1] == s_height and feats[2] == s_tense
             if is_match:
                 return target_vowel
-        raise RuntimeError(f"No vowel matches {agree} for {trigger_vowel}")
+        raise RuntimeError(f"No vowel matches {agree} for source {source_vowel} and trigger {trigger_vowel}")
 
     # Map a base vowel to the corresponding vowel in the selected variant inventory.
     def _map_variant_vowel(self, base_vowel: str, variant: Optional[str]) -> str:
@@ -352,11 +367,23 @@ class BacknessHarmony(LanguagePattern):
     ) -> Tuple[List[Tuple[str, str, str]], List[Tuple[str, str, str]]]:
         vowels_in_word = [parts[1] for parts in ur_tuple]
         if directionality == "l2r":
-            vh_vowels = [vowels_in_word[0]] + [self._match_vowel(vowel, "vh") for vowel in vowels_in_word[1:]]
-            dh_vowels = [vowels_in_word[0]] + [self._match_vowel(vowel, "dh") for vowel in vowels_in_word[1:]]
+            # Use the first vowel as the trigger for all vowels to its right.
+            trigger_vowel = vowels_in_word[0]
+            vh_vowels = [trigger_vowel] + [
+                self._match_vowel(vowel, trigger_vowel, "vh") for vowel in vowels_in_word[1:]
+            ]
+            dh_vowels = [trigger_vowel] + [
+                self._match_vowel(vowel, trigger_vowel, "dh") for vowel in vowels_in_word[1:]
+            ]
         else:
-            vh_vowels = [self._match_vowel(vowel, "vh") for vowel in vowels_in_word[:-1]] + [vowels_in_word[-1]]
-            dh_vowels = [self._match_vowel(vowel, "dh") for vowel in vowels_in_word[:-1]] + [vowels_in_word[-1]]
+            # Use the last vowel as the trigger for all vowels to its left.
+            trigger_vowel = vowels_in_word[-1]
+            vh_vowels = [
+                self._match_vowel(vowel, trigger_vowel, "vh") for vowel in vowels_in_word[:-1]
+            ] + [trigger_vowel]
+            dh_vowels = [
+                self._match_vowel(vowel, trigger_vowel, "dh") for vowel in vowels_in_word[:-1]
+            ] + [trigger_vowel]
         vh_sr_tuple = [(parts[0], vh_vowels[i], parts[2]) for i, parts in enumerate(ur_tuple)]
         dh_sr_tuple = [(parts[0], dh_vowels[i], parts[2]) for i, parts in enumerate(ur_tuple)]
         return vh_sr_tuple, dh_sr_tuple
@@ -549,7 +576,8 @@ class BacknessHarmony(LanguagePattern):
 
             sylls.append(syll)
 
-        # Build the template string from the parsed syllables.
+        # Convert the parsed syllables into onset-vowel-coda template bits and
+        # reject the word if that full template is not licensed in this language.
         bits = []
         for o, v, c in sylls:
             bits.append(("1" if o else "0") + "1" + ("1" if c else "0"))

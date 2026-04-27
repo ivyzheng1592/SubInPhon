@@ -89,10 +89,18 @@ class AudioTrainer:
                     self.evaluate_one_epoch(gen_eval_dataloader)
                 )
                 gen_eval_acc = self.recorder.record_pred(
-                    epoch, "generalization", gen_eval_src, gen_eval_trg, gen_eval_pred
+                    epoch,
+                    "gen",
+                    gen_eval_src,
+                    gen_eval_trg,
+                    gen_eval_pred,
                 )
                 self.recorder.record_acc(
-                    epoch, "generalization", gen_eval_rec_loss, gen_eval_pred_loss, gen_eval_acc
+                    epoch, 
+                    "gen", 
+                    gen_eval_rec_loss, 
+                    gen_eval_pred_loss, 
+                    gen_eval_acc
                 )
 
             print(f"Epoch {epoch} Train Reconstruction Task Loss: {train_rec_loss:7.3f} "
@@ -102,9 +110,9 @@ class AudioTrainer:
                   f"| {eval_record_type.capitalize()} Prediction Task Loss: {eval_pred_loss:7.3f} "
                   f"| {eval_record_type.capitalize()} Prediction Acc: {eval_acc:7.3f}")
             if gen_eval_dataloader is not None:
-                print(f"Epoch {epoch} Generalization Reconstruction Task Loss: {gen_eval_rec_loss:7.3f} "
-                      f"| Generalization Prediction Task Loss: {gen_eval_pred_loss:7.3f} "
-                      f"| Generalization Prediction Acc: {gen_eval_acc:7.3f}")
+                print(f"Epoch {epoch} Gen Reconstruction Task Loss: {gen_eval_rec_loss:7.3f} "
+                      f"| Gen Prediction Task Loss: {gen_eval_pred_loss:7.3f} "
+                      f"| Gen Prediction Acc: {gen_eval_acc:7.3f}")
 
             # save model every other save_epochs
             if epoch % hp.save_epochs == 0 or epoch == hp.n_epochs-1:
