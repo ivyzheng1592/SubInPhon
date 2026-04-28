@@ -52,7 +52,7 @@ n_samples = 24000
 n_mels = 128
 
 # Dataset hyperparameters
-data_proportion = 0.1
+data_proportion = 1.0
 gen_data_proportion = 0.0001
 text_data_split_ratio = [0.6, 0.2, 0.2]
 audio_data_split_ratio = [0.8, 0.1, 0.1]
@@ -79,28 +79,29 @@ embedding_init_high = 1.0  # original=0.01
 freeze = False
 
 # Training hyperparameters
-n_epochs = 100
+n_epochs = 120
 save_epochs = 10
 learning_rate = 1e-4
 batch_size = 32
 # Weight applied to the EOS class in text prediction loss.
 # Use 1.0 for the standard objective; lower values weaken the learned stopping bias.
-eos_loss_weight = 0.5
+eos_loss_weight = 1.0
 
 # Reproducibility
 base_seed = 1234
 
 # Audio data root
-audio_root = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/dataset"
+#audio_root = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon"
+audio_root = "/mnt/data/Projects/subinphon/dataset"
 
 # Experiment settings
-lang_name = "EnglishBH"
+lang_name = "EnglishBH_shortened"
 # Property options: "nonidentical," where identical surface vowels are avoided
 property = ""
-directionality = ["l2r", "r2l"]
+directionality = ["l2r"]
 conditions = ["harmony", "disharmony"]
 # Whether to conduct generalization test with three syllable words
-gen_eval = True
+gen_eval = False
 # Run mode options: "train and evaluate", "tuning", "inspection"
 run_mode = "train and evaluate"
 # Prediction logging mode options: "vowel_only_error", "consonant_vowel_error", "all_correct_syll"
