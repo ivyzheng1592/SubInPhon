@@ -3,6 +3,7 @@
 # Dictionary data are saved to file using utils in AudioTrainer
 
 import os
+import re
 from typing import Any, List, Tuple
 import torch
 import hyper_params as hp
@@ -79,7 +80,10 @@ class AudioRecorder(TextRecorder):
         textgrid_file: str,
     ) -> List[Tuple[float, float, str]]:
         vowel_labels = list(self.language.focus.keys())
-        vowel_label_set = {txt_ipa_to_arpabet(vowel_label) for vowel_label in vowel_labels}
+        vowel_label_set = {
+            re.sub(r"\d", "", txt_ipa_to_arpabet(vowel_label))
+            for vowel_label in vowel_labels
+        }
         current_tier = None
         phones_tier = None
         current_interval = {}
@@ -132,8 +136,12 @@ class AudioRecorder(TextRecorder):
         if phones_tier is None:
             raise RuntimeError(f"Could not find phones tier in {textgrid_file}")
 
-        # Keep only the intervals whose labels match the requested vowels.
-        vowel_intervals = [interval for interval in phones_tier["intervals"] if interval[2] in vowel_label_set]
+        # Keep intervals whose ARPABET label matches a focus vowel, ignoring stress numbers.
+        vowel_intervals = [
+            interval
+            for interval in phones_tier["intervals"]
+            if re.sub(r"\d", "", interval[2]) in vowel_label_set
+        ]
 
         # The current audio setup expects exactly two vowel intervals per word.
         if len(vowel_intervals) != 2:
