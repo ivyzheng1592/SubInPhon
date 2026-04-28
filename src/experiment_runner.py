@@ -153,18 +153,18 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
                         "test",
                         gen_eval_dataloader=gen_test_dataloader,
                     )
-                    rep.evaluate_attention(test_dataloader)
+                    rep.evaluate_attention(test_dataloader, eval_epoch=hp.n_epochs - 1)
                     if hp.gen_eval:
-                        rep.evaluate_attention(gen_test_dataloader)
+                        rep.evaluate_attention(gen_test_dataloader, eval_epoch=hp.n_epochs - 1)
                     rep.evaluate_embedding()
                 elif hp.run_mode == "tuning":
                     rep.run(train_dataloader, valid_dataloader, "valid")
-                    rep.evaluate_attention(valid_dataloader)
+                    rep.evaluate_attention(valid_dataloader, eval_epoch=hp.n_epochs - 1)
                     rep.evaluate_embedding()
                 else:
-                    rep.evaluate_attention(test_dataloader)
+                    rep.evaluate_attention(test_dataloader, eval_epoch=hp.n_epochs - 1)
                     if hp.gen_eval:
-                        rep.evaluate_attention(gen_test_dataloader)
+                        rep.evaluate_attention(gen_test_dataloader, eval_epoch=hp.n_epochs - 1)
                     rep.evaluate_embedding()
 
 
@@ -269,18 +269,18 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
                         "test",
                         gen_eval_dataloader=gen_test_dataloader,
                     )
-                    rep.evaluate_attention(test_dataloader)
+                    rep.evaluate_attention(test_dataloader, eval_epoch=hp.n_epochs - 1)
                     if hp.gen_eval:
-                        rep.evaluate_attention(gen_test_dataloader)
+                        rep.evaluate_attention(gen_test_dataloader, eval_epoch=hp.n_epochs - 1)
                     rep.evaluate_embedding()
                 elif hp.run_mode == "tuning":
                     rep.run(train_dataloader, valid_dataloader, "valid")
-                    rep.evaluate_attention(valid_dataloader)
+                    rep.evaluate_attention(valid_dataloader, eval_epoch=hp.n_epochs - 1)
                     rep.evaluate_embedding()
                 else:
-                    rep.evaluate_attention(test_dataloader)
+                    rep.evaluate_attention(test_dataloader, eval_epoch=hp.n_epochs - 1)
                     if hp.gen_eval:
-                        rep.evaluate_attention(gen_test_dataloader)
+                        rep.evaluate_attention(gen_test_dataloader, eval_epoch=hp.n_epochs - 1)
                     rep.evaluate_embedding()
 
 
@@ -399,22 +399,22 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                         "test",
                         gen_eval_dataloader=gen_test_dataloader,
                     )
-                    rep.evaluate_attention(test_dataloader)
+                    rep.evaluate_attention(test_dataloader, eval_epoch=hp.n_epochs - 1)
                     if hp.gen_eval:
-                        rep.evaluate_attention(gen_test_dataloader)
+                        rep.evaluate_attention(gen_test_dataloader, eval_epoch=hp.n_epochs - 1)
                     rep.evaluate_embedding()
-                    rep.evaluate_audio_embedding(test_dataloader)
+                    rep.evaluate_audio_embedding(test_dataloader, eval_epoch=hp.n_epochs - 1)
                 elif hp.run_mode == "tuning":
                     rep.run(train_dataloader, valid_dataloader, "valid")
-                    rep.evaluate_attention(valid_dataloader)
+                    rep.evaluate_attention(valid_dataloader, eval_epoch=hp.n_epochs - 1)
                     rep.evaluate_embedding()
-                    rep.evaluate_audio_embedding(valid_dataloader)
+                    rep.evaluate_audio_embedding(valid_dataloader, eval_epoch=hp.n_epochs - 1)
                 else:
-                    rep.evaluate_attention(test_dataloader)
+                    rep.evaluate_attention(test_dataloader, eval_epoch=hp.n_epochs - 1)
                     if hp.gen_eval:
-                        rep.evaluate_attention(gen_test_dataloader)
+                        rep.evaluate_attention(gen_test_dataloader, eval_epoch=hp.n_epochs - 1)
                     rep.evaluate_embedding()
-                    rep.evaluate_audio_embedding(test_dataloader)
+                    rep.evaluate_audio_embedding(test_dataloader, eval_epoch=hp.n_epochs - 1)
 
 
 def run_experiment(
