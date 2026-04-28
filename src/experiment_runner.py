@@ -9,7 +9,8 @@ from torch.utils.data import random_split
 
 from language_registry import languages
 from audio_dataset import AudioDataset
-from audio_network_t1 import AudioSeq2Seq
+from audio_network_t1 import AudioSeq2Seq as AudioSeq2SeqT1
+from audio_network_t2 import AudioSeq2Seq as AudioSeq2SeqT2
 from audio_recorder import AudioRecorder
 from audio_trainer import AudioTrainer
 from feature_dataset import FeatureDataset
@@ -358,14 +359,24 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                 text_output_dim = len(dataset.sr_alphabet)
                 audio_output_dim = hp.n_mels
 
-                seq2seq = AudioSeq2Seq(
-                    encoder_input_dim,
-                    decoder_input_dim,
-                    synthsizer_input_dim,
-                    text_output_dim,
-                    audio_output_dim,
-                    device=hp.device,
-                )
+                if hp.audio_model == "t1":
+                    seq2seq = AudioSeq2SeqT1(
+                        encoder_input_dim,
+                        decoder_input_dim,
+                        synthsizer_input_dim,
+                        text_output_dim,
+                        audio_output_dim,
+                        device=hp.device,
+                    )
+                else:
+                    seq2seq = AudioSeq2SeqT2(
+                        encoder_input_dim,
+                        decoder_input_dim,
+                        synthsizer_input_dim,
+                        text_output_dim,
+                        audio_output_dim,
+                        device=hp.device,
+                    )
 
                 print(" - Preparing data recorder:")
                 recorder = AudioRecorder(

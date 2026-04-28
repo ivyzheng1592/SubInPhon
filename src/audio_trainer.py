@@ -338,7 +338,7 @@ class AudioTrainer:
         # Run the model on a small number of evaluation batches and extract vowel embeddings.
         with torch.no_grad():
             for i, input in enumerate(eval_dataloader):
-                if i >= hp.audio_embedding_inspection_batches:
+                if i >= hp.aud_embed_inspect_batch:
                     break
                 src_txt, src_aud, trg_txt, trg_aud = input
                 _, pred_txt, pred_spec, _, _ = self.seq2seq(input, 0, 0)

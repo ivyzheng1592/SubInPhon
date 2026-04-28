@@ -14,6 +14,7 @@ Command-line arguments:
 - --runs N | START:STOP[:STEP]
 - --data-proportion FLOAT
 - --gen-data-proportion FLOAT
+- --audio-model {t1,t2}
 - --n-epochs INT
 - --save-epochs INT
 - --base-seed SEED
@@ -29,6 +30,7 @@ Typical examples:
 - python3 src/main.py --modality text --lang-name EnglishBH_shortened --runs 0:2 --device cpu
 - python3 src/main.py --base-seed 2026
 - python3 src/main.py --data-proportion 0.2 --gen-data-proportion 0.001 --n-epochs 20 --save-epochs 5
+- python3 src/main.py --audio-model t2
 - python3 src/main.py --lang-name EnglishBH_expanded --property nonidentical
 - python3 src/main.py --modality audio --resume-model-file /path/to/model_seq2seq.pth
 
@@ -92,6 +94,12 @@ def _build_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help="Override hp.gen_data_proportion for this run.",
+    )
+    parser.add_argument(
+        "--audio-model",
+        choices=("t1", "t2"),
+        default=None,
+        help="Override hp.audio_model for this run.",
     )
     parser.add_argument(
         "--n-epochs",
@@ -184,6 +192,8 @@ def main() -> None:
         hp.data_proportion = args.data_proportion
     if args.gen_data_proportion is not None:
         hp.gen_data_proportion = args.gen_data_proportion
+    if args.audio_model is not None:
+        hp.audio_model = args.audio_model
     if args.n_epochs is not None:
         hp.n_epochs = args.n_epochs
     if args.save_epochs is not None:
@@ -208,6 +218,7 @@ def main() -> None:
     print(
         f"Run mode={hp.run_mode} pred_log={hp.pred_log} device={hp.device} "
         f"data_proportion={hp.data_proportion} gen_data_proportion={hp.gen_data_proportion} "
+        f"audio_model={hp.audio_model} "
         f"n_epochs={hp.n_epochs} save_epochs={hp.save_epochs} "
         f"base_seed={hp.base_seed} lang_name={hp.lang_name} property={hp.property} "
         f"runs={list(runs)} trial_num={trial_num}"

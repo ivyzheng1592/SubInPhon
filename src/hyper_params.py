@@ -58,6 +58,7 @@ text_data_split_ratio = [0.6, 0.2, 0.2]
 audio_data_split_ratio = [0.8, 0.1, 0.1]
 
 # Model hyperparameters
+audio_model = "t1"  # "t1" or "t2"
 embedding_dim = 11  # original=300
 prenet_dim = 64
 text_hidden_dim = 4  # original=256
@@ -88,8 +89,6 @@ base_seed = 1234
 
 # Audio data root
 audio_root = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/dataset"
-# Number of evaluation batches used for audio embedding inspection
-audio_embedding_inspection_batches = 3
 
 # Experiment settings
 lang_name = "EnglishBH"
@@ -103,4 +102,6 @@ gen_eval = True
 run_mode = "train and evaluate"
 # Prediction logging mode options: "vowel_only_error", "consonant_vowel_error", "all_correct_syll"
 pred_log = "vowel_only_error"
+# Number of evaluation batches used for audio embedding inspection
+aud_embed_inspect_batch = 3
 device = "cuda"
