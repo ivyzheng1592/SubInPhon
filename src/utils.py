@@ -190,6 +190,9 @@ def plot_aud_att(
 def plot_aud_embed(embed_store: Mapping[str, Sequence[Any]], embed_plot: str) -> None:
     embed_df = pd.DataFrame(embed_store)
     feature_cols = [col for col in embed_df.columns if col.startswith("mel_")]
+    embed_df = embed_df[embed_df["vowel_label"] != "NA"].copy()
+    if len(embed_df) == 0:
+        return
 
     reduced = PCA(n_components=2).fit_transform(embed_df[feature_cols])
     embed_df["pc1"] = reduced[:, 0]

@@ -143,12 +143,6 @@ class AudioRecorder(TextRecorder):
             if re.sub(r"\d", "", interval[2]) in vowel_label_set
         ]
 
-        # The current audio setup expects exactly two vowel intervals per word.
-        if len(vowel_intervals) != 2:
-            raise RuntimeError(
-                f"Expected 2 vowel intervals in phones tier of {textgrid_file}, found {len(vowel_intervals)}"
-            )
-
         return vowel_intervals
 
     # Convert one time interval into mel-frame boundaries.
@@ -182,6 +176,14 @@ class AudioRecorder(TextRecorder):
 
         # Read the vowel intervals from the TextGrid file.
         intervals = self.read_vowel_intervals(textgrid_file)
+        if len(intervals) != 2:
+            for vowel_index in range(2):
+                store["word_ref"].append(word_ref)
+                store["vowel_index"].append(vowel_index)
+                store["vowel_label"].append("NA")
+                for mel_idx in range(self.dataset.n_mels):
+                    store[f"mel_{mel_idx}"].append("NA")
+            return
         max_frames = spectrogram.shape[1]
 
         # Convert each vowel interval into one mean mel embedding row.
