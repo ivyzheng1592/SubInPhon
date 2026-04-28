@@ -48,11 +48,16 @@ class AudioTrainer:
         trg_txt = trg_txt[1:].view(-1)
         # trg = [(trg_len - 1) * batch_size]
 
-        # detect padded 0s from target spectrogram for loss calculation
-        weight = torch.where(torch.eq(trg_aud, -100), 0.0, 1.0)
+        # Weight the audio reconstruction loss so padded spectrogram frames do not contribute.
+        aud_weight = torch.where(torch.eq(trg_aud, -100), 0.0, 1.0)
+        rec_loss = F.l1_loss(spec, trg_aud, reduction='mean', weight=aud_weight)
 
-        rec_loss = F.l1_loss(spec, trg_aud, reduction='mean', weight=weight)
-        pred_loss = F.cross_entropy(output, trg_txt, ignore_index=hp.special_tokens.index(hp.pad_token))
+        # Weight the text prediction loss so EOS can be downweighted during training.
+        txt_weight = torch.ones(txt_dim, device=output.device)
+        txt_weight[hp.special_tokens.index(hp.eos_token)] = hp.eos_loss_weight
+        pred_loss = F.cross_entropy(output, trg_txt,
+                                    ignore_index=hp.special_tokens.index(hp.pad_token),
+                                    weight=txt_weight)
 
         return rec_loss, pred_loss
 
@@ -221,11 +226,11 @@ class AudioTrainer:
     # a function that manages evaluation of one random batch
     def evaluate_attention(
         self,
-        test_dataloader: Any,
+        dataloader: Any,
         eval_epoch: int = hp.n_epochs-1,
     ) -> None:
         # get one random batch of test data
-        dataiter = iter(test_dataloader)
+        dataiter = iter(dataloader)
         input = next(dataiter)
 
         # load model
@@ -323,8 +328,7 @@ class AudioTrainer:
 
     def evaluate_audio_embedding(
         self,
-        eval_dataloader: Any,
-        eval_record_type: str,
+        dataloader: Any,
         eval_epoch: int = hp.n_epochs - 1,
     ) -> None:
         # Load the saved model checkpoint used for audio embedding inspection.
@@ -337,7 +341,7 @@ class AudioTrainer:
 
         # Run the model on a small number of evaluation batches and extract vowel embeddings.
         with torch.no_grad():
-            for i, input in enumerate(eval_dataloader):
+            for i, input in enumerate(dataloader):
                 if i >= hp.aud_embed_inspect_batch:
                     break
                 src_txt, src_aud, trg_txt, trg_aud = input
@@ -354,7 +358,7 @@ class AudioTrainer:
                     sr_ref = self.recorder.dataset.word_to_sr_ref(sr_string)
 
                     # Load the source and target TextGrid files for vowel segmentation.
-                    textgrid_dir = os.path.join(hp.audio_root, hp.lang_name + "segmented")
+                    textgrid_dir = os.path.join(hp.audio_root, hp.lang_name + "_segmented")
                     src_textgrid = os.path.join(textgrid_dir, ur_ref + ".TextGrid")
                     trg_textgrid = os.path.join(textgrid_dir, sr_ref + ".TextGrid")
                     if not os.path.exists(src_textgrid):
@@ -363,9 +367,24 @@ class AudioTrainer:
                         raise FileNotFoundError(f"Could not find TextGrid for {sr_ref} in {textgrid_dir}")
 
                     # Record one row per vowel token into the three embedding stores.
-                    self.recorder.record_audio_embedding("source", src_aud[j, 0], src_textgrid, ur_ref)
-                    self.recorder.record_audio_embedding("target", trg_aud[j, 0], trg_textgrid, sr_ref)
-                    self.recorder.record_audio_embedding("pred", pred_spec[j, 0], trg_textgrid, sr_ref)
+                    self.recorder.record_audio_embedding(
+                        "source",
+                        src_aud[j, 0],
+                        src_textgrid,
+                        ur_ref,
+                    )
+                    self.recorder.record_audio_embedding(
+                        "target",
+                        trg_aud[j, 0],
+                        trg_textgrid,
+                        sr_ref,
+                    )
+                    self.recorder.record_audio_embedding(
+                        "pred",
+                        pred_spec[j, 0],
+                        trg_textgrid,
+                        sr_ref,
+                    )
 
         # Save the three embedding stores to CSV files.
         utils.save_to_file(self.recorder.source_audio_embed_store, self.recorder.source_audio_embed_file)

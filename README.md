@@ -62,9 +62,11 @@ python3 src/main.py --modality audio --audio-model t2
 - `--trial-num` sets the output folder prefix; default is a timestamp
 - `--data-proportion` overrides `hp.data_proportion`
 - `--gen-data-proportion` overrides `hp.gen_data_proportion`
+- `--gen-eval {true,false}` overrides `hp.gen_eval`
 - `--audio-model {t1,t2}` overrides `hp.audio_model`
 - `--n-epochs` overrides `hp.n_epochs`
 - `--save-epochs` overrides `hp.save_epochs`
+- `--eos-loss-weight` overrides `hp.eos_loss_weight`; use `1.0` for standard EOS loss
 - `--base-seed` overrides `hp.base_seed`
 - `--run-mode` overrides the run mode without editing `hyper_params.py`
 - `--pred-log {vowel_only_error,consonant_vowel_error,all_correct_syll}` overrides `hp.pred_log` for a single run
@@ -83,3 +85,4 @@ python3 src/main.py --modality audio --audio-model t2
 - `property`, `directionality`, `conditions`, and `audio_root` are currently set directly in `hyper_params.py`.
 - Text and feature experiments currently read `ur_string` and `sr_string` from the dataset CSVs.
 - Reproducibility: each run seeds `random`, `numpy`, and `torch` using `base_seed + run_num` (set in `hyper_params.py`).
+- See `generalization_notes.md` for the current plan around three-syllable generalization and EOS/coverage decoding interventions.

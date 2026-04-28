@@ -31,6 +31,13 @@ IPA_TO_ARPABET = {
 }
 
 
+TXT_IPA_TO_ARPABET = {
+    **IPA_TO_ARPABET,
+    "e": "EY1",
+    "o": "OW1",
+}
+
+
 # IPA to English-letter mapping used by TextGrid labels.
 IPA_TO_ENGLISH = {
     "i": "ii",
@@ -80,11 +87,15 @@ def ipa_to_english(ipa_string: str) -> str:
     return english_string
 
 
-# Convert an IPA string into an ARPABET phone sequence.
-def ipa_to_arpabet(ipa_string: str) -> str:
+def _ipa_to_arpabet(
+    ipa_string: str,
+    ipa_to_arpabet: dict,
+    use_diphthongs: bool,
+) -> str:
     working_string = ipa_string
-    for diphthong, arpabet in DIPHTHONGS.items():
-        working_string = working_string.replace(diphthong, f"[{arpabet}]")
+    if use_diphthongs:
+        for diphthong, arpabet in DIPHTHONGS.items():
+            working_string = working_string.replace(diphthong, f"[{arpabet}]")
 
     arpabet_phones = []
     i = 0
@@ -97,13 +108,23 @@ def ipa_to_arpabet(ipa_string: str) -> str:
                 continue
 
         char = working_string[i]
-        if char in IPA_TO_ARPABET:
-            arpabet_phones.append(IPA_TO_ARPABET[char])
+        if char in ipa_to_arpabet:
+            arpabet_phones.append(ipa_to_arpabet[char])
         else:
             arpabet_phones.append(char)
         i += 1
 
     return " ".join(arpabet_phones)
+
+
+# Convert an audio-variant IPA string into an ARPABET phone sequence.
+def aud_ipa_to_arpabet(ipa_string: str) -> str:
+    return _ipa_to_arpabet(ipa_string, IPA_TO_ARPABET, use_diphthongs=True)
+
+
+# Convert a text IPA string into an ARPABET phone sequence without diphthong handling.
+def txt_ipa_to_arpabet(ipa_string: str) -> str:
+    return _ipa_to_arpabet(ipa_string, TXT_IPA_TO_ARPABET, use_diphthongs=False)
 
 
 if __name__ == "__main__":
@@ -129,7 +150,7 @@ if __name__ == "__main__":
                 ur_var = row["ur_var"]
 
                 wordlist_col1 = ipa_to_english(ur_string)
-                wordlist_col2 = ipa_to_arpabet(ur_var)
+                wordlist_col2 = aud_ipa_to_arpabet(ur_var)
                 wordlist_out.write(f"{wordlist_col1}\t{wordlist_col2}\n")
 
                 textgrid_col1 = ur_var

@@ -83,6 +83,9 @@ n_epochs = 100
 save_epochs = 10
 learning_rate = 1e-4
 batch_size = 32
+# Weight applied to the EOS class in text prediction loss.
+# Use 1.0 for the standard objective; lower values weaken the learned stopping bias.
+eos_loss_weight = 0.5
 
 # Reproducibility
 base_seed = 1234

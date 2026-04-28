@@ -6,7 +6,7 @@ import os
 from typing import Any, List, Tuple
 import torch
 import hyper_params as hp
-from ipa_transformation import ipa_to_english
+from ipa_transformation import txt_ipa_to_arpabet
 from text_recorder import TextRecorder
 
 
@@ -79,7 +79,7 @@ class AudioRecorder(TextRecorder):
         textgrid_file: str,
     ) -> List[Tuple[float, float, str]]:
         vowel_labels = list(self.language.focus.keys())
-        vowel_label_set = {ipa_to_english(vowel_label) for vowel_label in vowel_labels}
+        vowel_label_set = {txt_ipa_to_arpabet(vowel_label) for vowel_label in vowel_labels}
         current_tier = None
         phones_tier = None
         current_interval = {}

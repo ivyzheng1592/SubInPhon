@@ -403,18 +403,18 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                     if hp.gen_eval:
                         rep.evaluate_attention(gen_test_dataloader)
                     rep.evaluate_embedding()
-                    rep.evaluate_audio_embedding(test_dataloader, "test")
+                    rep.evaluate_audio_embedding(test_dataloader)
                 elif hp.run_mode == "tuning":
                     rep.run(train_dataloader, valid_dataloader, "valid")
                     rep.evaluate_attention(valid_dataloader)
                     rep.evaluate_embedding()
-                    rep.evaluate_audio_embedding(valid_dataloader, "valid")
+                    rep.evaluate_audio_embedding(valid_dataloader)
                 else:
                     rep.evaluate_attention(test_dataloader)
                     if hp.gen_eval:
                         rep.evaluate_attention(gen_test_dataloader)
                     rep.evaluate_embedding()
-                    rep.evaluate_audio_embedding(test_dataloader, "test")
+                    rep.evaluate_audio_embedding(test_dataloader)
 
 
 def run_experiment(

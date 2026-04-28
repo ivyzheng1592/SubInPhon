@@ -1,7 +1,6 @@
 import argparse
 from datetime import datetime
 import os
-import sys
 from typing import Optional, Union
 
 from experiment_runner import run_experiment
@@ -14,9 +13,11 @@ Command-line arguments:
 - --runs N | START:STOP[:STEP]
 - --data-proportion FLOAT
 - --gen-data-proportion FLOAT
+- --gen-eval BOOL
 - --audio-model {t1,t2}
 - --n-epochs INT
 - --save-epochs INT
+- --eos-loss-weight FLOAT
 - --base-seed SEED
 - --lang-name LANGUAGE_KEY
 - --property PROPERTY_LABEL
@@ -30,6 +31,8 @@ Typical examples:
 - python3 src/main.py --modality text --lang-name EnglishBH_shortened --runs 0:2 --device cpu
 - python3 src/main.py --base-seed 2026
 - python3 src/main.py --data-proportion 0.2 --gen-data-proportion 0.001 --n-epochs 20 --save-epochs 5
+- python3 src/main.py --eos-loss-weight 0.5
+- python3 src/main.py --gen-eval false
 - python3 src/main.py --audio-model t2
 - python3 src/main.py --lang-name EnglishBH_expanded --property nonidentical
 - python3 src/main.py --modality audio --resume-model-file /path/to/model_seq2seq.pth
@@ -65,6 +68,17 @@ def _resolve_trial_num(trial_num: Optional[str]) -> str:
     return trial_num or datetime.now().strftime("%Y%m%d%H%M")
 
 
+def _parse_bool(value: Union[str, bool]) -> bool:
+    if isinstance(value, bool):
+        return value
+    normalized = str(value).strip().lower()
+    if normalized in ("1", "true", "t", "yes", "y", "on"):
+        return True
+    if normalized in ("0", "false", "f", "no", "n", "off"):
+        return False
+    raise argparse.ArgumentTypeError(f"Invalid boolean value: {value}")
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run SubInPhon experiments.")
     parser.add_argument(
@@ -96,6 +110,13 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Override hp.gen_data_proportion for this run.",
     )
     parser.add_argument(
+        "--gen-eval",
+        type=_parse_bool,
+        default=None,
+        metavar="BOOL",
+        help="Override hp.gen_eval for this run. Examples: true, false.",
+    )
+    parser.add_argument(
         "--audio-model",
         choices=("t1", "t2"),
         default=None,
@@ -112,6 +133,12 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="Override hp.save_epochs for this run.",
+    )
+    parser.add_argument(
+        "--eos-loss-weight",
+        type=float,
+        default=None,
+        help="Override hp.eos_loss_weight for this run. Use 1.0 for no downweighting.",
     )
     parser.add_argument(
         "--base-seed",
@@ -171,16 +198,12 @@ def _write_run_config(args: argparse.Namespace, trial_num: str, runs: range) -> 
         hp_items[name] = value
 
     with open(config_file, "w") as f:
-        f.write("command:\n")
-        f.write(" ".join(sys.argv) + "\n\n")
-
-        f.write("input_arguments:\n")
-        for key, value in vars(args).items():
-            f.write(f"{key}: {value}\n")
+        f.write("mandatory_input_arguments:\n")
+        f.write(f"modality: {args.modality}\n")
         f.write(f"resolved_trial_num: {trial_num}\n")
         f.write(f"resolved_runs: {list(runs)}\n\n")
 
-        f.write("hyper_parameters:\n")
+        f.write("hyper_parameters_after_overrides:\n")
         for key in sorted(hp_items):
             f.write(f"{key}: {hp_items[key]}\n")
 
@@ -192,12 +215,16 @@ def main() -> None:
         hp.data_proportion = args.data_proportion
     if args.gen_data_proportion is not None:
         hp.gen_data_proportion = args.gen_data_proportion
+    if args.gen_eval is not None:
+        hp.gen_eval = args.gen_eval
     if args.audio_model is not None:
         hp.audio_model = args.audio_model
     if args.n_epochs is not None:
         hp.n_epochs = args.n_epochs
     if args.save_epochs is not None:
         hp.save_epochs = args.save_epochs
+    if args.eos_loss_weight is not None:
+        hp.eos_loss_weight = args.eos_loss_weight
     if args.base_seed is not None:
         hp.base_seed = args.base_seed
     if args.lang_name is not None:
@@ -218,8 +245,10 @@ def main() -> None:
     print(
         f"Run mode={hp.run_mode} pred_log={hp.pred_log} device={hp.device} "
         f"data_proportion={hp.data_proportion} gen_data_proportion={hp.gen_data_proportion} "
+        f"gen_eval={hp.gen_eval} "
         f"audio_model={hp.audio_model} "
         f"n_epochs={hp.n_epochs} save_epochs={hp.save_epochs} "
+        f"eos_loss_weight={hp.eos_loss_weight} "
         f"base_seed={hp.base_seed} lang_name={hp.lang_name} property={hp.property} "
         f"runs={list(runs)} trial_num={trial_num}"
     )
