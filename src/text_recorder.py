@@ -35,19 +35,6 @@ class TextRecorder:
         self.ur_alphabet = self.dataset.ur_alphabet
         self.sr_alphabet = self.dataset.sr_alphabet
 
-        # Build the shared filename roots for this run.
-        self.result_root = "_".join(part for part in [self.lang_name, self.modality] if part)
-        self.run_root = "_".join(
-            part for part in [
-                self.result_root,
-                self.directionality,
-                self.property,
-                self.condition,
-                "run" + str(self.run_num),
-            ]
-            if part
-        )
-
         # Create the accuracy recorder store.
         self.acc_store = {
             'trial_num': [], 'language': [], 'modality': [],
@@ -92,28 +79,41 @@ class TextRecorder:
                 })
 
         # Build the result files and directories for this run.
-        self.acc_file = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
-                                     self.result_root + "_acc.csv")
-        self.pred_file = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
-                                      self.result_root + "_pred.csv")
+        self.result_root = "_".join(part for part in [self.lang_name, self.modality] if part)
+        self.run_root = "_".join(
+            part for part in [
+                self.result_root,
+                self.directionality,
+                self.property,
+                self.condition,
+                "run" + str(self.run_num),
+            ]
+            if part
+        )
+        output_dir = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality)
 
-        self.acc_plot_dir = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
-                                         self.result_root + "_acc_plots")
+        self.acc_file = os.path.join(output_dir, self.result_root + "_acc.csv")
+        self.pred_file = os.path.join(output_dir, self.result_root + "_pred.csv")
+
+        self.acc_plot_dir = os.path.join(output_dir, self.result_root + "_acc_plots")
         os.makedirs(self.acc_plot_dir, exist_ok=True)
         self.acc_plot = os.path.join(self.acc_plot_dir, self.run_root + "_acc_plot.png")
 
-        self.model_dir = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
-                                      self.result_root + "_model_files",
-                                      self.run_root + "_model_files")
+        self.model_dir = os.path.join(
+            output_dir,
+            self.result_root + "_model_files",
+            self.run_root + "_model_files",
+        )
         os.makedirs(self.model_dir, exist_ok=True)
 
-        self.att_plot_dir = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
-                                         self.result_root + "_att_plots",
-                                         self.run_root + "_att_plots")
+        self.att_plot_dir = os.path.join(
+            output_dir,
+            self.result_root + "_att_plots",
+            self.run_root + "_att_plots",
+        )
         os.makedirs(self.att_plot_dir, exist_ok=True)
 
-        self.embed_plot_dir = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality,
-                                           self.result_root + "_embed_plots")
+        self.embed_plot_dir = os.path.join(output_dir, self.result_root + "_embed_plots")
         os.makedirs(self.embed_plot_dir, exist_ok=True)
         self.embed_plot = os.path.join(self.embed_plot_dir, self.run_root + "_embedding.html")
         self.focus_embed_plot = os.path.join(self.embed_plot_dir, self.run_root + "_focus_embedding.html")
@@ -215,7 +215,7 @@ class TextRecorder:
 
                 # convert the pair
                 ur_string, sr_string, pred_sr_string = self.tensor2string(ur, sr, pred_sr)
-                ur_sylls, sr_sylls, pred_sr_sylls = self.tensor2syll(
+                _, sr_sylls, pred_sr_sylls = self.tensor2syll(
                     ur,
                     sr,
                     pred_sr,

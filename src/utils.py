@@ -1,5 +1,5 @@
 import os
-from typing import Any, List, Mapping, Sequence, Tuple
+from typing import Any, Mapping, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,76 +20,6 @@ def save_to_file(data_store: Mapping[str, Any], save_file: str) -> None:
         data_df.to_csv(save_file, header=False, index=False, mode="a")
     else:
         data_df.to_csv(save_file, header=True, index=False, mode="w")
-
-
-# Audio alignment helpers
-
-# Read the vowel intervals from the TextGrid tier that matches the requested labels best.
-def read_vowel_intervals(textgrid_file: str, vowel_labels: Sequence[str]) -> List[Tuple[float, float, str]]:
-    vowel_label_set = set(vowel_labels)
-    tiers = []
-    current_tier = None
-    current_interval = {}
-    in_interval = False
-
-    with open(textgrid_file, "r", encoding="utf-8") as f:
-        for raw_line in f:
-            line = raw_line.strip()
-            if line.startswith("class = ") and '"IntervalTier"' in line:
-                if current_tier is not None:
-                    tiers.append(current_tier)
-                current_tier = {"name": "", "intervals": []}
-                current_interval = {}
-                in_interval = False
-            elif current_tier is not None and line.startswith("name = "):
-                current_tier["name"] = line.split("=", 1)[1].strip().strip('"')
-            elif current_tier is not None and line.startswith("intervals ["):
-                current_interval = {}
-                in_interval = True
-            elif current_tier is not None and in_interval and line.startswith("xmin = "):
-                value = float(line.split("=", 1)[1].strip())
-                if "xmin" not in current_interval:
-                    current_interval["xmin"] = value
-            elif current_tier is not None and in_interval and line.startswith("xmax = "):
-                value = float(line.split("=", 1)[1].strip())
-                if "xmin" in current_interval and "xmax" not in current_interval:
-                    current_interval["xmax"] = value
-            elif current_tier is not None and in_interval and line.startswith("text = "):
-                current_interval["text"] = line.split("=", 1)[1].strip().strip('"')
-                if {"xmin", "xmax", "text"} <= current_interval.keys():
-                    current_tier["intervals"].append(
-                        (current_interval["xmin"], current_interval["xmax"], current_interval["text"])
-                    )
-                    current_interval = {}
-                    in_interval = False
-
-    if current_tier is not None:
-        tiers.append(current_tier)
-
-    best_intervals = []
-    best_match_count = -1
-    for tier in tiers:
-        matched = [interval for interval in tier["intervals"] if interval[2] in vowel_label_set]
-        if len(matched) > best_match_count:
-            best_match_count = len(matched)
-            best_intervals = matched
-    return best_intervals
-
-
-# Convert a time interval into mel-frame boundaries.
-def interval_to_frame_span(
-    start_time: float,
-    end_time: float,
-    max_frames: int,
-    sample_rate: int,
-    hop_length: int,
-    start_frame_offset: int = 1,
-) -> Tuple[int, int]:
-    start_frame = int(round(start_time * sample_rate / hop_length)) + start_frame_offset
-    end_frame = int(round(end_time * sample_rate / hop_length)) + start_frame_offset
-    start_frame = max(0, min(start_frame, max_frames - 1))
-    end_frame = max(start_frame + 1, min(end_frame, max_frames))
-    return start_frame, end_frame
 
 
 # Basic signal plots
@@ -150,7 +80,7 @@ def plot_txt_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
         ax1.plot(gen_data["epoch"], gen_data["loss"], label="gen")
     ax1.legend()
     ax1.set_title("Loss")
-    ax1.set_ylim(0, 3)
+    ax1.set_ylim(-0.1, 3.1)
 
     ax2.plot(train_data["epoch"], train_data["acc"], label="train")
     ax2.plot(valid_data["epoch"], valid_data["acc"], label="valid")
@@ -159,7 +89,7 @@ def plot_txt_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
         ax2.plot(gen_data["epoch"], gen_data["acc"], label="gen")
     ax2.legend()
     ax2.set_title("Acc")
-    ax2.set_ylim(0, 1)
+    ax2.set_ylim(-0.05, 1.05)
 
     plt.savefig(acc_plot)
     plt.close()
@@ -182,7 +112,7 @@ def plot_aud_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
         ax1.plot(gen_data["epoch"], gen_data["rec_loss"], label="gen")
     ax1.legend()
     ax1.set_title("Reconstruction Loss")
-    ax1.set_ylim(0, 20)
+    ax1.set_ylim(-0.5, 20.5)
 
     ax2.plot(train_data["epoch"], train_data["pred_loss"], label="train")
     ax2.plot(valid_data["epoch"], valid_data["pred_loss"], label="valid")
@@ -191,7 +121,7 @@ def plot_aud_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
         ax2.plot(gen_data["epoch"], gen_data["pred_loss"], label="gen")
     ax2.legend()
     ax2.set_title("Prediction Loss")
-    ax2.set_ylim(0, 3)
+    ax2.set_ylim(-0.1, 3.1)
 
     ax3.plot(train_data["epoch"], train_data["pred_acc"], label="train")
     ax3.plot(valid_data["epoch"], valid_data["pred_acc"], label="valid")
@@ -200,7 +130,7 @@ def plot_aud_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
         ax3.plot(gen_data["epoch"], gen_data["pred_acc"], label="gen")
     ax3.legend()
     ax3.set_title("Prediction Acc")
-    ax3.set_ylim(0, 1)
+    ax3.set_ylim(-0.05, 1.05)
 
     plt.savefig(acc_plot)
     plt.close()
@@ -244,9 +174,11 @@ def plot_aud_att(
     plt.savefig(txt_att_plot)
     plt.close()
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(12, 6), gridspec_kw={"height_ratios": [1, 1]})
-    ax1.imshow(sr_aud, origin="lower", aspect="auto")
-    ax2.imshow(aud_attention, origin="lower", aspect="auto", cmap="bone")
+    fig, axs = plt.subplots(2, 2, figsize=(12, 6))
+    axs[0, 0].axis("off")
+    axs[0, 1].imshow(ur_aud, origin="lower", aspect="auto")
+    axs[1, 0].imshow(sr_aud, origin="lower", aspect="auto")
+    axs[1, 1].imshow(aud_attention, origin="lower", aspect="auto", cmap="bone")
     plt.tight_layout()
     plt.savefig(aud_att_plot)
     plt.close()
@@ -255,31 +187,40 @@ def plot_aud_att(
 # Embedding plots
 
 # Plot extracted audio vowel embeddings.
-def plot_audio_embedding(embedding_store: Mapping[str, Sequence[Any]], embed_plot: str, title: str) -> None:
-    embed_df = pd.DataFrame(embedding_store)
+def plot_aud_embed(embed_store: Mapping[str, Sequence[Any]], embed_plot: str) -> None:
+    embed_df = pd.DataFrame(embed_store)
     feature_cols = [col for col in embed_df.columns if col.startswith("mel_")]
-    if len(embed_df) == 0 or len(feature_cols) < 2:
-        fig, ax = plt.subplots(figsize=(7, 6))
-        ax.text(0.5, 0.5, "No vowel tokens extracted", ha="center", va="center")
-        ax.set_axis_off()
-        ax.set_title(title)
-        plt.tight_layout()
-        plt.savefig(embed_plot, dpi=300)
-        plt.close()
-        return
 
     reduced = PCA(n_components=2).fit_transform(embed_df[feature_cols])
     embed_df["pc1"] = reduced[:, 0]
     embed_df["pc2"] = reduced[:, 1]
+    vowel_labels = sorted(embed_df["vowel_label"].unique())
+    color_codes = pd.Categorical(embed_df["vowel_label"], categories=vowel_labels).codes
+    cmap = plt.colormaps.get_cmap("tab10")
 
     fig, ax = plt.subplots(figsize=(7, 6))
-    for vowel_label in sorted(embed_df["vowel_label"].unique()):
-        vowel_data = embed_df[embed_df["vowel_label"] == vowel_label]
-        ax.scatter(vowel_data["pc1"], vowel_data["pc2"], s=15, alpha=0.7, label=vowel_label)
+    for i, (_, row) in enumerate(embed_df.iterrows()):
+        ax.scatter(
+            row["pc1"], 
+            row["pc2"], 
+            s=5, 
+            alpha=0.7, 
+            color=cmap(color_codes[i]))
+        ax.text(
+            row["pc1"],
+            row["pc2"],
+            row["word_ref"],
+            ha="left",
+            va="bottom",
+            fontsize=5,
+        )
     ax.set_xlabel("pc1")
     ax.set_ylabel("pc2")
-    ax.set_title(title)
-    ax.legend(ncols=2, fontsize=7)
+    legend_handles = [
+        plt.Line2D([0], [0], marker="o", linestyle="", markersize=5, color=cmap(i))
+        for i in range(len(vowel_labels))
+    ]
+    ax.legend(legend_handles, vowel_labels, ncols=2, fontsize=7)
     plt.tight_layout()
     plt.savefig(embed_plot, dpi=300)
     plt.close()
@@ -385,8 +326,10 @@ def plot_embed_updated(
         r"(?:_(?P<property>[^_]+))?_(?P<condition>[^_]+)_run(?P<run_num>\d+)"
         r"_epoch(?P<epoch>-?\d+)_(?P<suffix>.+)$"
     )
-    if metadata.isnull().any().any():
-        bad_files = combined_df.loc[metadata.isnull().any(axis=1), "file_name"].tolist()
+    metadata["property"] = metadata["property"].fillna("")
+    required_columns = ["language", "modality", "directionality", "condition", "run_num", "epoch", "suffix"]
+    if metadata[required_columns].isnull().any().any():
+        bad_files = combined_df.loc[metadata[required_columns].isnull().any(axis=1), "file_name"].tolist()
         raise RuntimeError(f"Could not parse embedding metadata from file names: {bad_files}")
     metadata["run_num"] = metadata["run_num"].astype(int)
     metadata["epoch"] = metadata["epoch"].astype(int)

@@ -4,13 +4,12 @@
 
 import os
 from typing import Any, List, Tuple
-import math
 import pandas as pd
 import torch
 import torchaudio
 import torchaudio.transforms as T
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader, Subset, random_split, default_collate
+from torch.utils.data import Dataset, DataLoader, random_split, default_collate
 from text_dataset import Alphabet
 import hyper_params as hp
 
@@ -74,17 +73,17 @@ class AudioDataset(Dataset):
         trg_audio = trg_audio.to(self.device)
 
         # pre-process source and target audio
-        src_audio = self.resampling(src_audio, src_sr)
-        trg_audio = self.resampling(trg_audio, trg_sr)
-        src_audio, trg_audio = self.padding(src_audio, trg_audio)
+        src_audio = self._resampling(src_audio, src_sr)
+        trg_audio = self._resampling(trg_audio, trg_sr)
+        src_audio, trg_audio = self._padding(src_audio, trg_audio)
 
         # transform source and target audio
         if self.wav2mel:  # [n_channels, n_freq, dur]
-            src_audio = self.wav_to_mel(src_audio)
-            trg_audio = self.wav_to_mel(trg_audio)
+            src_audio = self._wav_to_mel(src_audio)
+            trg_audio = self._wav_to_mel(trg_audio)
         if self.power2db:
-            src_audio = self.power_to_db(src_audio)
-            trg_audio = self.power_to_db(trg_audio)
+            src_audio = self._power_to_db(src_audio)
+            trg_audio = self._power_to_db(trg_audio)
 
         # get source text
         src = self.ur_words[index]
@@ -98,7 +97,7 @@ class AudioDataset(Dataset):
 
         return src_tensor, src_audio, trg_tensor, trg_audio
 
-    def resampling(self, signal: torch.Tensor, sr: int) -> torch.Tensor:
+    def _resampling(self, signal: torch.Tensor, sr: int) -> torch.Tensor:
         # in this project, we expect all sr == self.sample_rate
         assert (
             sr == self.sample_rate
@@ -109,7 +108,7 @@ class AudioDataset(Dataset):
             signal = resampler(signal)
         return signal
 
-    def padding(self, signal1: torch.Tensor, signal2: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _padding(self, signal1: torch.Tensor, signal2: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         # in this project, we are padding to a maximum length
         # so we expect all length_signal < self.n_samples
         length_signal1 = signal1.shape[1]
@@ -134,7 +133,7 @@ class AudioDataset(Dataset):
         return non_zeros
 
     # converting waveform to mel spectrogram
-    def wav_to_mel(self, signal: torch.Tensor) -> torch.Tensor:
+    def _wav_to_mel(self, signal: torch.Tensor) -> torch.Tensor:
         mel_spectrogram = T.MelSpectrogram(
             sample_rate=self.sample_rate,  # sampling rate, i.e. 24000 samples in 1s
             n_fft=1024,  # length of the FFT window
@@ -152,24 +151,30 @@ class AudioDataset(Dataset):
 
     # converting power scale to decibel scale in spectrogram
     # for readability of the spectrogram figure
-    def power_to_db(self, signal: torch.Tensor) -> torch.Tensor:
+    def _power_to_db(self, signal: torch.Tensor) -> torch.Tensor:
         db_spectrogram = T.AmplitudeToDB(stype="power").to(self.device)
         signal = db_spectrogram(signal)
         return signal
 
+    # Return the source audio reference for one UR string.
+    def word_to_ur_ref(self, ur_word: str) -> str:
+        match = self.ur_refs[self.ur_words == ur_word]
+        if len(match) == 0:
+            raise KeyError(f"No UR reference found for {ur_word}")
+        return match.iloc[0]
+
+    # Return the target audio reference for one SR string.
+    def word_to_sr_ref(self, sr_word: str) -> str:
+        match = self.sr_refs[self.sr_words == sr_word]
+        if len(match) == 0:
+            raise KeyError(f"No SR reference found for {sr_word}")
+        return match.iloc[0]
+
     def split_dataset(self, data_split_ratio: List[float]) -> Any:
         return random_split(self, data_split_ratio)
 
-    def sample_dataset(self, data_percentage: float) -> Dataset:
-        if data_percentage == 1:
-            return self
-
-        subset_size = math.ceil(len(self) * data_percentage)
-        subset_indices = torch.randperm(len(self))[:subset_size].tolist()
-        return Subset(self, subset_indices)
-
-    # a closure of customized collate_fn
-    def get_collate_fn(self):
+    # Build the custom collate function used by this dataset's dataloader.
+    def _get_collate_fn(self):
         def collate_fn(
             batch: List[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]]
         ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -190,7 +195,7 @@ class AudioDataset(Dataset):
             dataset=dataset,
             batch_size=batch_size,
             shuffle=shuffle,
-            collate_fn=self.get_collate_fn(),
+            collate_fn=self._get_collate_fn(),
             drop_last=True  # drop incomplete batch
         )
         return data_loader

@@ -3,11 +3,10 @@
 
 from typing import Any, Iterable, List, Tuple, Dict
 
-import math
 import pandas as pd
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader, Subset, random_split
+from torch.utils.data import Dataset, DataLoader, random_split
 
 
 class Alphabet:
@@ -126,16 +125,8 @@ class TextDataset(Dataset):
     def split_dataset(self, data_split_ratio: List[float]) -> Any:
         return random_split(self, data_split_ratio)
 
-    def sample_dataset(self, data_percentage: float) -> Dataset:
-        if data_percentage == 1:
-            return self
-
-        subset_size = math.ceil(len(self) * data_percentage)
-        subset_indices = torch.randperm(len(self))[:subset_size].tolist()
-        return Subset(self, subset_indices)
-
-    # a closure of customized collate_fn
-    def get_collate_fn(self):
+    # Build the custom collate function used by this dataset's dataloader.
+    def _get_collate_fn(self):
         def collate_fn(batch: List[Tuple[torch.Tensor, torch.Tensor]]) -> Tuple[torch.Tensor, torch.Tensor]:
             srcs = [item[0] for item in batch]
             srcs = nn.utils.rnn.pad_sequence(srcs, batch_first=False, padding_value=self.pad_idx)
@@ -150,7 +141,7 @@ class TextDataset(Dataset):
             dataset=dataset,
             batch_size=batch_size,
             shuffle=shuffle,
-            collate_fn=self.get_collate_fn(),
+            collate_fn=self._get_collate_fn(),
             drop_last=True  # drop incomplete batch
         )
         return data_loader
