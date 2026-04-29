@@ -374,7 +374,25 @@ def plot_aud_embed_updated(
                 "buttons": buttons,
                 "x": 0,
                 "y": 1.12,
-            }
+            },
+            {
+                "type": "buttons",
+                "direction": "right",
+                "buttons": [
+                    {
+                        "label": "show text",
+                        "method": "restyle",
+                        "args": [{"mode": "markers+text"}],
+                    },
+                    {
+                        "label": "hide text",
+                        "method": "restyle",
+                        "args": [{"mode": "markers"}],
+                    },
+                ],
+                "x": 0.35,
+                "y": 1.12,
+            },
         ],
     )
     fig.write_html(embed_plot)
