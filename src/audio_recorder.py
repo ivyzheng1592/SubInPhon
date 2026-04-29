@@ -80,8 +80,11 @@ class AudioRecorder(TextRecorder):
         textgrid_file: str,
     ) -> List[Tuple[float, float, str]]:
         vowel_labels = list(self.language.focus.keys())
-        vowel_label_set = {
-            re.sub(r"\d", "", txt_ipa_to_arpabet(vowel_label))
+        # TextGrid phone labels are ARPABET and may carry stress digits, while
+        # the language inventory is IPA. Build a stressless ARPABET -> IPA map
+        # for matching intervals, but keep IPA as the stored vowel label.
+        vowel_label_by_arpabet = {
+            re.sub(r"\d", "", txt_ipa_to_arpabet(vowel_label)): vowel_label
             for vowel_label in vowel_labels
         }
         current_tier = None
@@ -137,11 +140,14 @@ class AudioRecorder(TextRecorder):
             raise RuntimeError(f"Could not find phones tier in {textgrid_file}")
 
         # Keep intervals whose ARPABET label matches a focus vowel, ignoring stress numbers.
-        vowel_intervals = [
-            interval
-            for interval in phones_tier["intervals"]
-            if re.sub(r"\d", "", interval[2]) in vowel_label_set
-        ]
+        # Store the corresponding IPA label so downstream CSVs and plots remain linguistically readable.
+        vowel_intervals = []
+        for start_time, end_time, textgrid_label in phones_tier["intervals"]:
+            arpabet_label = re.sub(r"\d", "", textgrid_label)
+            if arpabet_label in vowel_label_by_arpabet:
+                vowel_intervals.append(
+                    (start_time, end_time, vowel_label_by_arpabet[arpabet_label])
+                )
 
         return vowel_intervals
 

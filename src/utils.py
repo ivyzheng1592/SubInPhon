@@ -16,6 +16,7 @@ import torch
 def save_to_file(data_store: Mapping[str, Any], save_file: str) -> None:
     data_df = pd.DataFrame(data_store)
 
+    # Append rows to an existing CSV or create a new CSV with headers.
     if os.path.exists(save_file):
         data_df.to_csv(save_file, header=False, index=False, mode="a")
     else:
@@ -72,6 +73,7 @@ def plot_txt_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
     test_data = acc_data[acc_data["record_type"] == "test"]
     gen_data = acc_data[acc_data["record_type"] == "gen"]
 
+    # Plot train, valid, test, and available gen curves.
     fig, (ax1, ax2) = plt.subplots(2, 1, sharex="all", figsize=(6, 6))
     ax1.plot(train_data["epoch"], train_data["loss"], label="train")
     ax1.plot(valid_data["epoch"], valid_data["loss"], label="valid")
@@ -104,6 +106,7 @@ def plot_aud_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
     test_data = acc_data[acc_data["record_type"] == "test"]
     gen_data = acc_data[acc_data["record_type"] == "gen"]
 
+    # Plot reconstruction loss, prediction loss, and prediction accuracy.
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex="all", figsize=(6, 8))
     ax1.plot(train_data["epoch"], train_data["rec_loss"], label="train")
     ax1.plot(valid_data["epoch"], valid_data["rec_loss"], label="valid")
@@ -166,7 +169,8 @@ def plot_aud_att(
     txt_attention = txt_attention.cpu().numpy()
     aud_attention = aud_attention.cpu().numpy()
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(12, 6), gridspec_kw={"height_ratios": [1, 1]})
+    # Plot source spectrogram and text-decoder attention.
+    fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(6, 6), gridspec_kw={"height_ratios": [1, 1]})
     ax1.imshow(ur_aud, origin="lower", aspect="auto")
     ax2.imshow(txt_attention, origin="lower", aspect="auto", cmap="bone")
     ax2.set_yticks(ticks=np.arange(len(sr_txt)), labels=sr_txt)
@@ -174,6 +178,7 @@ def plot_aud_att(
     plt.savefig(txt_att_plot)
     plt.close()
 
+    # Plot source spectrogram, target spectrogram, and audio attention.
     fig, axs = plt.subplots(2, 2, figsize=(12, 6))
     axs[0, 0].axis("off")
     axs[0, 1].imshow(ur_aud, origin="lower", aspect="auto")
@@ -194,36 +199,60 @@ def plot_aud_embed(embed_store: Mapping[str, Sequence[Any]], embed_plot: str) ->
     if len(embed_df) == 0:
         return
 
-    reduced = PCA(n_components=2).fit_transform(embed_df[feature_cols])
-    embed_df["pc1"] = reduced[:, 0]
-    embed_df["pc2"] = reduced[:, 1]
-    vowel_labels = sorted(embed_df["vowel_label"].unique())
-    color_codes = pd.Categorical(embed_df["vowel_label"], categories=vowel_labels).codes
-    cmap = plt.colormaps.get_cmap("tab10")
+    # Assign IPA vowel order for sorting and color selection.
+    embed_new_idx = ["i", "e", "u", "o", "ɪ", "ɛ", "ʊ", "ɔ"]
+    vowel_dtype = pd.CategoricalDtype(categories=embed_new_idx, ordered=True)
+    embed_df["vowel_label"] = embed_df["vowel_label"].astype(vowel_dtype)
+    embed_df = embed_df.sort_values("vowel_label")
 
-    fig, ax = plt.subplots(figsize=(7, 6))
-    for i, (_, row) in enumerate(embed_df.iterrows()):
+    # Reduce mel embeddings to three principal components.
+    pca = PCA(n_components=3)
+    reduced_data = pca.fit_transform(embed_df[feature_cols])
+    reduced_df = pd.DataFrame(data=reduced_data, columns=["pc1", "pc2", "pc3"])
+    reduced_df["word_ref"] = embed_df["word_ref"].to_numpy()
+    reduced_df["vowel_label"] = embed_df["vowel_label"].to_numpy()
+    plotted_labels = set(reduced_df["vowel_label"])
+    vowel_labels = [label for label in embed_new_idx if label in plotted_labels]
+    cmap = plt.colormaps.get_cmap("tab20")
+
+    plt.rcParams.update({"font.size": 5})
+    fig = plt.figure(figsize=(6, 6))
+    ax = fig.add_subplot(111, projection="3d")
+    for i in reduced_df.index:
         ax.scatter(
-            row["pc1"], 
-            row["pc2"], 
+            xs=reduced_df.loc[i, "pc1"],
+            ys=reduced_df.loc[i, "pc2"],
+            zs=reduced_df.loc[i, "pc3"],
             s=5, 
             alpha=0.7, 
-            color=cmap(color_codes[i]))
+            color=cmap(embed_new_idx.index(reduced_df.loc[i, "vowel_label"]) % 18),
+        )
         ax.text(
-            row["pc1"],
-            row["pc2"],
-            row["word_ref"],
+            x=reduced_df.loc[i, "pc1"],
+            y=reduced_df.loc[i, "pc2"],
+            z=reduced_df.loc[i, "pc3"],
+            s=reduced_df.loc[i, "word_ref"],
             ha="left",
             va="bottom",
             fontsize=5,
         )
     ax.set_xlabel("pc1")
     ax.set_ylabel("pc2")
+    ax.set_zlabel("pc3")
+    ax.set_title("Spectrogram vowel embedding")
+    # Build one legend entry for each plotted vowel label.
     legend_handles = [
-        plt.Line2D([0], [0], marker="o", linestyle="", markersize=5, color=cmap(i))
-        for i in range(len(vowel_labels))
+        plt.Line2D(
+            [0],
+            [0],
+            marker="o",
+            linestyle="",
+            markersize=5,
+            color=cmap(embed_new_idx.index(label) % 18),
+        )
+        for label in vowel_labels
     ]
-    ax.legend(legend_handles, vowel_labels, ncols=2, fontsize=7)
+    ax.legend(legend_handles, vowel_labels, ncols=2, loc="center left", bbox_to_anchor=(1.1, 0.5))
     plt.tight_layout()
     plt.savefig(embed_plot, dpi=300)
     plt.close()
@@ -239,6 +268,7 @@ def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_
         "i", "e", "u", "o", "ɪ", "ɛ", "ʊ", "ɔ",
     ]
     focus_embed_new_idx = ["i", "e", "u", "o", "ɪ", "ɛ", "ʊ", "ɔ"]
+    # Reindex phonemes and vowels into the display order.
     embed_df = embed_df.reindex(embed_new_idx)
     focus_embed_df = focus_embed_df.reindex(focus_embed_new_idx)
 
@@ -247,6 +277,7 @@ def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_
     reduced_df = pd.DataFrame(data=reduced_data, columns=["pc1", "pc2", "pc3"])
     reduced_df["phoneme"] = embed_df.index
 
+    # Reduce the focused vowel embeddings separately.
     focus_pca = PCA(n_components=3)
     focus_reduced_data = focus_pca.fit_transform(focus_embed_df)
     focus_reduced_df = pd.DataFrame(data=focus_reduced_data, columns=["pc1", "pc2", "pc3"])
@@ -324,6 +355,7 @@ def plot_embed_updated(
         dfs.append(df)
     combined_df = pd.concat(dfs, ignore_index=True)
 
+    # Extract run metadata from embedding file names.
     metadata = combined_df["file_name"].str.extract(
         r"^(?P<language>.+)_(?P<modality>txt|fea|aud)_(?P<directionality>[^_]+)"
         r"(?:_(?P<property>[^_]+))?_(?P<condition>[^_]+)_run(?P<run_num>\d+)"
@@ -338,6 +370,7 @@ def plot_embed_updated(
     metadata["epoch"] = metadata["epoch"].astype(int)
     combined_df = pd.concat([combined_df, metadata], axis=1)
 
+    # Create a vowel-only dataframe for the focused trajectory plot.
     focus_combined_df = combined_df[combined_df["phoneme"].isin(focus_list)].reset_index()
 
     pca = PCA(n_components=3)
@@ -362,6 +395,7 @@ def plot_embed_updated(
     combined_df["phoneme"] = combined_df["phoneme"].astype(phoneme)
     focus_combined_df["phoneme"] = focus_combined_df["phoneme"].astype(vowel)
 
+    # Sort by phoneme and epoch before building animation frames.
     combined_df = combined_df.sort_values(by=["phoneme", "epoch"], ascending=[True, True])
     focus_combined_df = focus_combined_df.sort_values(by=["phoneme", "epoch"], ascending=[True, True])
 
