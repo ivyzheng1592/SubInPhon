@@ -390,6 +390,12 @@ class AudioTrainer:
             self.recorder.pred_audio_embed_store,
             self.recorder.audio_embed_plot,
         )
+        utils.plot_aud_embed_relation(
+            self.recorder.source_audio_embed_store,
+            self.recorder.target_audio_embed_store,
+            self.recorder.pred_audio_embed_store,
+            self.recorder.audio_embed_relation_plot,
+        )
         print(
             f"Run {self.recorder.run_num} source, target, and predicted audio embedding plots are saved "
             f"({len(self.recorder.source_audio_embed_store['vowel_label'])}, "
