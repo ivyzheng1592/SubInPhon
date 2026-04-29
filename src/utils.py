@@ -477,6 +477,7 @@ def plot_aud_embed_relation(
         "source": "#1f77b4",
         "target": "#2ca02c",
         "pred": "#d62728",
+        "error": "#000000",
     }
 
     fig = make_subplots(
@@ -488,6 +489,39 @@ def plot_aud_embed_relation(
             "Cosine similarity",
             "Vowel-pair vectors",
         ],
+    )
+
+    mean_pair_df = pair_df.groupby("spectrogram_type", observed=True)[["euclidean", "cosine"]].mean()
+    mean_pair_df = mean_pair_df.reindex(spectrogram_types).reset_index()
+    fig.add_trace(
+        go.Scatter(
+            x=mean_pair_df["spectrogram_type"],
+            y=mean_pair_df["euclidean"],
+            mode="lines+markers",
+            name="overall mean",
+            legendgroup="overall mean",
+            line={"color": "black", "width": 5},
+            marker={"size": 8, "color": "black"},
+            hovertemplate="spectrogram_type=%{x}<br>mean euclidean=%{y}<extra></extra>",
+            showlegend=True,
+        ),
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=mean_pair_df["spectrogram_type"],
+            y=mean_pair_df["cosine"],
+            mode="lines+markers",
+            name="overall mean",
+            legendgroup="overall mean",
+            line={"color": "black", "width": 5},
+            marker={"size": 8, "color": "black"},
+            hovertemplate="spectrogram_type=%{x}<br>mean cosine=%{y}<extra></extra>",
+            showlegend=False,
+        ),
+        row=1,
+        col=2,
     )
 
     for word_ref, word_df in pair_df.groupby("word_ref"):
@@ -507,7 +541,7 @@ def plot_aud_embed_relation(
                 legendgroup=word_ref,
                 text=hover_text,
                 hovertemplate="%{text}<br>euclidean=%{y}<extra></extra>",
-                showlegend=False,
+                showlegend=True,
             ),
             row=1,
             col=1,
@@ -528,6 +562,8 @@ def plot_aud_embed_relation(
         )
 
     for (spectrogram_type, word_ref), word_df in reduced_df.groupby(["spectrogram_type", "word_ref"], observed=True):
+        if spectrogram_type not in ["target", "pred"]:
+            continue
         word_df = word_df.sort_values("vowel_index")
         if len(word_df) != 2:
             continue
@@ -545,7 +581,7 @@ def plot_aud_embed_relation(
                 ],
                 textposition="top center",
                 name=f"{word_ref}-{spectrogram_type}",
-                legendgroup=spectrogram_type,
+                legendgroup=word_ref,
                 line={"color": type_colors[str(spectrogram_type)], "width": 3},
                 marker={
                     "size": 3,
@@ -570,8 +606,98 @@ def plot_aud_embed_relation(
             col=3,
         )
 
+    for word_ref, word_df in reduced_df.groupby("word_ref"):
+        target_df = word_df[word_df["spectrogram_type"] == "target"].sort_values("vowel_index")
+        pred_df = word_df[word_df["spectrogram_type"] == "pred"].sort_values("vowel_index")
+        if len(target_df) != 2 or len(pred_df) != 2:
+            continue
+        target_endpoint = target_df.iloc[1]
+        pred_endpoint = pred_df.iloc[1]
+        fig.add_trace(
+            go.Scatter3d(
+                x=[target_endpoint["pc1"], pred_endpoint["pc1"]],
+                y=[target_endpoint["pc2"], pred_endpoint["pc2"]],
+                z=[target_endpoint["pc3"], pred_endpoint["pc3"]],
+                mode="lines+markers",
+                name=f"{word_ref}-error",
+                legendgroup=word_ref,
+                line={"color": type_colors["error"], "width": 2},
+                marker={"size": 3, "color": type_colors["error"]},
+                customdata=[
+                    [word_ref, "target endpoint", target_endpoint["vowel_label"]],
+                    [word_ref, "pred endpoint", pred_endpoint["vowel_label"]],
+                ],
+                hovertemplate=(
+                    "word_ref=%{customdata[0]}<br>"
+                    "point=%{customdata[1]}<br>"
+                    "vowel_label=%{customdata[2]}<extra></extra>"
+                ),
+                showlegend=False,
+            ),
+            row=1,
+            col=3,
+        )
+
+    mean_vector_df = reduced_df.groupby(["spectrogram_type", "vowel_index"], observed=True)[["pc1", "pc2", "pc3"]].mean()
+    mean_vector_df = mean_vector_df.reset_index()
+    for spectrogram_type, vector_df in mean_vector_df.groupby("spectrogram_type", observed=True):
+        if spectrogram_type not in ["target", "pred"]:
+            continue
+        vector_df = vector_df.sort_values("vowel_index")
+        if len(vector_df) != 2:
+            continue
+        fig.add_trace(
+            go.Scatter3d(
+                x=vector_df["pc1"],
+                y=vector_df["pc2"],
+                z=vector_df["pc3"],
+                mode="lines+markers+text",
+                text=[
+                    f"mean{vector_df.iloc[0]['vowel_index']}",
+                    f"mean{vector_df.iloc[1]['vowel_index']}",
+                ],
+                textposition="top center",
+                name=f"overall mean-{spectrogram_type}",
+                legendgroup="overall mean",
+                line={"color": type_colors[str(spectrogram_type)], "width": 8},
+                marker={"size": 6, "color": type_colors[str(spectrogram_type)]},
+                hovertemplate=(
+                    f"spectrogram_type={spectrogram_type}<br>"
+                    "mean vector point<extra></extra>"
+                ),
+                showlegend=False,
+            ),
+            row=1,
+            col=3,
+        )
+
+    mean_target_df = mean_vector_df[mean_vector_df["spectrogram_type"] == "target"].sort_values("vowel_index")
+    mean_pred_df = mean_vector_df[mean_vector_df["spectrogram_type"] == "pred"].sort_values("vowel_index")
+    if len(mean_target_df) == 2 and len(mean_pred_df) == 2:
+        mean_target_endpoint = mean_target_df.iloc[1]
+        mean_pred_endpoint = mean_pred_df.iloc[1]
+        fig.add_trace(
+            go.Scatter3d(
+                x=[mean_target_endpoint["pc1"], mean_pred_endpoint["pc1"]],
+                y=[mean_target_endpoint["pc2"], mean_pred_endpoint["pc2"]],
+                z=[mean_target_endpoint["pc3"], mean_pred_endpoint["pc3"]],
+                mode="lines+markers+text",
+                text=["mean target endpoint", "mean pred endpoint"],
+                textposition="top center",
+                name="overall mean-error",
+                legendgroup="overall mean",
+                line={"color": type_colors["error"], "width": 6},
+                marker={"size": 5, "color": type_colors["error"]},
+                hovertemplate="overall mean error vector<extra></extra>",
+                showlegend=False,
+            ),
+            row=1,
+            col=3,
+        )
+
     fig.update_layout(
         title="Within-word spectrogram vowel relation",
+        legend={"groupclick": "togglegroup"},
         scene={
             "xaxis_title": "pc1",
             "yaxis_title": "pc2",
