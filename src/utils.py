@@ -491,6 +491,14 @@ def plot_aud_embed_relation(
         ],
     )
 
+    word_vowel_map = {}
+    for word_ref, word_df in pair_df.groupby("word_ref"):
+        word_vowels = set(word_df["first_vowel"].astype(str)) | set(word_df["second_vowel"].astype(str))
+        word_vowel_map[word_ref] = [
+            vowel for vowel in AUD_EMBED_NEW_IDX
+            if vowel in word_vowels
+        ]
+
     mean_pair_df = pair_df.groupby("spectrogram_type", observed=True)[["euclidean", "cosine"]].mean()
     mean_pair_df = mean_pair_df.reindex(spectrogram_types).reset_index()
     fig.add_trace(
@@ -504,6 +512,7 @@ def plot_aud_embed_relation(
             marker={"size": 8, "color": "black"},
             hovertemplate="spectrogram_type=%{x}<br>mean euclidean=%{y}<extra></extra>",
             showlegend=True,
+            meta={"selector": "overall", "vowels": []},
         ),
         row=1,
         col=1,
@@ -519,6 +528,7 @@ def plot_aud_embed_relation(
             marker={"size": 8, "color": "black"},
             hovertemplate="spectrogram_type=%{x}<br>mean cosine=%{y}<extra></extra>",
             showlegend=False,
+            meta={"selector": "overall", "vowels": []},
         ),
         row=1,
         col=2,
@@ -542,6 +552,7 @@ def plot_aud_embed_relation(
                 text=hover_text,
                 hovertemplate="%{text}<br>euclidean=%{y}<extra></extra>",
                 showlegend=True,
+                meta={"selector": "word", "vowels": word_vowel_map[word_ref]},
             ),
             row=1,
             col=1,
@@ -556,6 +567,7 @@ def plot_aud_embed_relation(
                 text=hover_text,
                 hovertemplate="%{text}<br>cosine=%{y}<extra></extra>",
                 showlegend=False,
+                meta={"selector": "word", "vowels": word_vowel_map[word_ref]},
             ),
             row=1,
             col=2,
@@ -601,6 +613,7 @@ def plot_aud_embed_relation(
                     "spectrogram_type=%{customdata[3]}<extra></extra>"
                 ),
                 showlegend=False,
+                meta={"selector": "word", "vowels": word_vowel_map[word_ref]},
             ),
             row=1,
             col=3,
@@ -633,6 +646,7 @@ def plot_aud_embed_relation(
                     "vowel_label=%{customdata[2]}<extra></extra>"
                 ),
                 showlegend=False,
+                meta={"selector": "word", "vowels": word_vowel_map[word_ref]},
             ),
             row=1,
             col=3,
@@ -666,6 +680,7 @@ def plot_aud_embed_relation(
                     "mean vector point<extra></extra>"
                 ),
                 showlegend=False,
+                meta={"selector": "overall", "vowels": []},
             ),
             row=1,
             col=3,
@@ -690,9 +705,47 @@ def plot_aud_embed_relation(
                 marker={"size": 5, "color": type_colors["error"]},
                 hovertemplate="overall mean error vector<extra></extra>",
                 showlegend=False,
+                meta={"selector": "overall", "vowels": []},
             ),
             row=1,
             col=3,
+        )
+
+    visible_all = [True for _ in fig.data]
+    vowel_buttons = [
+        {
+            "label": "all vowels",
+            "method": "update",
+            "args": [
+                {"visible": visible_all},
+                {"title": "Within-word spectrogram vowel relation"},
+            ],
+        }
+    ]
+    plotted_vowels = sorted(
+        {
+            vowel
+            for vowels in word_vowel_map.values()
+            for vowel in vowels
+        },
+        key=AUD_EMBED_NEW_IDX.index,
+    )
+    for vowel in plotted_vowels:
+        visible = []
+        for trace in fig.data:
+            if trace.meta["selector"] == "overall":
+                visible.append(True)
+            else:
+                visible.append(vowel in trace.meta["vowels"])
+        vowel_buttons.append(
+            {
+                "label": vowel,
+                "method": "update",
+                "args": [
+                    {"visible": visible},
+                    {"title": f"Within-word spectrogram vowel relation: {vowel}"},
+                ],
+            }
         )
 
     fig.update_layout(
@@ -703,6 +756,15 @@ def plot_aud_embed_relation(
             "yaxis_title": "pc2",
             "zaxis_title": "pc3",
         },
+        updatemenus=[
+            {
+                "type": "buttons",
+                "direction": "right",
+                "buttons": vowel_buttons,
+                "x": 0,
+                "y": 1.12,
+            }
+        ],
     )
     fig.update_xaxes(title_text="spectrogram type", row=1, col=1)
     fig.update_yaxes(title_text="distance", row=1, col=1)
