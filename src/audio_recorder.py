@@ -57,6 +57,7 @@ class AudioRecorder(TextRecorder):
         self.source_audio_embed_plot = os.path.join(self.audio_embed_dir, self.run_root + "_source_audio_embedding.png")
         self.target_audio_embed_plot = os.path.join(self.audio_embed_dir, self.run_root + "_target_audio_embedding.png")
         self.pred_audio_embed_plot = os.path.join(self.audio_embed_dir, self.run_root + "_predicted_audio_embedding.png")
+        self.audio_embed_plot = os.path.join(self.audio_embed_dir, self.run_root + "_audio_embedding.html")
 
     # a function that records accuracy rates into a dictionary
     # the function is called at each training/evaluation epoch

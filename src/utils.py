@@ -6,6 +6,7 @@ import numpy as np
 from nooverlap import push_text_free
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from sklearn.decomposition import PCA
 import torch
 
@@ -191,6 +192,9 @@ def plot_aud_att(
 
 # Embedding plots
 
+AUD_EMBED_NEW_IDX = ["i", "e", "u", "o", "ɪ", "ɛ", "ʊ", "ɔ"]
+
+
 # Plot extracted audio vowel embeddings.
 def plot_aud_embed(embed_store: Mapping[str, Sequence[Any]], embed_plot: str) -> None:
     embed_df = pd.DataFrame(embed_store)
@@ -200,8 +204,7 @@ def plot_aud_embed(embed_store: Mapping[str, Sequence[Any]], embed_plot: str) ->
         return
 
     # Assign IPA vowel order for sorting and color selection.
-    embed_new_idx = ["i", "e", "u", "o", "ɪ", "ɛ", "ʊ", "ɔ"]
-    vowel_dtype = pd.CategoricalDtype(categories=embed_new_idx, ordered=True)
+    vowel_dtype = pd.CategoricalDtype(categories=AUD_EMBED_NEW_IDX, ordered=True)
     embed_df["vowel_label"] = embed_df["vowel_label"].astype(vowel_dtype)
     embed_df = embed_df.sort_values("vowel_label")
 
@@ -213,7 +216,7 @@ def plot_aud_embed(embed_store: Mapping[str, Sequence[Any]], embed_plot: str) ->
     reduced_df["vowel_index"] = embed_df["vowel_index"].to_numpy()
     reduced_df["vowel_label"] = embed_df["vowel_label"].to_numpy()
     plotted_labels = set(reduced_df["vowel_label"])
-    vowel_labels = [label for label in embed_new_idx if label in plotted_labels]
+    vowel_labels = [label for label in AUD_EMBED_NEW_IDX if label in plotted_labels]
     cmap = plt.colormaps.get_cmap("tab20")
 
     plt.rcParams.update({"font.size": 5})
@@ -226,7 +229,7 @@ def plot_aud_embed(embed_store: Mapping[str, Sequence[Any]], embed_plot: str) ->
             zs=reduced_df.loc[i, "pc3"],
             s=5, 
             alpha=0.7, 
-            color=cmap(embed_new_idx.index(reduced_df.loc[i, "vowel_label"]) % 18),
+            color=cmap(AUD_EMBED_NEW_IDX.index(reduced_df.loc[i, "vowel_label"]) % 18),
         )
         ax.text(
             x=reduced_df.loc[i, "pc1"],
@@ -249,7 +252,7 @@ def plot_aud_embed(embed_store: Mapping[str, Sequence[Any]], embed_plot: str) ->
             marker="o",
             linestyle="",
             markersize=5,
-            color=cmap(embed_new_idx.index(label) % 18),
+            color=cmap(AUD_EMBED_NEW_IDX.index(label) % 18),
         )
         for label in vowel_labels
     ]
@@ -257,6 +260,124 @@ def plot_aud_embed(embed_store: Mapping[str, Sequence[Any]], embed_plot: str) ->
     plt.tight_layout()
     plt.savefig(embed_plot, dpi=300)
     plt.close()
+
+
+# Plot interactive audio vowel embeddings for source, target, and predicted spectrograms.
+def plot_aud_embed_updated(
+    source_embed_store: Mapping[str, Sequence[Any]],
+    target_embed_store: Mapping[str, Sequence[Any]],
+    pred_embed_store: Mapping[str, Sequence[Any]],
+    embed_plot: str,
+) -> None:
+    source_df = pd.DataFrame(source_embed_store)
+    source_df = source_df[source_df["vowel_label"] != "NA"].copy()
+    source_df["spectrogram_type"] = "source"
+    target_df = pd.DataFrame(target_embed_store)
+    target_df = target_df[target_df["vowel_label"] != "NA"].copy()
+    target_df["spectrogram_type"] = "target"
+    pred_df = pd.DataFrame(pred_embed_store)
+    pred_df = pred_df[pred_df["vowel_label"] != "NA"].copy()
+    pred_df["spectrogram_type"] = "pred"
+
+    dfs = [source_df, target_df, pred_df]
+    combined_df = pd.concat(dfs, ignore_index=True)
+    if len(combined_df) == 0:
+        return
+
+    # Assign IPA vowel order for sorting and color selection.
+    vowel_dtype = pd.CategoricalDtype(categories=AUD_EMBED_NEW_IDX, ordered=True)
+    spectrogram_dtype = pd.CategoricalDtype(categories=["source", "target", "pred"], ordered=True)
+    combined_df["vowel_label"] = combined_df["vowel_label"].astype(vowel_dtype)
+    combined_df["spectrogram_type"] = combined_df["spectrogram_type"].astype(spectrogram_dtype)
+    combined_df = combined_df.sort_values(["spectrogram_type", "vowel_label", "word_ref", "vowel_index"])
+
+    # Reduce all spectrogram types in one shared PCA space.
+    feature_cols = [col for col in combined_df.columns if col.startswith("mel_")]
+    pca = PCA(n_components=3)
+    reduced_data = pca.fit_transform(combined_df[feature_cols])
+    reduced_df = pd.DataFrame(data=reduced_data, columns=["pc1", "pc2", "pc3"])
+    reduced_df["word_ref"] = combined_df["word_ref"].to_numpy()
+    reduced_df["vowel_index"] = combined_df["vowel_index"].to_numpy()
+    reduced_df["vowel_label"] = combined_df["vowel_label"].to_numpy()
+    reduced_df["spectrogram_type"] = combined_df["spectrogram_type"].to_numpy()
+    reduced_df["token_label"] = reduced_df["word_ref"].astype(str) + reduced_df["vowel_index"].astype(str)
+
+    cmap = plt.colormaps.get_cmap("tab20")
+    colors = {
+        vowel: "#{:02x}{:02x}{:02x}".format(
+            *[int(channel * 255) for channel in cmap(i % 18)[:3]]
+        )
+        for i, vowel in enumerate(AUD_EMBED_NEW_IDX)
+    }
+    fig = go.Figure()
+    spectrogram_types = ["source", "target", "pred"]
+    for spectrogram_type in spectrogram_types:
+        spectrogram_df = reduced_df[reduced_df["spectrogram_type"] == spectrogram_type]
+        for vowel_label in AUD_EMBED_NEW_IDX:
+            plot_df = spectrogram_df[spectrogram_df["vowel_label"] == vowel_label]
+            if len(plot_df) == 0:
+                continue
+            fig.add_trace(
+                go.Scatter3d(
+                    x=plot_df["pc1"],
+                    y=plot_df["pc2"],
+                    z=plot_df["pc3"],
+                    mode="markers+text",
+                    text=plot_df["token_label"],
+                    textposition="top center",
+                    name=vowel_label,
+                    legendgroup=vowel_label,
+                    marker={"size": 3, "color": colors[vowel_label]},
+                    customdata=plot_df[["word_ref", "vowel_index", "spectrogram_type"]],
+                    hovertemplate=(
+                        "word_ref=%{customdata[0]}<br>"
+                        "vowel_index=%{customdata[1]}<br>"
+                        "spectrogram_type=%{customdata[2]}<br>"
+                        "pc1=%{x}<br>pc2=%{y}<br>pc3=%{z}<extra></extra>"
+                    ),
+                    visible=spectrogram_type == "source",
+                    showlegend=True,
+                )
+            )
+
+    buttons = []
+    for spectrogram_type in spectrogram_types:
+        visible = [
+            trace.customdata[0][2] == spectrogram_type
+            for trace in fig.data
+        ]
+        buttons.append(
+            {
+                "label": spectrogram_type,
+                "method": "update",
+                "args": [
+                    {"visible": visible},
+                    {
+                        "title": f"Spectrogram vowel embedding: {spectrogram_type}",
+                        "showlegend": True,
+                    },
+                ],
+            }
+        )
+
+    fig.update_layout(
+        title="Spectrogram vowel embedding: source",
+        scene={
+            "xaxis_title": "pc1",
+            "yaxis_title": "pc2",
+            "zaxis_title": "pc3",
+        },
+        updatemenus=[
+            {
+                "type": "buttons",
+                "direction": "right",
+                "buttons": buttons,
+                "x": 0,
+                "y": 1.12,
+            }
+        ],
+    )
+    fig.write_html(embed_plot)
 
 
 # Plot one static 3D embedding snapshot.
