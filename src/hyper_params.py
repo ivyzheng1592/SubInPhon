@@ -30,7 +30,7 @@ When {property} is empty, that segment is omitted from file names.
             - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_focus_embedding.html"
             - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_embedding.csv"
             - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_embedding.png"
-        - {lang_name} + "_" + {modality} + "_audio_embed_plots"
+        - {lang_name} + "_" + {modality} + "_aud_embed_plots"
             - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_source_audio_embedding.csv"
             - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_target_audio_embedding.csv"
             - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_predicted_audio_embedding.csv"

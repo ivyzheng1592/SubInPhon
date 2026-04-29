@@ -210,6 +210,7 @@ def plot_aud_embed(embed_store: Mapping[str, Sequence[Any]], embed_plot: str) ->
     reduced_data = pca.fit_transform(embed_df[feature_cols])
     reduced_df = pd.DataFrame(data=reduced_data, columns=["pc1", "pc2", "pc3"])
     reduced_df["word_ref"] = embed_df["word_ref"].to_numpy()
+    reduced_df["vowel_index"] = embed_df["vowel_index"].to_numpy()
     reduced_df["vowel_label"] = embed_df["vowel_label"].to_numpy()
     plotted_labels = set(reduced_df["vowel_label"])
     vowel_labels = [label for label in embed_new_idx if label in plotted_labels]
@@ -231,7 +232,7 @@ def plot_aud_embed(embed_store: Mapping[str, Sequence[Any]], embed_plot: str) ->
             x=reduced_df.loc[i, "pc1"],
             y=reduced_df.loc[i, "pc2"],
             z=reduced_df.loc[i, "pc3"],
-            s=reduced_df.loc[i, "word_ref"],
+            s=f"{reduced_df.loc[i, 'word_ref']}{reduced_df.loc[i, 'vowel_index']}",
             ha="left",
             va="bottom",
             fontsize=5,
