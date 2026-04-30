@@ -220,24 +220,33 @@ class AudioRecorder(TextRecorder):
                 self.aud_embed_store[f"mel_{mel_idx}"].append(value)
 
     # Calculate within-word vowel distances from the recorded audio embedding store.
-    def record_vowel_relation(self) -> None:
+    def record_vowel_relation(self) -> int:
         embed_df = pd.DataFrame(self.aud_embed_store)
 
         # Remove placeholder rows before calculating vowel relations.
         embed_df = embed_df[embed_df["vowel_label"] != "NA"].copy()
         if len(embed_df) == 0:
-            return
+            return 0
 
         spectrogram_types = ["source", "target", "pred"]
         feature_cols = [col for col in embed_df.columns if col.startswith("mel_")]
+        relation_count = 0
 
         # Process each evaluated word item.
         for item_index in sorted(embed_df["item_index"].unique()):
+            item_frames = {}
+            for spectrogram_type in spectrogram_types:
+                item_frames[spectrogram_type] = embed_df[
+                    (embed_df["item_index"] == item_index)
+                    & (embed_df["spectrogram_type"] == spectrogram_type)
+                ].sort_values("vowel_index")
+
+            # Keep an item only when source, target, and pred each provide two vowels.
+            if any(len(item_frames[spectrogram_type]) < 2 for spectrogram_type in spectrogram_types):
+                continue
+
             # Use the source vowel pair to label the item by backness pattern.
-            source_df = embed_df[
-                (embed_df["item_index"] == item_index)
-                & (embed_df["spectrogram_type"] == "source")
-            ].sort_values("vowel_index")
+            source_df = item_frames["source"]
             source_backness_group = (
                 self.language.vowel[source_df.iloc[0]["vowel_label"]][0]
                 + "_"
@@ -246,10 +255,7 @@ class AudioRecorder(TextRecorder):
 
             for spectrogram_type in spectrogram_types:
                 # Calculate one vowel-relation row for the current item and spectrogram type.
-                word_df = embed_df[
-                    (embed_df["item_index"] == item_index)
-                    & (embed_df["spectrogram_type"] == spectrogram_type)
-                ].sort_values("vowel_index")
+                word_df = item_frames[spectrogram_type]
 
                 # Extract the two vowel embeddings for the current word and spectrogram type.
                 first_vowel = word_df.iloc[0]
@@ -274,3 +280,6 @@ class AudioRecorder(TextRecorder):
                 self.aud_vowel_relation_store["source_backness_group"].append(source_backness_group)
                 self.aud_vowel_relation_store["euclidean"].append(euclidean)
                 self.aud_vowel_relation_store["cosine"].append(cosine)
+                relation_count += 1
+
+        return relation_count

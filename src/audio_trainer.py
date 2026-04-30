@@ -343,7 +343,7 @@ class AudioTrainer:
                     self.recorder.record_audio_embedding("pred", pred_spec[j, 0], trg_textgrid, sr_ref, item_index)
 
         # Save the embedding store and the derived vowel relation store to CSV files.
-        self.recorder.record_vowel_relation()
+        relation_count = self.recorder.record_vowel_relation()
         utils.save_to_file(self.recorder.aud_embed_store, self.recorder.aud_embed_file)
         utils.save_to_file(self.recorder.aud_vowel_relation_store, self.recorder.aud_vowel_relation_file)
 
@@ -356,7 +356,10 @@ class AudioTrainer:
             self.recorder.aud_vowel_relation_store,
             self.recorder.aud_vowel_relation_plot,
         )
+        saved_vowel_count = sum(
+            1 for vowel_label in self.recorder.aud_embed_store["vowel_label"] if vowel_label != "NA"
+        )
         print(
             f"Run {self.recorder.run_num} source, target, and predicted audio embedding plots are saved "
-            f"({len(self.recorder.aud_embed_store['vowel_label'])} vowel tokens)"
+            f"({saved_vowel_count} vowel tokens saved; {relation_count * 2} vowel tokens included in relation plotting)"
         )
