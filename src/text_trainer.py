@@ -22,7 +22,7 @@ class TextTrainer:
         self.start_epoch = 0
 
         if resume_model_file:
-            self.seq2seq.load_state_dict(torch.load(resume_model_file))
+            self.seq2seq.load_state_dict(torch.load(resume_model_file, map_location=hp.device))
             match = re.search(r"_epoch(-?\d+)_seq2seq\.pth$", resume_model_file)
             if not match:
                 raise RuntimeError(f"Cannot parse epoch from model file: {resume_model_file}")
@@ -185,7 +185,7 @@ class TextTrainer:
             self.recorder.model_dir,
             self.recorder.run_root + "_epoch" + str(eval_epoch) + "_seq2seq.pth",
         )
-        self.seq2seq.load_state_dict(torch.load(model_file))
+        self.seq2seq.load_state_dict(torch.load(model_file, map_location=hp.device))
         self.seq2seq.eval()  # disable dropout in evaluation
 
         with torch.no_grad():  # disable gradient tracking
@@ -227,7 +227,7 @@ class TextTrainer:
         for file_name in os.listdir(self.recorder.model_dir):
             # load model
             model_file = os.path.join(self.recorder.model_dir, file_name)
-            self.seq2seq.load_state_dict(torch.load(model_file))
+            self.seq2seq.load_state_dict(torch.load(model_file, map_location=hp.device))
 
             # retrieve target embedding
             embed = self.seq2seq.decoder.embedding.weight

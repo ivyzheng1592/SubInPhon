@@ -60,6 +60,21 @@ class TextRecorder:
                 'sr_c1': [], 'sr_c2': [],
                 'pred_sr_c1': [], 'pred_sr_c2': [],
             })
+        if "expanded" in hp.lang_name:
+            self.pred_store.update({
+                'v3_error': [],
+                'sr_v3': [],
+                'pred_sr_v3': [],
+            })
+            if hp.pred_log != "vowel_only_error":
+                self.pred_store.update({
+                    'o3_error': [],
+                    'sr_o3': [],
+                    'pred_sr_o3': [],
+                    'c3_error': [],
+                    'sr_c3': [],
+                    'pred_sr_c3': [],
+                })
 
         # Build the result files and directories for this run.
         self.result_root = "_".join(part for part in [self.lang_name, self.modality] if part)
@@ -265,8 +280,8 @@ class TextRecorder:
                 self.pred_store['pred_sr_v1'].append(pred_v[0])
                 self.pred_store['pred_sr_v2'].append(pred_v[1])
 
-                # record third-syllable fields only for 3-syllable outputs
-                if syll_count == 3:
+                # record third-syllable fields only for expanded-language runs
+                if "expanded" in hp.lang_name:
                     if hp.pred_log != "vowel_only_error":
                         self.pred_store['o3_error'].append(o_errors[2])
                         self.pred_store['sr_o3'].append(sr_o[2])
@@ -277,17 +292,6 @@ class TextRecorder:
                     self.pred_store['v3_error'].append(v_errors[2])
                     self.pred_store['sr_v3'].append(sr_v[2])
                     self.pred_store['pred_sr_v3'].append(pred_v[2])
-                elif 'v3_error' in self.pred_store:
-                    if hp.pred_log != "vowel_only_error":
-                        self.pred_store['o3_error'].append("")
-                        self.pred_store['sr_o3'].append("")
-                        self.pred_store['pred_sr_o3'].append("")
-                        self.pred_store['c3_error'].append("")
-                        self.pred_store['sr_c3'].append("")
-                        self.pred_store['pred_sr_c3'].append("")
-                    self.pred_store['v3_error'].append("")
-                    self.pred_store['sr_v3'].append("")
-                    self.pred_store['pred_sr_v3'].append("")
 
         if len(epoch_correct) == 0:
             raise RuntimeError(f"No predictions recorded for epoch {epoch} ({record_type})")
