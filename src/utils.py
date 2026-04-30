@@ -73,15 +73,12 @@ def plot_txt_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
     train_data = acc_data[acc_data["record_type"] == "train"]
     valid_data = acc_data[acc_data["record_type"] == "valid"]
     test_data = acc_data[acc_data["record_type"] == "test"]
-    gen_data = acc_data[acc_data["record_type"] == "gen"]
 
-    # Plot train, valid, test, and available gen curves.
+    # Plot train, valid, and test curves.
     fig, (ax1, ax2) = plt.subplots(2, 1, sharex="all", figsize=(6, 6))
     ax1.plot(train_data["epoch"], train_data["loss"], label="train")
     ax1.plot(valid_data["epoch"], valid_data["loss"], label="valid")
     ax1.plot(test_data["epoch"], test_data["loss"], label="test")
-    if len(gen_data) > 0:
-        ax1.plot(gen_data["epoch"], gen_data["loss"], label="gen")
     ax1.legend()
     ax1.set_title("Loss")
     ax1.set_ylim(-0.1, 3.1)
@@ -89,8 +86,6 @@ def plot_txt_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
     ax2.plot(train_data["epoch"], train_data["acc"], label="train")
     ax2.plot(valid_data["epoch"], valid_data["acc"], label="valid")
     ax2.plot(test_data["epoch"], test_data["acc"], label="test")
-    if len(gen_data) > 0:
-        ax2.plot(gen_data["epoch"], gen_data["acc"], label="gen")
     ax2.legend()
     ax2.set_title("Acc")
     ax2.set_ylim(-0.05, 1.05)
@@ -106,15 +101,12 @@ def plot_aud_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
     train_data = acc_data[acc_data["record_type"] == "train"]
     valid_data = acc_data[acc_data["record_type"] == "valid"]
     test_data = acc_data[acc_data["record_type"] == "test"]
-    gen_data = acc_data[acc_data["record_type"] == "gen"]
 
     # Plot reconstruction loss, prediction loss, and prediction accuracy.
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex="all", figsize=(6, 8))
     ax1.plot(train_data["epoch"], train_data["rec_loss"], label="train")
     ax1.plot(valid_data["epoch"], valid_data["rec_loss"], label="valid")
     ax1.plot(test_data["epoch"], test_data["rec_loss"], label="test")
-    if len(gen_data) > 0:
-        ax1.plot(gen_data["epoch"], gen_data["rec_loss"], label="gen")
     ax1.legend()
     ax1.set_title("Reconstruction Loss")
     ax1.set_ylim(-0.5, 20.5)
@@ -122,8 +114,6 @@ def plot_aud_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
     ax2.plot(train_data["epoch"], train_data["pred_loss"], label="train")
     ax2.plot(valid_data["epoch"], valid_data["pred_loss"], label="valid")
     ax2.plot(test_data["epoch"], test_data["pred_loss"], label="test")
-    if len(gen_data) > 0:
-        ax2.plot(gen_data["epoch"], gen_data["pred_loss"], label="gen")
     ax2.legend()
     ax2.set_title("Prediction Loss")
     ax2.set_ylim(-0.1, 3.1)
@@ -131,8 +121,6 @@ def plot_aud_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
     ax3.plot(train_data["epoch"], train_data["pred_acc"], label="train")
     ax3.plot(valid_data["epoch"], valid_data["pred_acc"], label="valid")
     ax3.plot(test_data["epoch"], test_data["pred_acc"], label="test")
-    if len(gen_data) > 0:
-        ax3.plot(gen_data["epoch"], gen_data["pred_acc"], label="gen")
     ax3.legend()
     ax3.set_title("Prediction Acc")
     ax3.set_ylim(-0.05, 1.05)

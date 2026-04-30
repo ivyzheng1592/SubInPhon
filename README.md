@@ -61,8 +61,6 @@ python3 src/main.py --modality audio --audio-model t2
 - `--runs` accepts a count (`2`) or range-style spec (`0:2`, `1:5:2`)
 - `--trial-num` sets the output folder prefix; default is a timestamp
 - `--data-proportion` overrides `hp.data_proportion`
-- `--gen-data-proportion` overrides `hp.gen_data_proportion`
-- `--gen-eval {true,false}` overrides `hp.gen_eval`
 - `--audio-model {t1,t2}` overrides `hp.audio_model`
 - `--n-epochs` overrides `hp.n_epochs`
 - `--save-epochs` overrides `hp.save_epochs`
@@ -84,4 +82,3 @@ python3 src/main.py --modality audio --audio-model t2
 - `property`, `directionality`, `conditions`, and `audio_root` are currently set directly in `hyper_params.py`.
 - Text and feature experiments currently read `ur_string` and `sr_string` from the dataset CSVs.
 - Reproducibility: each run seeds `random`, `numpy`, and `torch` using `base_seed + run_num` (set in `hyper_params.py`).
-- See `generalization_notes.md` for the current plan around three-syllable generalization and EOS/coverage decoding interventions.

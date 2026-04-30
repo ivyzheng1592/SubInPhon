@@ -62,7 +62,6 @@ class AudioTrainer:
         train_dataloader: Any,
         eval_dataloader: Any,
         eval_record_type: str,
-        gen_eval_dataloader: Any = None,
     ) -> None:
         if self.start_epoch == 0:
             # save untrained model
@@ -84,24 +83,6 @@ class AudioTrainer:
             # record accuracy
             self.recorder.record_acc(epoch, "train", train_rec_loss, train_pred_loss, train_acc)
             self.recorder.record_acc(epoch, eval_record_type, eval_rec_loss, eval_pred_loss, eval_acc)
-            if gen_eval_dataloader is not None:
-                gen_eval_rec_loss, gen_eval_pred_loss, gen_eval_src, gen_eval_trg, gen_eval_pred = (
-                    self.evaluate_one_epoch(gen_eval_dataloader)
-                )
-                gen_eval_acc = self.recorder.record_pred(
-                    epoch,
-                    "gen",
-                    gen_eval_src,
-                    gen_eval_trg,
-                    gen_eval_pred,
-                )
-                self.recorder.record_acc(
-                    epoch, 
-                    "gen", 
-                    gen_eval_rec_loss, 
-                    gen_eval_pred_loss, 
-                    gen_eval_acc
-                )
 
             print(f"Epoch {epoch} Train Reconstruction Task Loss: {train_rec_loss:7.3f} "
                   f"| Train Prediction Task Loss: {train_pred_loss:7.3f} "
@@ -109,10 +90,6 @@ class AudioTrainer:
             print(f"Epoch {epoch} {eval_record_type.capitalize()} Reconstruction Task Loss: {eval_rec_loss:7.3f} "
                   f"| {eval_record_type.capitalize()} Prediction Task Loss: {eval_pred_loss:7.3f} "
                   f"| {eval_record_type.capitalize()} Prediction Acc: {eval_acc:7.3f}")
-            if gen_eval_dataloader is not None:
-                print(f"Epoch {epoch} Gen Reconstruction Task Loss: {gen_eval_rec_loss:7.3f} "
-                      f"| Gen Prediction Task Loss: {gen_eval_pred_loss:7.3f} "
-                      f"| Gen Prediction Acc: {gen_eval_acc:7.3f}")
 
             # save model every other save_epochs
             if epoch % hp.save_epochs == 0 or epoch == hp.n_epochs-1:

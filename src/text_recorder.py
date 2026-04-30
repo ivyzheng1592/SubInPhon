@@ -3,7 +3,7 @@
 # Dictionary data are saved to file using utils in TextTrainer
 
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 import hyper_params as hp
 
 
@@ -13,7 +13,6 @@ class TextRecorder:
         dataset: Any,
         trial_num: str,
         language: Any,
-        gen_language: Optional[Any],
         modality: str,
         directionality: str,
         condition: str,
@@ -23,7 +22,6 @@ class TextRecorder:
         self.dataset = dataset
         self.trial_num = trial_num
         self.language = language
-        self.gen_language = gen_language
         self.lang_name = hp.lang_name
         self.modality = modality
         self.directionality = directionality
@@ -53,12 +51,6 @@ class TextRecorder:
             'sr_v1': [], 'sr_v2': [],
             'pred_sr_v1': [], 'pred_sr_v2': [],
         }
-        if hp.gen_eval:
-            self.pred_store.update({
-                'v3_error': [],
-                'sr_v3': [],
-                'pred_sr_v3': [],
-            })
         if hp.pred_log != "vowel_only_error":
             self.pred_store.update({
                 'o1_error': [], 'o2_error': [],
@@ -68,15 +60,6 @@ class TextRecorder:
                 'sr_c1': [], 'sr_c2': [],
                 'pred_sr_c1': [], 'pred_sr_c2': [],
             })
-            if hp.gen_eval:
-                self.pred_store.update({
-                    'o3_error': [],
-                    'sr_o3': [],
-                    'pred_sr_o3': [],
-                    'c3_error': [],
-                    'sr_c3': [],
-                    'pred_sr_c3': [],
-                })
 
         # Build the result files and directories for this run.
         self.result_root = "_".join(part for part in [self.lang_name, self.modality] if part)
@@ -174,13 +157,10 @@ class TextRecorder:
         # convert tensor to word list
         ur_list, sr_list, pred_sr_list = self.tensor2list(ur, sr, pred_sr)
 
-        # Use the expanded language when recording gen predictions.
-        language = self.gen_language if record_type == "gen" and self.gen_language is not None else self.language
-
         # decompose word list into structured syllables
-        ur_sylls = language.decompose_stimuli(ur_list)
-        sr_sylls = language.decompose_stimuli(sr_list)
-        pred_sr_sylls = language.decompose_stimuli(pred_sr_list)
+        ur_sylls = self.language.decompose_stimuli(ur_list)
+        sr_sylls = self.language.decompose_stimuli(sr_list)
+        pred_sr_sylls = self.language.decompose_stimuli(pred_sr_list)
 
         return ur_sylls, sr_sylls, pred_sr_sylls
 

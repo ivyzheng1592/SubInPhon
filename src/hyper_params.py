@@ -51,7 +51,6 @@ n_mels = 128
 
 # Dataset hyperparameters
 data_proportion = 1.0
-gen_data_proportion = 0.0001
 text_data_split_ratio = [0.6, 0.2, 0.2]
 audio_data_split_ratio = [0.8, 0.1, 0.1]
 
@@ -95,8 +94,6 @@ lang_name = "EnglishBH_shortened"
 property = ""
 directionality = ["l2r"]
 conditions = ["harmony", "disharmony"]
-# Whether to conduct generalization test with three syllable words
-gen_eval = False
 # Run mode options: "train and evaluate", "tuning", "inspection"
 run_mode = "train and evaluate"
 # Prediction logging mode options: "vowel_only_error", "consonant_vowel_error", "all_correct_syll"

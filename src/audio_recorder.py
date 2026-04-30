@@ -19,13 +19,12 @@ class AudioRecorder(TextRecorder):
         dataset: Any,
         trial_num: str,
         language: Any,
-        gen_language: Any,
         modality: str,
         directionality: str,
         condition: str,
         run_num: int,
     ) -> None:
-        super().__init__(dataset, trial_num, language, gen_language, modality, directionality, condition, run_num)
+        super().__init__(dataset, trial_num, language, modality, directionality, condition, run_num)
 
         # Create the audio accuracy store.
         self.acc_store = {

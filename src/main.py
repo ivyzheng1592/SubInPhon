@@ -12,8 +12,6 @@ Command-line arguments:
 - --trial-num TRIAL_ID
 - --runs N | START:STOP[:STEP]
 - --data-proportion FLOAT
-- --gen-data-proportion FLOAT
-- --gen-eval BOOL
 - --audio-model {t1,t2}
 - --n-epochs INT
 - --save-epochs INT
@@ -29,8 +27,7 @@ Typical examples:
 - python3 src/main.py
 - python3 src/main.py --modality text --lang-name EnglishBH_shortened --runs 0:2 --device cpu
 - python3 src/main.py --base-seed 2026
-- python3 src/main.py --data-proportion 0.2 --gen-data-proportion 0.001 --n-epochs 20 --save-epochs 5
-- python3 src/main.py --gen-eval false
+- python3 src/main.py --data-proportion 0.2 --n-epochs 20 --save-epochs 5
 - python3 src/main.py --audio-model t2
 - python3 src/main.py --lang-name EnglishBH_expanded --property nonidentical
 - python3 src/main.py --modality audio --resume-model-file /path/to/model_seq2seq.pth
@@ -66,17 +63,6 @@ def _resolve_trial_num(trial_num: Optional[str]) -> str:
     return trial_num or datetime.now().strftime("%Y%m%d%H%M")
 
 
-def _parse_bool(value: Union[str, bool]) -> bool:
-    if isinstance(value, bool):
-        return value
-    normalized = str(value).strip().lower()
-    if normalized in ("1", "true", "t", "yes", "y", "on"):
-        return True
-    if normalized in ("0", "false", "f", "no", "n", "off"):
-        return False
-    raise argparse.ArgumentTypeError(f"Invalid boolean value: {value}")
-
-
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run SubInPhon experiments.")
     parser.add_argument(
@@ -100,19 +86,6 @@ def _build_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help="Override hp.data_proportion for this run.",
-    )
-    parser.add_argument(
-        "--gen-data-proportion",
-        type=float,
-        default=None,
-        help="Override hp.gen_data_proportion for this run.",
-    )
-    parser.add_argument(
-        "--gen-eval",
-        type=_parse_bool,
-        default=None,
-        metavar="BOOL",
-        help="Override hp.gen_eval for this run. Examples: true, false.",
     )
     parser.add_argument(
         "--audio-model",
@@ -205,10 +178,6 @@ def main() -> None:
 
     if args.data_proportion is not None:
         hp.data_proportion = args.data_proportion
-    if args.gen_data_proportion is not None:
-        hp.gen_data_proportion = args.gen_data_proportion
-    if args.gen_eval is not None:
-        hp.gen_eval = args.gen_eval
     if args.audio_model is not None:
         hp.audio_model = args.audio_model
     if args.n_epochs is not None:
@@ -234,8 +203,7 @@ def main() -> None:
     print(f"Running modality={args.modality} lang={hp.lang_name}")
     print(
         f"Run mode={hp.run_mode} pred_log={hp.pred_log} device={hp.device} "
-        f"data_proportion={hp.data_proportion} gen_data_proportion={hp.gen_data_proportion} "
-        f"gen_eval={hp.gen_eval} "
+        f"data_proportion={hp.data_proportion} "
         f"audio_model={hp.audio_model} "
         f"n_epochs={hp.n_epochs} save_epochs={hp.save_epochs} "
         f"base_seed={hp.base_seed} lang_name={hp.lang_name} property={hp.property} "
