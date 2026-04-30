@@ -528,12 +528,15 @@ def plot_aud_vowel_relation(
     embed_plot: str,
 ) -> None:
     source_df = pd.DataFrame(source_embed_store)
+    source_df["item_index"] = source_df.index // 2
     source_df = source_df[source_df["vowel_label"] != "NA"].copy()
     source_df["spectrogram_type"] = "source"
     target_df = pd.DataFrame(target_embed_store)
+    target_df["item_index"] = target_df.index // 2
     target_df = target_df[target_df["vowel_label"] != "NA"].copy()
     target_df["spectrogram_type"] = "target"
     pred_df = pd.DataFrame(pred_embed_store)
+    pred_df["item_index"] = pred_df.index // 2
     pred_df = pred_df[pred_df["vowel_label"] != "NA"].copy()
     pred_df["spectrogram_type"] = "pred"
 
@@ -551,7 +554,7 @@ def plot_aud_vowel_relation(
 
     feature_cols = [col for col in combined_df.columns if col.startswith("mel_")]
     pair_rows = []
-    for (spectrogram_type, word_ref), word_df in combined_df.groupby(["spectrogram_type", "word_ref"], observed=True):
+    for (spectrogram_type, item_index), word_df in combined_df.groupby(["spectrogram_type", "item_index"], observed=True):
         word_df = word_df.sort_values("vowel_index")
         if len(word_df) != 2:
             continue
@@ -559,6 +562,7 @@ def plot_aud_vowel_relation(
         # Extract the two vowel embeddings for the current word and spectrogram type.
         first_vowel = word_df.iloc[0]
         second_vowel = word_df.iloc[1]
+        word_ref = first_vowel["word_ref"]
         first_embed = first_vowel[feature_cols].astype(float).to_numpy()
         second_embed = second_vowel[feature_cols].astype(float).to_numpy()
 
@@ -570,6 +574,7 @@ def plot_aud_vowel_relation(
         pair_rows.append(
             {
                 "spectrogram_type": spectrogram_type,
+                "item_index": item_index,
                 "word_ref": word_ref,
                 "first_vowel": first_vowel["vowel_label"],
                 "second_vowel": second_vowel["vowel_label"],
@@ -582,18 +587,24 @@ def plot_aud_vowel_relation(
     if len(pair_df) == 0:
         return
 
+    pair_group_df = pair_df.pivot(index="item_index", columns="spectrogram_type", values="vowel_pair")
+    pair_group_df = pair_group_df.reindex(columns=spectrogram_types).dropna()
+    pair_group_df["vowel_pair_group"] = pair_group_df[spectrogram_types].agg(", ".join, axis=1)
+    pair_df = pair_df.merge(pair_group_df[["vowel_pair_group"]], left_on="item_index", right_index=True)
+    if len(pair_df) == 0:
+        return
+
     cmap = plt.colormaps.get_cmap("tab20")
-    vowel_pair_order = [f"{vowel_1}_{vowel_2}" for vowel_1 in AUD_EMBED_NEW_IDX for vowel_2 in AUD_EMBED_NEW_IDX]
-    plotted_vowel_pairs = [
-        vowel_pair
-        for vowel_pair in vowel_pair_order
-        if vowel_pair in set(pair_df["vowel_pair"])
+    plotted_vowel_pair_groups = [
+        vowel_pair_group
+        for vowel_pair_group in pair_group_df["vowel_pair_group"].drop_duplicates()
+        if vowel_pair_group in set(pair_df["vowel_pair_group"])
     ]
     colors = {
-        vowel_pair: "#{:02x}{:02x}{:02x}".format(
+        vowel_pair_group: "#{:02x}{:02x}{:02x}".format(
             *[int(channel * 255) for channel in cmap(i % cmap.N)[:3]]
         )
-        for i, vowel_pair in enumerate(plotted_vowel_pairs)
+        for i, vowel_pair_group in enumerate(plotted_vowel_pair_groups)
     }
 
     fig = make_subplots(
@@ -642,9 +653,11 @@ def plot_aud_vowel_relation(
 
     word_trace_indices = []
 
-    # Plot individual words as points grouped by source, target, or predicted vowel pair.
-    for vowel_pair in plotted_vowel_pairs:
-        plot_df = pair_df[pair_df["vowel_pair"] == vowel_pair].sort_values(["spectrogram_type", "word_ref"])
+    # Plot individual words as points grouped by their source-target-pred vowel-pair sequence.
+    for vowel_pair_group in plotted_vowel_pair_groups:
+        plot_df = pair_df[pair_df["vowel_pair_group"] == vowel_pair_group].sort_values(
+            ["spectrogram_type", "word_ref"]
+        )
         vowel_pair_mean_df = plot_df.groupby("spectrogram_type", observed=True)[["euclidean", "cosine"]].mean()
         vowel_pair_mean_df = vowel_pair_mean_df.reindex(spectrogram_types).reset_index()
 
@@ -655,15 +668,16 @@ def plot_aud_vowel_relation(
                 mode="markers+text",
                 text=plot_df["word_ref"],
                 textposition="top center",
-                name=vowel_pair,
-                legendgroup=vowel_pair,
-                marker={"size": 5, "color": colors[vowel_pair], "opacity": 0.65},
-                customdata=plot_df[["word_ref", "vowel_pair", "first_vowel", "second_vowel"]],
+                name=vowel_pair_group,
+                legendgroup=vowel_pair_group,
+                marker={"size": 5, "color": colors[vowel_pair_group], "opacity": 0.65},
+                customdata=plot_df[["word_ref", "vowel_pair_group", "vowel_pair", "first_vowel", "second_vowel"]],
                 hovertemplate=(
                     "word_ref=%{customdata[0]}<br>"
-                    "vowel_pair=%{customdata[1]}<br>"
-                    "first_vowel=%{customdata[2]}<br>"
-                    "second_vowel=%{customdata[3]}<br>"
+                    "vowel_pair_group=%{customdata[1]}<br>"
+                    "vowel_pair=%{customdata[2]}<br>"
+                    "first_vowel=%{customdata[3]}<br>"
+                    "second_vowel=%{customdata[4]}<br>"
                     "spectrogram_type=%{x}<br>"
                     "euclidean=%{y}<extra></extra>"
                 ),
@@ -680,15 +694,16 @@ def plot_aud_vowel_relation(
                 mode="markers+text",
                 text=plot_df["word_ref"],
                 textposition="top center",
-                name=vowel_pair,
-                legendgroup=vowel_pair,
-                marker={"size": 5, "color": colors[vowel_pair], "opacity": 0.65},
-                customdata=plot_df[["word_ref", "vowel_pair", "first_vowel", "second_vowel"]],
+                name=vowel_pair_group,
+                legendgroup=vowel_pair_group,
+                marker={"size": 5, "color": colors[vowel_pair_group], "opacity": 0.65},
+                customdata=plot_df[["word_ref", "vowel_pair_group", "vowel_pair", "first_vowel", "second_vowel"]],
                 hovertemplate=(
                     "word_ref=%{customdata[0]}<br>"
-                    "vowel_pair=%{customdata[1]}<br>"
-                    "first_vowel=%{customdata[2]}<br>"
-                    "second_vowel=%{customdata[3]}<br>"
+                    "vowel_pair_group=%{customdata[1]}<br>"
+                    "vowel_pair=%{customdata[2]}<br>"
+                    "first_vowel=%{customdata[3]}<br>"
+                    "second_vowel=%{customdata[4]}<br>"
                     "spectrogram_type=%{x}<br>"
                     "cosine=%{y}<extra></extra>"
                 ),
@@ -703,12 +718,12 @@ def plot_aud_vowel_relation(
                 x=vowel_pair_mean_df["spectrogram_type"],
                 y=vowel_pair_mean_df["euclidean"],
                 mode="lines+markers",
-                name=f"{vowel_pair} mean",
-                legendgroup=vowel_pair,
-                line={"color": colors[vowel_pair], "width": 3},
-                marker={"size": 7, "color": colors[vowel_pair]},
+                name=f"{vowel_pair_group} mean",
+                legendgroup=vowel_pair_group,
+                line={"color": colors[vowel_pair_group], "width": 3},
+                marker={"size": 7, "color": colors[vowel_pair_group]},
                 hovertemplate=(
-                    f"vowel_pair={vowel_pair}<br>"
+                    f"vowel_pair_group={vowel_pair_group}<br>"
                     "spectrogram_type=%{x}<br>"
                     "mean euclidean=%{y}<extra></extra>"
                 ),
@@ -722,12 +737,12 @@ def plot_aud_vowel_relation(
                 x=vowel_pair_mean_df["spectrogram_type"],
                 y=vowel_pair_mean_df["cosine"],
                 mode="lines+markers",
-                name=f"{vowel_pair} mean",
-                legendgroup=vowel_pair,
-                line={"color": colors[vowel_pair], "width": 3},
-                marker={"size": 7, "color": colors[vowel_pair]},
+                name=f"{vowel_pair_group} mean",
+                legendgroup=vowel_pair_group,
+                line={"color": colors[vowel_pair_group], "width": 3},
+                marker={"size": 7, "color": colors[vowel_pair_group]},
                 hovertemplate=(
-                    f"vowel_pair={vowel_pair}<br>"
+                    f"vowel_pair_group={vowel_pair_group}<br>"
                     "spectrogram_type=%{x}<br>"
                     "mean cosine=%{y}<extra></extra>"
                 ),
