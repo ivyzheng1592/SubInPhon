@@ -17,7 +17,6 @@ Command-line arguments:
 - --audio-model {t1,t2}
 - --n-epochs INT
 - --save-epochs INT
-- --eos-loss-weight FLOAT
 - --base-seed SEED
 - --lang-name LANGUAGE_KEY
 - --property PROPERTY_LABEL
@@ -31,7 +30,6 @@ Typical examples:
 - python3 src/main.py --modality text --lang-name EnglishBH_shortened --runs 0:2 --device cpu
 - python3 src/main.py --base-seed 2026
 - python3 src/main.py --data-proportion 0.2 --gen-data-proportion 0.001 --n-epochs 20 --save-epochs 5
-- python3 src/main.py --eos-loss-weight 0.5
 - python3 src/main.py --gen-eval false
 - python3 src/main.py --audio-model t2
 - python3 src/main.py --lang-name EnglishBH_expanded --property nonidentical
@@ -135,12 +133,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Override hp.save_epochs for this run.",
     )
     parser.add_argument(
-        "--eos-loss-weight",
-        type=float,
-        default=None,
-        help="Override hp.eos_loss_weight for this run. Use 1.0 for no downweighting.",
-    )
-    parser.add_argument(
         "--base-seed",
         type=int,
         default=None,
@@ -223,8 +215,6 @@ def main() -> None:
         hp.n_epochs = args.n_epochs
     if args.save_epochs is not None:
         hp.save_epochs = args.save_epochs
-    if args.eos_loss_weight is not None:
-        hp.eos_loss_weight = args.eos_loss_weight
     if args.base_seed is not None:
         hp.base_seed = args.base_seed
     if args.lang_name is not None:
@@ -248,7 +238,6 @@ def main() -> None:
         f"gen_eval={hp.gen_eval} "
         f"audio_model={hp.audio_model} "
         f"n_epochs={hp.n_epochs} save_epochs={hp.save_epochs} "
-        f"eos_loss_weight={hp.eos_loss_weight} "
         f"base_seed={hp.base_seed} lang_name={hp.lang_name} property={hp.property} "
         f"runs={list(runs)} trial_num={trial_num}"
     )

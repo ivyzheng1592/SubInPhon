@@ -5,6 +5,8 @@
 import os
 import re
 from typing import Any, List, Tuple
+import numpy as np
+import pandas as pd
 import torch
 import hyper_params as hp
 from ipa_transformation import txt_ipa_to_arpabet
@@ -33,14 +35,27 @@ class AudioRecorder(TextRecorder):
             'rec_loss': [], 'pred_loss': [], 'pred_acc': []
         }
 
-        # Create the source, target, and predicted audio embedding stores.
-        self.source_audio_embed_store = {"word_ref": [], "vowel_index": [], "vowel_label": []}
-        self.target_audio_embed_store = {"word_ref": [], "vowel_index": [], "vowel_label": []}
-        self.pred_audio_embed_store = {"word_ref": [], "vowel_index": [], "vowel_label": []}
+        # Create the audio embedding store.
+        self.aud_embed_store = {
+            "spectrogram_type": [],
+            "item_index": [],
+            "word_ref": [],
+            "vowel_index": [],
+            "vowel_label": [],
+        }
         for mel_idx in range(dataset.n_mels):
-            self.source_audio_embed_store[f"mel_{mel_idx}"] = []
-            self.target_audio_embed_store[f"mel_{mel_idx}"] = []
-            self.pred_audio_embed_store[f"mel_{mel_idx}"] = []
+            self.aud_embed_store[f"mel_{mel_idx}"] = []
+        self.aud_vowel_relation_store = {
+            "spectrogram_type": [],
+            "item_index": [],
+            "word_ref": [],
+            "first_vowel": [],
+            "second_vowel": [],
+            "vowel_pair": [],
+            "source_backness_group": [],
+            "euclidean": [],
+            "cosine": [],
+        }
 
         # Build the audio embedding result directory.
         self.audio_embed_dir = os.path.join(
@@ -50,10 +65,9 @@ class AudioRecorder(TextRecorder):
         )
         os.makedirs(self.audio_embed_dir, exist_ok=True)
 
-        # Build the source, target, and predicted audio embedding files and plots.
-        self.source_audio_embed_file = os.path.join(self.audio_embed_dir, self.run_root + "_source_audio_embedding.csv")
-        self.target_audio_embed_file = os.path.join(self.audio_embed_dir, self.run_root + "_target_audio_embedding.csv")
-        self.pred_audio_embed_file = os.path.join(self.audio_embed_dir, self.run_root + "_predicted_audio_embedding.csv")
+        # Build the audio embedding files and plots.
+        self.aud_embed_file = os.path.join(self.audio_embed_dir, self.run_root + "_aud_embed.csv")
+        self.aud_vowel_relation_file = os.path.join(self.audio_embed_dir, self.run_root + "_aud_vowel_relation.csv")
         self.aud_embed_plot = os.path.join(self.audio_embed_dir, self.run_root + "_aud_embed.html")
         self.aud_vowel_relation_plot = os.path.join(
             self.audio_embed_dir,
@@ -166,43 +180,98 @@ class AudioRecorder(TextRecorder):
         end_frame = max(start_frame + 1, min(end_frame, max_frames))
         return start_frame, end_frame
 
-    # Read the TextGrid intervals and add one row per vowel token to an audio embedding store.
+    # Read the TextGrid intervals and add one row per vowel token to the audio embedding store.
     def record_audio_embedding(
         self,
         embedding_type: str,
         spectrogram: torch.Tensor,
         textgrid_file: str,
         word_ref: str,
+        item_index: int,
     ) -> None:
-        # Select the audio embedding store for this recording type.
-        store_lookup = {
-            "source": self.source_audio_embed_store,
-            "target": self.target_audio_embed_store,
-            "pred": self.pred_audio_embed_store,
-        }
-        store = store_lookup[embedding_type]
-
         # Read the vowel intervals from the TextGrid file.
         intervals = self.read_vowel_intervals(textgrid_file)
+        
+        # Add placeholder rows if the TextGrid does not provide exactly two vowel intervals.
         if len(intervals) != 2:
             for vowel_index in range(2):
-                store["word_ref"].append(word_ref)
-                store["vowel_index"].append(vowel_index)
-                store["vowel_label"].append("NA")
+                self.aud_embed_store["spectrogram_type"].append(embedding_type)
+                self.aud_embed_store["item_index"].append(item_index)
+                self.aud_embed_store["word_ref"].append(word_ref)
+                self.aud_embed_store["vowel_index"].append(vowel_index)
+                self.aud_embed_store["vowel_label"].append("NA")
                 for mel_idx in range(self.dataset.n_mels):
-                    store[f"mel_{mel_idx}"].append("NA")
+                    self.aud_embed_store[f"mel_{mel_idx}"].append("NA")
             return
+        
         max_frames = spectrogram.shape[1]
-
-        # Convert each vowel interval into one mean mel embedding row.
+        # Otherwise, convert each vowel interval into one mean mel embedding row.
         for vowel_index, (start_time, end_time, vowel_label) in enumerate(intervals):
             start_frame, end_frame = self.time_to_mel_frame(start_time, end_time, max_frames)
             vowel_slice = spectrogram[:, start_frame:end_frame]
             vowel_embed = vowel_slice.mean(dim=1).cpu().tolist()
 
             # Append the vowel metadata and mel values to the selected store.
-            store["word_ref"].append(word_ref)
-            store["vowel_index"].append(vowel_index)
-            store["vowel_label"].append(vowel_label)
+            self.aud_embed_store["spectrogram_type"].append(embedding_type)
+            self.aud_embed_store["item_index"].append(item_index)
+            self.aud_embed_store["word_ref"].append(word_ref)
+            self.aud_embed_store["vowel_index"].append(vowel_index)
+            self.aud_embed_store["vowel_label"].append(vowel_label)
             for mel_idx, value in enumerate(vowel_embed):
-                store[f"mel_{mel_idx}"].append(value)
+                self.aud_embed_store[f"mel_{mel_idx}"].append(value)
+
+    # Calculate within-word vowel distances from the recorded audio embedding store.
+    def record_vowel_relation(self) -> None:
+        embed_df = pd.DataFrame(self.aud_embed_store)
+
+        # Remove placeholder rows before calculating vowel relations.
+        embed_df = embed_df[embed_df["vowel_label"] != "NA"].copy()
+        if len(embed_df) == 0:
+            return
+
+        spectrogram_types = ["source", "target", "pred"]
+        feature_cols = [col for col in embed_df.columns if col.startswith("mel_")]
+
+        # Process each evaluated word item.
+        for item_index in sorted(embed_df["item_index"].unique()):
+            # Use the source vowel pair to label the item by backness pattern.
+            source_df = embed_df[
+                (embed_df["item_index"] == item_index)
+                & (embed_df["spectrogram_type"] == "source")
+            ].sort_values("vowel_index")
+            source_backness_group = (
+                self.language.vowel[source_df.iloc[0]["vowel_label"]][0]
+                + "_"
+                + self.language.vowel[source_df.iloc[1]["vowel_label"]][0]
+            )
+
+            for spectrogram_type in spectrogram_types:
+                # Calculate one vowel-relation row for the current item and spectrogram type.
+                word_df = embed_df[
+                    (embed_df["item_index"] == item_index)
+                    & (embed_df["spectrogram_type"] == spectrogram_type)
+                ].sort_values("vowel_index")
+
+                # Extract the two vowel embeddings for the current word and spectrogram type.
+                first_vowel = word_df.iloc[0]
+                second_vowel = word_df.iloc[1]
+                first_embed = first_vowel[feature_cols].astype(float).to_numpy()
+                second_embed = second_vowel[feature_cols].astype(float).to_numpy()
+
+                # Calculate Euclidean distance and cosine similarity between the two vowel embeddings.
+                euclidean = np.linalg.norm(first_embed - second_embed)
+                cosine = np.dot(first_embed, second_embed) / (
+                    np.linalg.norm(first_embed) * np.linalg.norm(second_embed)
+                )
+
+                self.aud_vowel_relation_store["spectrogram_type"].append(spectrogram_type)
+                self.aud_vowel_relation_store["item_index"].append(item_index)
+                self.aud_vowel_relation_store["word_ref"].append(first_vowel["word_ref"])
+                self.aud_vowel_relation_store["first_vowel"].append(first_vowel["vowel_label"])
+                self.aud_vowel_relation_store["second_vowel"].append(second_vowel["vowel_label"])
+                self.aud_vowel_relation_store["vowel_pair"].append(
+                    f"{first_vowel['vowel_label']}_{second_vowel['vowel_label']}"
+                )
+                self.aud_vowel_relation_store["source_backness_group"].append(source_backness_group)
+                self.aud_vowel_relation_store["euclidean"].append(euclidean)
+                self.aud_vowel_relation_store["cosine"].append(cosine)

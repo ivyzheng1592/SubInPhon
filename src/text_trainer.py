@@ -31,12 +31,8 @@ class TextTrainer:
 
         # optimizer and loss function
         self.optimizer = torch.optim.Adam(self.seq2seq.parameters(), lr=hp.learning_rate)
-        # Weight the text prediction loss so EOS can be downweighted during training.
-        txt_weight = torch.ones(self.seq2seq.output_dim, device=next(self.seq2seq.parameters()).device)
-        txt_weight[hp.special_tokens.index(hp.eos_token)] = hp.eos_loss_weight
         self.criterion = nn.CrossEntropyLoss(
             ignore_index=hp.special_tokens.index(hp.pad_token),
-            weight=txt_weight,
         )
 
     # a function that completes one repetition of training and evaluation

@@ -66,7 +66,6 @@ python3 src/main.py --modality audio --audio-model t2
 - `--audio-model {t1,t2}` overrides `hp.audio_model`
 - `--n-epochs` overrides `hp.n_epochs`
 - `--save-epochs` overrides `hp.save_epochs`
-- `--eos-loss-weight` overrides `hp.eos_loss_weight`; use `1.0` for standard EOS loss
 - `--base-seed` overrides `hp.base_seed`
 - `--run-mode` overrides the run mode without editing `hyper_params.py`
 - `--pred-log {vowel_only_error,consonant_vowel_error,all_correct_syll}` overrides `hp.pred_log` for a single run

@@ -336,7 +336,7 @@ class AudioTrainer:
 
         # Run the model over the evaluation dataloader and extract vowel embeddings.
         with torch.no_grad():
-            for input in dataloader:
+            for i, input in enumerate(dataloader):
                 src_txt, src_aud, trg_txt, trg_aud = input
                 _, pred_txt, pred_spec, _, _ = self.seq2seq(input, 0, 0)
 
@@ -359,32 +359,27 @@ class AudioTrainer:
                     if not os.path.exists(trg_textgrid):
                         raise FileNotFoundError(f"Could not find TextGrid for {sr_ref} in {textgrid_dir}")
 
-                    # Record one row per vowel token into the three embedding stores.
-                    self.recorder.record_audio_embedding("source", src_aud[j, 0], src_textgrid, ur_ref)
-                    self.recorder.record_audio_embedding("target", trg_aud[j, 0], trg_textgrid, sr_ref)
-                    self.recorder.record_audio_embedding("pred", pred_spec[j, 0], trg_textgrid, sr_ref)
+                    # Record one row per vowel token into the audio embedding store.
+                    item_index = i * hp.batch_size + j
+                    self.recorder.record_audio_embedding("source", src_aud[j, 0], src_textgrid, ur_ref, item_index)
+                    self.recorder.record_audio_embedding("target", trg_aud[j, 0], trg_textgrid, sr_ref, item_index)
+                    self.recorder.record_audio_embedding("pred", pred_spec[j, 0], trg_textgrid, sr_ref, item_index)
 
-        # Save the three embedding stores to CSV files.
-        utils.save_to_file(self.recorder.source_audio_embed_store, self.recorder.source_audio_embed_file)
-        utils.save_to_file(self.recorder.target_audio_embed_store, self.recorder.target_audio_embed_file)
-        utils.save_to_file(self.recorder.pred_audio_embed_store, self.recorder.pred_audio_embed_file)
+        # Save the embedding store and the derived vowel relation store to CSV files.
+        self.recorder.record_vowel_relation()
+        utils.save_to_file(self.recorder.aud_embed_store, self.recorder.aud_embed_file)
+        utils.save_to_file(self.recorder.aud_vowel_relation_store, self.recorder.aud_vowel_relation_file)
 
         # Plot the source, target, and predicted vowel embeddings.
         utils.plot_aud_embed(
-            self.recorder.source_audio_embed_store,
-            self.recorder.target_audio_embed_store,
-            self.recorder.pred_audio_embed_store,
+            self.recorder.aud_embed_store,
             self.recorder.aud_embed_plot,
         )
         utils.plot_aud_vowel_relation(
-            self.recorder.source_audio_embed_store,
-            self.recorder.target_audio_embed_store,
-            self.recorder.pred_audio_embed_store,
+            self.recorder.aud_vowel_relation_store,
             self.recorder.aud_vowel_relation_plot,
         )
         print(
             f"Run {self.recorder.run_num} source, target, and predicted audio embedding plots are saved "
-            f"({len(self.recorder.source_audio_embed_store['vowel_label'])}, "
-            f"{len(self.recorder.target_audio_embed_store['vowel_label'])}, "
-            f"{len(self.recorder.pred_audio_embed_store['vowel_label'])} vowel tokens)"
+            f"({len(self.recorder.aud_embed_store['vowel_label'])} vowel tokens)"
         )

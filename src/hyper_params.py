@@ -31,9 +31,8 @@ When {property} is empty, that segment is omitted from file names.
             - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_embedding.csv"
             - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_embedding.png"
         - {lang_name} + "_" + {modality} + "_aud_embed_plots"
-            - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_source_audio_embedding.csv"
-            - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_target_audio_embedding.csv"
-            - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_predicted_audio_embedding.csv"
+            - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_aud_embed.csv"
+            - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_aud_vowel_relation.csv"
             - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_aud_embed.html"
             - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_aud_vowel_relation.html"
 """
@@ -82,9 +81,6 @@ n_epochs = 120
 save_epochs = 10
 learning_rate = 1e-4
 batch_size = 32
-# Weight applied to the EOS class in text prediction loss.
-# Use 1.0 for the standard objective; lower values weaken the learned stopping bias.
-eos_loss_weight = 1.0
 
 # Reproducibility
 base_seed = 1234
