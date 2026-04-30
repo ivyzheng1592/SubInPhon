@@ -34,9 +34,8 @@ When {property} is empty, that segment is omitted from file names.
             - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_source_audio_embedding.csv"
             - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_target_audio_embedding.csv"
             - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_predicted_audio_embedding.csv"
-            - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_source_audio_embedding.png"
-            - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_target_audio_embedding.png"
-            - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_predicted_audio_embedding.png"
+            - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_aud_embed.html"
+            - {lang_name} + "_" + {modality} + "_" + {directionality} + "_{property}_" + {condition} + "_run" + {run_num} + "_aud_vowel_relation.html"
 """
 
 # Alphabet
@@ -106,6 +105,4 @@ gen_eval = False
 run_mode = "train and evaluate"
 # Prediction logging mode options: "vowel_only_error", "consonant_vowel_error", "all_correct_syll"
 pred_log = "vowel_only_error"
-# Number of evaluation batches used for audio embedding inspection
-aud_embed_inspect_batch = 3
 device = "cuda"

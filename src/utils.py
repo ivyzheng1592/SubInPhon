@@ -196,583 +196,6 @@ def plot_aud_att(
 AUD_EMBED_NEW_IDX = ["i", "e", "u", "o", "ɪ", "ɛ", "ʊ", "ɔ"]
 
 
-# Plot extracted audio vowel embeddings.
-def plot_aud_embed(embed_store: Mapping[str, Sequence[Any]], embed_plot: str) -> None:
-    embed_df = pd.DataFrame(embed_store)
-    feature_cols = [col for col in embed_df.columns if col.startswith("mel_")]
-    embed_df = embed_df[embed_df["vowel_label"] != "NA"].copy()
-    if len(embed_df) == 0:
-        return
-
-    # Assign IPA vowel order for sorting and color selection.
-    vowel_dtype = pd.CategoricalDtype(categories=AUD_EMBED_NEW_IDX, ordered=True)
-    embed_df["vowel_label"] = embed_df["vowel_label"].astype(vowel_dtype)
-    embed_df = embed_df.sort_values("vowel_label")
-
-    # Reduce mel embeddings to three principal components.
-    pca = PCA(n_components=3)
-    reduced_data = pca.fit_transform(embed_df[feature_cols])
-    reduced_df = pd.DataFrame(data=reduced_data, columns=["pc1", "pc2", "pc3"])
-    reduced_df["word_ref"] = embed_df["word_ref"].to_numpy()
-    reduced_df["vowel_index"] = embed_df["vowel_index"].to_numpy()
-    reduced_df["vowel_label"] = embed_df["vowel_label"].to_numpy()
-    plotted_labels = set(reduced_df["vowel_label"])
-    vowel_labels = [label for label in AUD_EMBED_NEW_IDX if label in plotted_labels]
-    cmap = plt.colormaps.get_cmap("tab20")
-
-    plt.rcParams.update({"font.size": 5})
-    fig = plt.figure(figsize=(6, 6))
-    ax = fig.add_subplot(111, projection="3d")
-    for i in reduced_df.index:
-        ax.scatter(
-            xs=reduced_df.loc[i, "pc1"],
-            ys=reduced_df.loc[i, "pc2"],
-            zs=reduced_df.loc[i, "pc3"],
-            s=5, 
-            alpha=0.7, 
-            color=cmap(AUD_EMBED_NEW_IDX.index(reduced_df.loc[i, "vowel_label"]) % 18),
-        )
-        ax.text(
-            x=reduced_df.loc[i, "pc1"],
-            y=reduced_df.loc[i, "pc2"],
-            z=reduced_df.loc[i, "pc3"],
-            s=f"{reduced_df.loc[i, 'word_ref']}{reduced_df.loc[i, 'vowel_index']}",
-            ha="left",
-            va="bottom",
-            fontsize=5,
-        )
-    ax.set_xlabel("pc1")
-    ax.set_ylabel("pc2")
-    ax.set_zlabel("pc3")
-    ax.set_title("Spectrogram vowel embedding")
-    # Build one legend entry for each plotted vowel label.
-    legend_handles = [
-        plt.Line2D(
-            [0],
-            [0],
-            marker="o",
-            linestyle="",
-            markersize=5,
-            color=cmap(AUD_EMBED_NEW_IDX.index(label) % 18),
-        )
-        for label in vowel_labels
-    ]
-    ax.legend(legend_handles, vowel_labels, ncols=2, loc="center left", bbox_to_anchor=(1.1, 0.5))
-    plt.tight_layout()
-    plt.savefig(embed_plot, dpi=300)
-    plt.close()
-
-
-# Plot interactive audio vowel embeddings for source, target, and predicted spectrograms.
-def plot_aud_embed_updated(
-    source_embed_store: Mapping[str, Sequence[Any]],
-    target_embed_store: Mapping[str, Sequence[Any]],
-    pred_embed_store: Mapping[str, Sequence[Any]],
-    embed_plot: str,
-) -> None:
-    source_df = pd.DataFrame(source_embed_store)
-    source_df = source_df[source_df["vowel_label"] != "NA"].copy()
-    source_df["spectrogram_type"] = "source"
-    target_df = pd.DataFrame(target_embed_store)
-    target_df = target_df[target_df["vowel_label"] != "NA"].copy()
-    target_df["spectrogram_type"] = "target"
-    pred_df = pd.DataFrame(pred_embed_store)
-    pred_df = pred_df[pred_df["vowel_label"] != "NA"].copy()
-    pred_df["spectrogram_type"] = "pred"
-
-    dfs = [source_df, target_df, pred_df]
-    combined_df = pd.concat(dfs, ignore_index=True)
-    if len(combined_df) == 0:
-        return
-
-    # Assign IPA vowel order for sorting and color selection.
-    vowel_dtype = pd.CategoricalDtype(categories=AUD_EMBED_NEW_IDX, ordered=True)
-    spectrogram_dtype = pd.CategoricalDtype(categories=["source", "target", "pred"], ordered=True)
-    combined_df["vowel_label"] = combined_df["vowel_label"].astype(vowel_dtype)
-    combined_df["spectrogram_type"] = combined_df["spectrogram_type"].astype(spectrogram_dtype)
-    combined_df = combined_df.sort_values(["spectrogram_type", "vowel_label", "word_ref", "vowel_index"])
-
-    # Reduce all spectrogram types in one shared PCA space.
-    feature_cols = [col for col in combined_df.columns if col.startswith("mel_")]
-    pca = PCA(n_components=3)
-    reduced_data = pca.fit_transform(combined_df[feature_cols])
-    reduced_df = pd.DataFrame(data=reduced_data, columns=["pc1", "pc2", "pc3"])
-    reduced_df["word_ref"] = combined_df["word_ref"].to_numpy()
-    reduced_df["vowel_index"] = combined_df["vowel_index"].to_numpy()
-    reduced_df["vowel_label"] = combined_df["vowel_label"].to_numpy()
-    reduced_df["spectrogram_type"] = combined_df["spectrogram_type"].to_numpy()
-    reduced_df["token_label"] = reduced_df["word_ref"].astype(str) + reduced_df["vowel_index"].astype(str)
-
-    cmap = plt.colormaps.get_cmap("tab20")
-    colors = {
-        vowel: "#{:02x}{:02x}{:02x}".format(
-            *[int(channel * 255) for channel in cmap(i % 18)[:3]]
-        )
-        for i, vowel in enumerate(AUD_EMBED_NEW_IDX)
-    }
-    fig = go.Figure()
-    spectrogram_types = ["source", "target", "pred"]
-    for spectrogram_type in spectrogram_types:
-        spectrogram_df = reduced_df[reduced_df["spectrogram_type"] == spectrogram_type]
-        for vowel_label in AUD_EMBED_NEW_IDX:
-            plot_df = spectrogram_df[spectrogram_df["vowel_label"] == vowel_label]
-            if len(plot_df) == 0:
-                continue
-            fig.add_trace(
-                go.Scatter3d(
-                    x=plot_df["pc1"],
-                    y=plot_df["pc2"],
-                    z=plot_df["pc3"],
-                    mode="markers+text",
-                    text=plot_df["token_label"],
-                    textposition="top center",
-                    name=vowel_label,
-                    legendgroup=vowel_label,
-                    marker={"size": 3, "color": colors[vowel_label]},
-                    customdata=plot_df[["word_ref", "vowel_index", "spectrogram_type"]],
-                    hovertemplate=(
-                        "word_ref=%{customdata[0]}<br>"
-                        "vowel_index=%{customdata[1]}<br>"
-                        "spectrogram_type=%{customdata[2]}<br>"
-                        "pc1=%{x}<br>pc2=%{y}<br>pc3=%{z}<extra></extra>"
-                    ),
-                    visible=spectrogram_type == "source",
-                    showlegend=True,
-                )
-            )
-
-    buttons = []
-    for spectrogram_type in spectrogram_types:
-        visible = [
-            trace.customdata[0][2] == spectrogram_type
-            for trace in fig.data
-        ]
-        buttons.append(
-            {
-                "label": spectrogram_type,
-                "method": "update",
-                "args": [
-                    {"visible": visible},
-                    {
-                        "title": f"Spectrogram vowel embedding: {spectrogram_type}",
-                        "showlegend": True,
-                    },
-                ],
-            }
-        )
-
-    fig.update_layout(
-        title="Spectrogram vowel embedding: source",
-        scene={
-            "xaxis_title": "pc1",
-            "yaxis_title": "pc2",
-            "zaxis_title": "pc3",
-        },
-        updatemenus=[
-            {
-                "type": "buttons",
-                "direction": "right",
-                "buttons": buttons,
-                "x": 0,
-                "y": 1.12,
-            },
-            {
-                "type": "buttons",
-                "direction": "right",
-                "buttons": [
-                    {
-                        "label": "show text",
-                        "method": "restyle",
-                        "args": [{"mode": "markers+text"}],
-                    },
-                    {
-                        "label": "hide text",
-                        "method": "restyle",
-                        "args": [{"mode": "markers"}],
-                    },
-                ],
-                "x": 0.35,
-                "y": 1.12,
-            },
-        ],
-    )
-    fig.write_html(embed_plot)
-
-
-# Plot within-word relations between first and second vowel embeddings.
-def plot_aud_embed_relation(
-    source_embed_store: Mapping[str, Sequence[Any]],
-    target_embed_store: Mapping[str, Sequence[Any]],
-    pred_embed_store: Mapping[str, Sequence[Any]],
-    embed_plot: str,
-) -> None:
-    source_df = pd.DataFrame(source_embed_store)
-    source_df = source_df[source_df["vowel_label"] != "NA"].copy()
-    source_df["spectrogram_type"] = "source"
-    target_df = pd.DataFrame(target_embed_store)
-    target_df = target_df[target_df["vowel_label"] != "NA"].copy()
-    target_df["spectrogram_type"] = "target"
-    pred_df = pd.DataFrame(pred_embed_store)
-    pred_df = pred_df[pred_df["vowel_label"] != "NA"].copy()
-    pred_df["spectrogram_type"] = "pred"
-
-    combined_df = pd.concat([source_df, target_df, pred_df], ignore_index=True)
-    if len(combined_df) == 0:
-        return
-
-    # Assign IPA vowel order and spectrogram type order.
-    vowel_dtype = pd.CategoricalDtype(categories=AUD_EMBED_NEW_IDX, ordered=True)
-    spectrogram_types = ["source", "target", "pred"]
-    spectrogram_dtype = pd.CategoricalDtype(categories=spectrogram_types, ordered=True)
-    combined_df["vowel_label"] = combined_df["vowel_label"].astype(vowel_dtype)
-    combined_df["spectrogram_type"] = combined_df["spectrogram_type"].astype(spectrogram_dtype)
-    combined_df = combined_df.sort_values(["spectrogram_type", "word_ref", "vowel_index"])
-
-    feature_cols = [col for col in combined_df.columns if col.startswith("mel_")]
-    pair_rows = []
-    for (spectrogram_type, word_ref), word_df in combined_df.groupby(["spectrogram_type", "word_ref"], observed=True):
-        word_df = word_df.sort_values("vowel_index")
-        if len(word_df) != 2:
-            continue
-        first_vowel = word_df.iloc[0]
-        second_vowel = word_df.iloc[1]
-        first_embed = first_vowel[feature_cols].astype(float).to_numpy()
-        second_embed = second_vowel[feature_cols].astype(float).to_numpy()
-        euclidean = np.linalg.norm(first_embed - second_embed)
-        cosine = np.dot(first_embed, second_embed) / (
-            np.linalg.norm(first_embed) * np.linalg.norm(second_embed)
-        )
-        pair_rows.append(
-            {
-                "spectrogram_type": spectrogram_type,
-                "word_ref": word_ref,
-                "first_vowel": first_vowel["vowel_label"],
-                "second_vowel": second_vowel["vowel_label"],
-                "vowel_pair": f"{first_vowel['vowel_label']}-{second_vowel['vowel_label']}",
-                "euclidean": euclidean,
-                "cosine": cosine,
-            }
-        )
-    pair_df = pd.DataFrame(pair_rows)
-    if len(pair_df) == 0:
-        return
-
-    # Reduce vowel-token embeddings for vector display.
-    pca = PCA(n_components=3)
-    reduced_data = pca.fit_transform(combined_df[feature_cols])
-    reduced_df = pd.DataFrame(data=reduced_data, columns=["pc1", "pc2", "pc3"])
-    reduced_df["word_ref"] = combined_df["word_ref"].to_numpy()
-    reduced_df["vowel_index"] = combined_df["vowel_index"].to_numpy()
-    reduced_df["vowel_label"] = combined_df["vowel_label"].to_numpy()
-    reduced_df["spectrogram_type"] = combined_df["spectrogram_type"].to_numpy()
-
-    cmap = plt.colormaps.get_cmap("tab20")
-    colors = {
-        vowel: "#{:02x}{:02x}{:02x}".format(
-            *[int(channel * 255) for channel in cmap(i % 18)[:3]]
-        )
-        for i, vowel in enumerate(AUD_EMBED_NEW_IDX)
-    }
-    type_colors = {
-        "source": "#1f77b4",
-        "target": "#2ca02c",
-        "pred": "#d62728",
-        "error": "#000000",
-    }
-
-    fig = make_subplots(
-        rows=1,
-        cols=3,
-        specs=[[{"type": "xy"}, {"type": "xy"}, {"type": "scene"}]],
-        subplot_titles=[
-            "Euclidean distance",
-            "Cosine similarity",
-            "Vowel-pair vectors",
-        ],
-    )
-
-    word_vowel_map = {}
-    for word_ref, word_df in pair_df.groupby("word_ref"):
-        word_vowels = set(word_df["first_vowel"].astype(str)) | set(word_df["second_vowel"].astype(str))
-        word_vowel_map[word_ref] = [
-            vowel for vowel in AUD_EMBED_NEW_IDX
-            if vowel in word_vowels
-        ]
-
-    mean_pair_df = pair_df.groupby("spectrogram_type", observed=True)[["euclidean", "cosine"]].mean()
-    mean_pair_df = mean_pair_df.reindex(spectrogram_types).reset_index()
-    fig.add_trace(
-        go.Scatter(
-            x=mean_pair_df["spectrogram_type"],
-            y=mean_pair_df["euclidean"],
-            mode="lines+markers",
-            name="overall mean",
-            legendgroup="overall mean",
-            line={"color": "black", "width": 5},
-            marker={"size": 8, "color": "black"},
-            hovertemplate="spectrogram_type=%{x}<br>mean euclidean=%{y}<extra></extra>",
-            showlegend=True,
-            meta={"selector": "overall", "vowels": []},
-        ),
-        row=1,
-        col=1,
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=mean_pair_df["spectrogram_type"],
-            y=mean_pair_df["cosine"],
-            mode="lines+markers",
-            name="overall mean",
-            legendgroup="overall mean",
-            line={"color": "black", "width": 5},
-            marker={"size": 8, "color": "black"},
-            hovertemplate="spectrogram_type=%{x}<br>mean cosine=%{y}<extra></extra>",
-            showlegend=False,
-            meta={"selector": "overall", "vowels": []},
-        ),
-        row=1,
-        col=2,
-    )
-
-    for word_ref, word_df in pair_df.groupby("word_ref"):
-        word_df = word_df.sort_values("spectrogram_type")
-        hover_text = [
-            f"word_ref={row.word_ref}<br>"
-            f"vowel_pair={row.vowel_pair}<br>"
-            f"spectrogram_type={row.spectrogram_type}"
-            for row in word_df.itertuples()
-        ]
-        fig.add_trace(
-            go.Scatter(
-                x=word_df["spectrogram_type"],
-                y=word_df["euclidean"],
-                mode="lines+markers",
-                name=word_ref,
-                legendgroup=word_ref,
-                text=hover_text,
-                hovertemplate="%{text}<br>euclidean=%{y}<extra></extra>",
-                showlegend=True,
-                meta={"selector": "word", "vowels": word_vowel_map[word_ref]},
-            ),
-            row=1,
-            col=1,
-        )
-        fig.add_trace(
-            go.Scatter(
-                x=word_df["spectrogram_type"],
-                y=word_df["cosine"],
-                mode="lines+markers",
-                name=word_ref,
-                legendgroup=word_ref,
-                text=hover_text,
-                hovertemplate="%{text}<br>cosine=%{y}<extra></extra>",
-                showlegend=False,
-                meta={"selector": "word", "vowels": word_vowel_map[word_ref]},
-            ),
-            row=1,
-            col=2,
-        )
-
-    for (spectrogram_type, word_ref), word_df in reduced_df.groupby(["spectrogram_type", "word_ref"], observed=True):
-        if spectrogram_type not in ["target", "pred"]:
-            continue
-        word_df = word_df.sort_values("vowel_index")
-        if len(word_df) != 2:
-            continue
-        first_vowel = word_df.iloc[0]
-        second_vowel = word_df.iloc[1]
-        fig.add_trace(
-            go.Scatter3d(
-                x=[first_vowel["pc1"], second_vowel["pc1"]],
-                y=[first_vowel["pc2"], second_vowel["pc2"]],
-                z=[first_vowel["pc3"], second_vowel["pc3"]],
-                mode="lines+markers+text",
-                text=[
-                    f"{word_ref}{first_vowel['vowel_index']}",
-                    f"{word_ref}{second_vowel['vowel_index']}",
-                ],
-                textposition="top center",
-                name=f"{word_ref}-{spectrogram_type}",
-                legendgroup=word_ref,
-                line={"color": type_colors[str(spectrogram_type)], "width": 3},
-                marker={
-                    "size": 3,
-                    "color": [
-                        colors[first_vowel["vowel_label"]],
-                        colors[second_vowel["vowel_label"]],
-                    ],
-                },
-                customdata=[
-                    [word_ref, first_vowel["vowel_index"], first_vowel["vowel_label"], spectrogram_type],
-                    [word_ref, second_vowel["vowel_index"], second_vowel["vowel_label"], spectrogram_type],
-                ],
-                hovertemplate=(
-                    "word_ref=%{customdata[0]}<br>"
-                    "vowel_index=%{customdata[1]}<br>"
-                    "vowel_label=%{customdata[2]}<br>"
-                    "spectrogram_type=%{customdata[3]}<extra></extra>"
-                ),
-                showlegend=False,
-                meta={"selector": "word", "vowels": word_vowel_map[word_ref]},
-            ),
-            row=1,
-            col=3,
-        )
-
-    for word_ref, word_df in reduced_df.groupby("word_ref"):
-        target_df = word_df[word_df["spectrogram_type"] == "target"].sort_values("vowel_index")
-        pred_df = word_df[word_df["spectrogram_type"] == "pred"].sort_values("vowel_index")
-        if len(target_df) != 2 or len(pred_df) != 2:
-            continue
-        target_endpoint = target_df.iloc[1]
-        pred_endpoint = pred_df.iloc[1]
-        fig.add_trace(
-            go.Scatter3d(
-                x=[target_endpoint["pc1"], pred_endpoint["pc1"]],
-                y=[target_endpoint["pc2"], pred_endpoint["pc2"]],
-                z=[target_endpoint["pc3"], pred_endpoint["pc3"]],
-                mode="lines+markers",
-                name=f"{word_ref}-error",
-                legendgroup=word_ref,
-                line={"color": type_colors["error"], "width": 2},
-                marker={"size": 3, "color": type_colors["error"]},
-                customdata=[
-                    [word_ref, "target endpoint", target_endpoint["vowel_label"]],
-                    [word_ref, "pred endpoint", pred_endpoint["vowel_label"]],
-                ],
-                hovertemplate=(
-                    "word_ref=%{customdata[0]}<br>"
-                    "point=%{customdata[1]}<br>"
-                    "vowel_label=%{customdata[2]}<extra></extra>"
-                ),
-                showlegend=False,
-                meta={"selector": "word", "vowels": word_vowel_map[word_ref]},
-            ),
-            row=1,
-            col=3,
-        )
-
-    mean_vector_df = reduced_df.groupby(["spectrogram_type", "vowel_index"], observed=True)[["pc1", "pc2", "pc3"]].mean()
-    mean_vector_df = mean_vector_df.reset_index()
-    for spectrogram_type, vector_df in mean_vector_df.groupby("spectrogram_type", observed=True):
-        if spectrogram_type not in ["target", "pred"]:
-            continue
-        vector_df = vector_df.sort_values("vowel_index")
-        if len(vector_df) != 2:
-            continue
-        fig.add_trace(
-            go.Scatter3d(
-                x=vector_df["pc1"],
-                y=vector_df["pc2"],
-                z=vector_df["pc3"],
-                mode="lines+markers+text",
-                text=[
-                    f"mean{vector_df.iloc[0]['vowel_index']}",
-                    f"mean{vector_df.iloc[1]['vowel_index']}",
-                ],
-                textposition="top center",
-                name=f"overall mean-{spectrogram_type}",
-                legendgroup="overall mean",
-                line={"color": type_colors[str(spectrogram_type)], "width": 8},
-                marker={"size": 6, "color": type_colors[str(spectrogram_type)]},
-                hovertemplate=(
-                    f"spectrogram_type={spectrogram_type}<br>"
-                    "mean vector point<extra></extra>"
-                ),
-                showlegend=False,
-                meta={"selector": "overall", "vowels": []},
-            ),
-            row=1,
-            col=3,
-        )
-
-    mean_target_df = mean_vector_df[mean_vector_df["spectrogram_type"] == "target"].sort_values("vowel_index")
-    mean_pred_df = mean_vector_df[mean_vector_df["spectrogram_type"] == "pred"].sort_values("vowel_index")
-    if len(mean_target_df) == 2 and len(mean_pred_df) == 2:
-        mean_target_endpoint = mean_target_df.iloc[1]
-        mean_pred_endpoint = mean_pred_df.iloc[1]
-        fig.add_trace(
-            go.Scatter3d(
-                x=[mean_target_endpoint["pc1"], mean_pred_endpoint["pc1"]],
-                y=[mean_target_endpoint["pc2"], mean_pred_endpoint["pc2"]],
-                z=[mean_target_endpoint["pc3"], mean_pred_endpoint["pc3"]],
-                mode="lines+markers+text",
-                text=["mean target endpoint", "mean pred endpoint"],
-                textposition="top center",
-                name="overall mean-error",
-                legendgroup="overall mean",
-                line={"color": type_colors["error"], "width": 6},
-                marker={"size": 5, "color": type_colors["error"]},
-                hovertemplate="overall mean error vector<extra></extra>",
-                showlegend=False,
-                meta={"selector": "overall", "vowels": []},
-            ),
-            row=1,
-            col=3,
-        )
-
-    visible_all = [True for _ in fig.data]
-    vowel_buttons = [
-        {
-            "label": "all vowels",
-            "method": "update",
-            "args": [
-                {"visible": visible_all},
-                {"title": "Within-word spectrogram vowel relation"},
-            ],
-        }
-    ]
-    plotted_vowels = sorted(
-        {
-            vowel
-            for vowels in word_vowel_map.values()
-            for vowel in vowels
-        },
-        key=AUD_EMBED_NEW_IDX.index,
-    )
-    for vowel in plotted_vowels:
-        visible = []
-        for trace in fig.data:
-            if trace.meta["selector"] == "overall":
-                visible.append(True)
-            else:
-                visible.append(vowel in trace.meta["vowels"])
-        vowel_buttons.append(
-            {
-                "label": vowel,
-                "method": "update",
-                "args": [
-                    {"visible": visible},
-                    {"title": f"Within-word spectrogram vowel relation: {vowel}"},
-                ],
-            }
-        )
-
-    fig.update_layout(
-        title="Within-word spectrogram vowel relation",
-        legend={"groupclick": "togglegroup"},
-        scene={
-            "xaxis_title": "pc1",
-            "yaxis_title": "pc2",
-            "zaxis_title": "pc3",
-        },
-        updatemenus=[
-            {
-                "type": "buttons",
-                "direction": "right",
-                "buttons": vowel_buttons,
-                "x": 0,
-                "y": 1.12,
-            }
-        ],
-    )
-    fig.update_xaxes(title_text="spectrogram type", row=1, col=1)
-    fig.update_yaxes(title_text="distance", row=1, col=1)
-    fig.update_xaxes(title_text="spectrogram type", row=1, col=2)
-    fig.update_yaxes(title_text="similarity", row=1, col=2)
-    fig.write_html(embed_plot)
-
-
 # Plot one static 3D embedding snapshot.
 def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_plot: str) -> None:
     embed_df = pd.DataFrame.from_dict(embed_store, orient="index")
@@ -952,3 +375,394 @@ def plot_embed_updated(
     )
     fig.write_html(focus_embed_plot)
     plt.close()
+
+
+# Plot interactive audio vowel embeddings for source, target, and predicted spectrograms.
+def plot_aud_embed(
+    source_embed_store: Mapping[str, Sequence[Any]],
+    target_embed_store: Mapping[str, Sequence[Any]],
+    pred_embed_store: Mapping[str, Sequence[Any]],
+    embed_plot: str,
+) -> None:
+    source_df = pd.DataFrame(source_embed_store)
+    source_df = source_df[source_df["vowel_label"] != "NA"].copy()
+    source_df["spectrogram_type"] = "source"
+    target_df = pd.DataFrame(target_embed_store)
+    target_df = target_df[target_df["vowel_label"] != "NA"].copy()
+    target_df["spectrogram_type"] = "target"
+    pred_df = pd.DataFrame(pred_embed_store)
+    pred_df = pred_df[pred_df["vowel_label"] != "NA"].copy()
+    pred_df["spectrogram_type"] = "pred"
+
+    dfs = [source_df, target_df, pred_df]
+    combined_df = pd.concat(dfs, ignore_index=True)
+    if len(combined_df) == 0:
+        return
+
+    # Assign IPA vowel order for sorting.
+    vowel_dtype = pd.CategoricalDtype(categories=AUD_EMBED_NEW_IDX, ordered=True)
+    spectrogram_types = ["source", "target", "pred"]
+    spectrogram_dtype = pd.CategoricalDtype(categories=spectrogram_types, ordered=True)
+    combined_df["vowel_label"] = combined_df["vowel_label"].astype(vowel_dtype)
+    combined_df["spectrogram_type"] = combined_df["spectrogram_type"].astype(spectrogram_dtype)
+    combined_df = combined_df.sort_values(["spectrogram_type", "vowel_label", "word_ref", "vowel_index"])
+
+    # Reduce all spectrogram types in one shared PCA space.
+    feature_cols = [col for col in combined_df.columns if col.startswith("mel_")]
+    pca = PCA(n_components=3)
+    reduced_data = pca.fit_transform(combined_df[feature_cols])
+    reduced_df = pd.DataFrame(data=reduced_data, columns=["pc1", "pc2", "pc3"])
+    reduced_df["word_ref"] = combined_df["word_ref"].to_numpy()
+    reduced_df["vowel_index"] = combined_df["vowel_index"].to_numpy()
+    reduced_df["vowel_label"] = combined_df["vowel_label"].to_numpy()
+    reduced_df["spectrogram_type"] = combined_df["spectrogram_type"].to_numpy()
+    reduced_df["token_label"] = reduced_df["word_ref"].astype(str) + reduced_df["vowel_index"].astype(str)
+
+    cmap = plt.colormaps.get_cmap("tab20")
+    plotted_vowels = [
+        vowel_label
+        for vowel_label in AUD_EMBED_NEW_IDX
+        if vowel_label in set(reduced_df["vowel_label"])
+    ]
+    colors = {
+        vowel_label: "#{:02x}{:02x}{:02x}".format(
+            *[int(channel * 255) for channel in cmap(i % 18)[:3]]
+        )
+        for i, vowel_label in enumerate(AUD_EMBED_NEW_IDX)
+    }
+    fig = go.Figure()
+    for spectrogram_type in spectrogram_types:
+        spectrogram_df = reduced_df[reduced_df["spectrogram_type"] == spectrogram_type]
+        for vowel_label in plotted_vowels:
+            plot_df = spectrogram_df[spectrogram_df["vowel_label"] == vowel_label]
+            if len(plot_df) == 0:
+                continue
+            fig.add_trace(
+                go.Scatter3d(
+                    x=plot_df["pc1"],
+                    y=plot_df["pc2"],
+                    z=plot_df["pc3"],
+                    mode="markers+text",
+                    text=plot_df["token_label"],
+                    textposition="top center",
+                    name=vowel_label,
+                    legendgroup=vowel_label,
+                    marker={"size": 3, "color": colors[vowel_label]},
+                    customdata=plot_df[["word_ref", "vowel_index", "vowel_label", "spectrogram_type"]],
+                    hovertemplate=(
+                        "word_ref=%{customdata[0]}<br>"
+                        "vowel_index=%{customdata[1]}<br>"
+                        "vowel_label=%{customdata[2]}<br>"
+                        "spectrogram_type=%{customdata[3]}<br>"
+                        "pc1=%{x}<br>pc2=%{y}<br>pc3=%{z}<extra></extra>"
+                    ),
+                    visible=spectrogram_type == "source",
+                    showlegend=spectrogram_type == "source",
+                )
+            )
+
+    buttons = []
+    for spectrogram_type in spectrogram_types:
+        visible = [
+            trace.customdata[0][3] == spectrogram_type
+            for trace in fig.data
+        ]
+        showlegend = visible.copy()
+        buttons.append(
+            {
+                "label": spectrogram_type,
+                "method": "update",
+                "args": [
+                    {"visible": visible, "showlegend": showlegend},
+                    {
+                        "title": f"Spectrogram vowel embedding: {spectrogram_type}",
+                        "showlegend": True,
+                    },
+                ],
+            }
+        )
+
+    fig.update_layout(
+        title="Spectrogram vowel embedding: source",
+        scene={
+            "xaxis_title": "pc1",
+            "yaxis_title": "pc2",
+            "zaxis_title": "pc3",
+        },
+        updatemenus=[
+            {
+                "type": "buttons",
+                "direction": "right",
+                "buttons": buttons,
+                "x": 0,
+                "y": 1.12,
+            },
+            {
+                "type": "buttons",
+                "direction": "right",
+                "buttons": [
+                    {
+                        "label": "show text",
+                        "method": "restyle",
+                        "args": [{"mode": "markers+text"}],
+                    },
+                    {
+                        "label": "hide text",
+                        "method": "restyle",
+                        "args": [{"mode": "markers"}],
+                    },
+                ],
+                "x": 0.35,
+                "y": 1.12,
+            },
+        ],
+    )
+    fig.write_html(embed_plot)
+
+
+# Plot within-word distance and similarity between first and second vowel embeddings.
+def plot_aud_vowel_relation(
+    source_embed_store: Mapping[str, Sequence[Any]],
+    target_embed_store: Mapping[str, Sequence[Any]],
+    pred_embed_store: Mapping[str, Sequence[Any]],
+    embed_plot: str,
+) -> None:
+    source_df = pd.DataFrame(source_embed_store)
+    source_df = source_df[source_df["vowel_label"] != "NA"].copy()
+    source_df["spectrogram_type"] = "source"
+    target_df = pd.DataFrame(target_embed_store)
+    target_df = target_df[target_df["vowel_label"] != "NA"].copy()
+    target_df["spectrogram_type"] = "target"
+    pred_df = pd.DataFrame(pred_embed_store)
+    pred_df = pred_df[pred_df["vowel_label"] != "NA"].copy()
+    pred_df["spectrogram_type"] = "pred"
+
+    combined_df = pd.concat([source_df, target_df, pred_df], ignore_index=True)
+    if len(combined_df) == 0:
+        return
+
+    # Assign IPA vowel order and spectrogram type order.
+    vowel_dtype = pd.CategoricalDtype(categories=AUD_EMBED_NEW_IDX, ordered=True)
+    spectrogram_types = ["source", "target", "pred"]
+    spectrogram_dtype = pd.CategoricalDtype(categories=spectrogram_types, ordered=True)
+    combined_df["vowel_label"] = combined_df["vowel_label"].astype(vowel_dtype)
+    combined_df["spectrogram_type"] = combined_df["spectrogram_type"].astype(spectrogram_dtype)
+    combined_df = combined_df.sort_values(["spectrogram_type", "word_ref", "vowel_index"])
+
+    feature_cols = [col for col in combined_df.columns if col.startswith("mel_")]
+    pair_rows = []
+    for (spectrogram_type, word_ref), word_df in combined_df.groupby(["spectrogram_type", "word_ref"], observed=True):
+        word_df = word_df.sort_values("vowel_index")
+        if len(word_df) != 2:
+            continue
+
+        # Extract the two vowel embeddings for the current word and spectrogram type.
+        first_vowel = word_df.iloc[0]
+        second_vowel = word_df.iloc[1]
+        first_embed = first_vowel[feature_cols].astype(float).to_numpy()
+        second_embed = second_vowel[feature_cols].astype(float).to_numpy()
+
+        # Calculate Euclidean distance and cosine similarity between the two vowel embeddings.
+        euclidean = np.linalg.norm(first_embed - second_embed)
+        cosine = np.dot(first_embed, second_embed) / (
+            np.linalg.norm(first_embed) * np.linalg.norm(second_embed)
+        )
+        pair_rows.append(
+            {
+                "spectrogram_type": spectrogram_type,
+                "word_ref": word_ref,
+                "first_vowel": first_vowel["vowel_label"],
+                "second_vowel": second_vowel["vowel_label"],
+                "vowel_pair": f"{first_vowel['vowel_label']}_{second_vowel['vowel_label']}",
+                "euclidean": euclidean,
+                "cosine": cosine,
+            }
+        )
+    pair_df = pd.DataFrame(pair_rows)
+    if len(pair_df) == 0:
+        return
+
+    cmap = plt.colormaps.get_cmap("tab20")
+    vowel_pair_order = [f"{vowel_1}_{vowel_2}" for vowel_1 in AUD_EMBED_NEW_IDX for vowel_2 in AUD_EMBED_NEW_IDX]
+    plotted_vowel_pairs = [
+        vowel_pair
+        for vowel_pair in vowel_pair_order
+        if vowel_pair in set(pair_df["vowel_pair"])
+    ]
+    colors = {
+        vowel_pair: "#{:02x}{:02x}{:02x}".format(
+            *[int(channel * 255) for channel in cmap(i % cmap.N)[:3]]
+        )
+        for i, vowel_pair in enumerate(plotted_vowel_pairs)
+    }
+
+    fig = make_subplots(
+        rows=1,
+        cols=2,
+        specs=[[{"type": "xy"}, {"type": "xy"}]],
+        subplot_titles=[
+            "Euclidean distance",
+            "Cosine similarity",
+        ],
+    )
+
+    # Add the overall relation across all words for each spectrogram type.
+    mean_pair_df = pair_df.groupby("spectrogram_type", observed=True)[["euclidean", "cosine"]].mean()
+    mean_pair_df = mean_pair_df.reindex(spectrogram_types).reset_index()
+    fig.add_trace(
+        go.Scatter(
+            x=mean_pair_df["spectrogram_type"],
+            y=mean_pair_df["euclidean"],
+            mode="lines+markers",
+            name="overall mean",
+            legendgroup="overall mean",
+            line={"color": "black", "width": 5},
+            marker={"size": 8, "color": "black"},
+            hovertemplate="spectrogram_type=%{x}<br>mean euclidean=%{y}<extra></extra>",
+            showlegend=True,
+        ),
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=mean_pair_df["spectrogram_type"],
+            y=mean_pair_df["cosine"],
+            mode="lines+markers",
+            name="overall mean",
+            legendgroup="overall mean",
+            line={"color": "black", "width": 5},
+            marker={"size": 8, "color": "black"},
+            hovertemplate="spectrogram_type=%{x}<br>mean cosine=%{y}<extra></extra>",
+            showlegend=False,
+        ),
+        row=1,
+        col=2,
+    )
+
+    word_trace_indices = []
+
+    # Plot individual words as points grouped by source, target, or predicted vowel pair.
+    for vowel_pair in plotted_vowel_pairs:
+        plot_df = pair_df[pair_df["vowel_pair"] == vowel_pair].sort_values(["spectrogram_type", "word_ref"])
+        vowel_pair_mean_df = plot_df.groupby("spectrogram_type", observed=True)[["euclidean", "cosine"]].mean()
+        vowel_pair_mean_df = vowel_pair_mean_df.reindex(spectrogram_types).reset_index()
+
+        fig.add_trace(
+            go.Scatter(
+                x=plot_df["spectrogram_type"],
+                y=plot_df["euclidean"],
+                mode="markers+text",
+                text=plot_df["word_ref"],
+                textposition="top center",
+                name=vowel_pair,
+                legendgroup=vowel_pair,
+                marker={"size": 5, "color": colors[vowel_pair], "opacity": 0.65},
+                customdata=plot_df[["word_ref", "vowel_pair", "first_vowel", "second_vowel"]],
+                hovertemplate=(
+                    "word_ref=%{customdata[0]}<br>"
+                    "vowel_pair=%{customdata[1]}<br>"
+                    "first_vowel=%{customdata[2]}<br>"
+                    "second_vowel=%{customdata[3]}<br>"
+                    "spectrogram_type=%{x}<br>"
+                    "euclidean=%{y}<extra></extra>"
+                ),
+                showlegend=True,
+            ),
+            row=1,
+            col=1,
+        )
+        word_trace_indices.append(len(fig.data) - 1)
+        fig.add_trace(
+            go.Scatter(
+                x=plot_df["spectrogram_type"],
+                y=plot_df["cosine"],
+                mode="markers+text",
+                text=plot_df["word_ref"],
+                textposition="top center",
+                name=vowel_pair,
+                legendgroup=vowel_pair,
+                marker={"size": 5, "color": colors[vowel_pair], "opacity": 0.65},
+                customdata=plot_df[["word_ref", "vowel_pair", "first_vowel", "second_vowel"]],
+                hovertemplate=(
+                    "word_ref=%{customdata[0]}<br>"
+                    "vowel_pair=%{customdata[1]}<br>"
+                    "first_vowel=%{customdata[2]}<br>"
+                    "second_vowel=%{customdata[3]}<br>"
+                    "spectrogram_type=%{x}<br>"
+                    "cosine=%{y}<extra></extra>"
+                ),
+                showlegend=False,
+            ),
+            row=1,
+            col=2,
+        )
+        word_trace_indices.append(len(fig.data) - 1)
+        fig.add_trace(
+            go.Scatter(
+                x=vowel_pair_mean_df["spectrogram_type"],
+                y=vowel_pair_mean_df["euclidean"],
+                mode="lines+markers",
+                name=f"{vowel_pair} mean",
+                legendgroup=vowel_pair,
+                line={"color": colors[vowel_pair], "width": 3},
+                marker={"size": 7, "color": colors[vowel_pair]},
+                hovertemplate=(
+                    f"vowel_pair={vowel_pair}<br>"
+                    "spectrogram_type=%{x}<br>"
+                    "mean euclidean=%{y}<extra></extra>"
+                ),
+                showlegend=False,
+            ),
+            row=1,
+            col=1,
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=vowel_pair_mean_df["spectrogram_type"],
+                y=vowel_pair_mean_df["cosine"],
+                mode="lines+markers",
+                name=f"{vowel_pair} mean",
+                legendgroup=vowel_pair,
+                line={"color": colors[vowel_pair], "width": 3},
+                marker={"size": 7, "color": colors[vowel_pair]},
+                hovertemplate=(
+                    f"vowel_pair={vowel_pair}<br>"
+                    "spectrogram_type=%{x}<br>"
+                    "mean cosine=%{y}<extra></extra>"
+                ),
+                showlegend=False,
+            ),
+            row=1,
+            col=2,
+        )
+
+    fig.update_layout(
+        title="Within-word spectrogram vowel relation",
+        legend={"groupclick": "togglegroup"},
+        updatemenus=[
+            {
+                "type": "buttons",
+                "direction": "right",
+                "buttons": [
+                    {
+                        "label": "show text",
+                        "method": "restyle",
+                        "args": [{"mode": "markers+text"}, word_trace_indices],
+                    },
+                    {
+                        "label": "hide text",
+                        "method": "restyle",
+                        "args": [{"mode": "markers"}, word_trace_indices],
+                    },
+                ],
+                "x": 0,
+                "y": 1.12,
+            }
+        ],
+    )
+    fig.update_xaxes(title_text="spectrogram type", row=1, col=1)
+    fig.update_yaxes(title_text="distance", row=1, col=1)
+    fig.update_xaxes(title_text="spectrogram type", row=1, col=2)
+    fig.update_yaxes(title_text="similarity", row=1, col=2)
+    fig.write_html(embed_plot)

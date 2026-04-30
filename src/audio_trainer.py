@@ -334,11 +334,9 @@ class AudioTrainer:
         self.seq2seq.load_state_dict(torch.load(model_file))
         self.seq2seq.eval()
 
-        # Run the model on a small number of evaluation batches and extract vowel embeddings.
+        # Run the model over the evaluation dataloader and extract vowel embeddings.
         with torch.no_grad():
-            for i, input in enumerate(dataloader):
-                if i >= hp.aud_embed_inspect_batch:
-                    break
+            for input in dataloader:
                 src_txt, src_aud, trg_txt, trg_aud = input
                 _, pred_txt, pred_spec, _, _ = self.seq2seq(input, 0, 0)
 
@@ -374,27 +372,15 @@ class AudioTrainer:
         # Plot the source, target, and predicted vowel embeddings.
         utils.plot_aud_embed(
             self.recorder.source_audio_embed_store,
-            self.recorder.source_audio_embed_plot,
-        )
-        utils.plot_aud_embed(
             self.recorder.target_audio_embed_store,
-            self.recorder.target_audio_embed_plot,
-        )
-        utils.plot_aud_embed(
             self.recorder.pred_audio_embed_store,
-            self.recorder.pred_audio_embed_plot,
+            self.recorder.aud_embed_plot,
         )
-        utils.plot_aud_embed_updated(
+        utils.plot_aud_vowel_relation(
             self.recorder.source_audio_embed_store,
             self.recorder.target_audio_embed_store,
             self.recorder.pred_audio_embed_store,
-            self.recorder.audio_embed_plot,
-        )
-        utils.plot_aud_embed_relation(
-            self.recorder.source_audio_embed_store,
-            self.recorder.target_audio_embed_store,
-            self.recorder.pred_audio_embed_store,
-            self.recorder.audio_embed_relation_plot,
+            self.recorder.aud_vowel_relation_plot,
         )
         print(
             f"Run {self.recorder.run_num} source, target, and predicted audio embedding plots are saved "
