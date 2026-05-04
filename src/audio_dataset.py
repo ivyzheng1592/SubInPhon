@@ -4,7 +4,9 @@
 
 import os
 from typing import Any, List, Tuple
+import numpy as np
 import pandas as pd
+from scipy.io import wavfile
 import torch
 import torchaudio
 import torchaudio.transforms as T
@@ -54,6 +56,13 @@ class AudioDataset(Dataset):
         # audio transformation
         self.wav2mel = wav2mel
         self.power2db = power2db
+        self.mel_spectrogram = T.MelSpectrogram(
+            sample_rate=self.sample_rate,
+            n_fft=1024,
+            hop_length=256,
+            n_mels=self.n_mels,
+        ).to(self.device)
+        self.db_spectrogram = T.AmplitudeToDB(stype="power").to(self.device)
 
     def __len__(self) -> int:
         return len(self.annotations)
@@ -63,13 +72,15 @@ class AudioDataset(Dataset):
         # retrieve source audio
         src_ref = self.ur_refs[index]
         src_path = os.path.join(self.audio_dir, src_ref + ".wav")
-        src_audio, src_sr = torchaudio.load_with_torchcodec(src_path)
+        # src_audio, src_sr = torchaudio.load_with_torchcodec(src_path)
+        src_audio, src_sr = self._load_wav(src_path)
         src_audio = src_audio.to(self.device)
 
         # retrieve target audio
         trg_ref = self.sr_refs[index]
         trg_path = os.path.join(self.audio_dir, trg_ref + ".wav")
-        trg_audio, trg_sr = torchaudio.load_with_torchcodec(trg_path)
+        # trg_audio, trg_sr = torchaudio.load_with_torchcodec(trg_path)
+        trg_audio, trg_sr = self._load_wav(trg_path)
         trg_audio = trg_audio.to(self.device)
 
         # pre-process source and target audio
@@ -96,6 +107,13 @@ class AudioDataset(Dataset):
         trg_tensor = torch.tensor(trg_vector).to(self.device)
 
         return src_tensor, src_audio, trg_tensor, trg_audio
+
+    def _load_wav(self, wav_path: str) -> Tuple[torch.Tensor, int]:
+        sr, signal = wavfile.read(wav_path)
+        signal = signal.astype(np.float32) / float(np.iinfo(np.int16).max)
+        signal = signal[np.newaxis, :]
+
+        return torch.from_numpy(signal), sr
 
     def _resampling(self, signal: torch.Tensor, sr: int) -> torch.Tensor:
         # in this project, we expect all sr == self.sample_rate
@@ -134,26 +152,14 @@ class AudioDataset(Dataset):
 
     # converting waveform to mel spectrogram
     def _wav_to_mel(self, signal: torch.Tensor) -> torch.Tensor:
-        mel_spectrogram = T.MelSpectrogram(
-            sample_rate=self.sample_rate,  # sampling rate, i.e. 24000 samples in 1s
-            n_fft=1024,  # length of the FFT window
-            # vowel length normally 50-100ms
-            # we select 40ms for each window --> 960 samples --> round up to 1024 samples as it is power of 2
-            # the higher n_fft is, the better frequency resolution it gets
-            hop_length=256,  # number of samples overlapping between successive frames
-            # we select 1024/4 = 256
-            # the shorter hop_length, the higher temporal resolution it gets
-            n_mels=self.n_mels,  # number of Mel bands to generate, normally 128
-        ).to(self.device)
-        signal = mel_spectrogram(signal)
+        signal = self.mel_spectrogram(signal)
         # [n_channels, n_mels, n_samples//hop_length+1]
         return signal
 
     # converting power scale to decibel scale in spectrogram
     # for readability of the spectrogram figure
     def _power_to_db(self, signal: torch.Tensor) -> torch.Tensor:
-        db_spectrogram = T.AmplitudeToDB(stype="power").to(self.device)
-        signal = db_spectrogram(signal)
+        signal = self.db_spectrogram(signal)
         return signal
 
     # Return the source audio reference for one UR string.
