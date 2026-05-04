@@ -76,7 +76,7 @@ embedding_init_high = 1.0  # original=0.01
 freeze = False
 
 # Training hyperparameters
-n_epochs = 120
+n_epochs = 100
 save_epochs = 10
 learning_rate = 1e-4
 batch_size = 32
