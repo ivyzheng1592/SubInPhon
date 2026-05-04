@@ -317,8 +317,8 @@ class AudioTrainer:
                 src_txt, src_aud, trg_txt, trg_aud = input
                 _, pred_txt, pred_spec, _, _ = self.seq2seq(input, 0, 0)
 
-                # Recover the word strings for direct audio-reference lookup.
                 for j in range(hp.batch_size):
+                    # Recover the word strings for direct audio-reference lookup.
                     ur_string, sr_string, _ = self.recorder.tensor2string(
                         src_txt[:, j],
                         trg_txt[:, j],
@@ -343,23 +343,21 @@ class AudioTrainer:
                     self.recorder.record_audio_embedding("pred", pred_spec[j, 0], trg_textgrid, sr_ref, item_index)
 
         # Save the embedding store and the derived vowel relation store to CSV files.
-        relation_count = self.recorder.record_vowel_relation()
+        self.recorder.record_vowel_relation()
         utils.save_to_file(self.recorder.aud_embed_store, self.recorder.aud_embed_file)
         utils.save_to_file(self.recorder.aud_vowel_relation_store, self.recorder.aud_vowel_relation_file)
 
         # Plot the source, target, and predicted vowel embeddings.
-        utils.plot_aud_embed(
+        embed_item_count = utils.plot_aud_embed(
             self.recorder.aud_embed_store,
             self.recorder.aud_embed_plot,
         )
-        utils.plot_aud_vowel_relation(
+        relation_item_count = utils.plot_aud_vowel_relation(
             self.recorder.aud_vowel_relation_store,
             self.recorder.aud_vowel_relation_plot,
         )
-        saved_vowel_count = sum(
-            1 for vowel_label in self.recorder.aud_embed_store["vowel_label"] if vowel_label != "NA"
-        )
+
         print(
             f"Run {self.recorder.run_num} source, target, and predicted audio embedding plots are saved "
-            f"({saved_vowel_count} vowel tokens saved; {relation_count * 2} vowel tokens included in relation plotting)"
+            f"({embed_item_count} items in plot_aud_embed; {relation_item_count} items in plot_aud_vowel_relation)"
         )

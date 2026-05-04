@@ -12,6 +12,13 @@ from sklearn.decomposition import PCA
 import torch
 
 
+EMBED_NEW_IDX = [
+    "m", "n", "ŋ", "p", "t", "k", "b", "d", "g", "f", "s", "θ", "ʃ", "v", "z", "ð", "ʒ", "h",
+    "i", "e", "u", "o", "ɪ", "ɛ", "ʊ", "ɔ",
+]
+FOCUS_EMBED_NEW_IDX = ["i", "e", "u", "o", "ɪ", "ɛ", "ʊ", "ɔ"]
+
+
 # File I/O
 
 # Save one recorder or embedding store to CSV.
@@ -181,22 +188,15 @@ def plot_aud_att(
 
 # Embedding plots
 
-AUD_EMBED_NEW_IDX = ["i", "e", "u", "o", "ɪ", "ɛ", "ʊ", "ɔ"]
-
 
 # Plot one static 3D embedding snapshot.
 def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_plot: str) -> None:
     embed_df = pd.DataFrame.from_dict(embed_store, orient="index")
     focus_embed_df = embed_df[embed_df.index.isin(focus_list)]
 
-    embed_new_idx = [
-        "m", "n", "ŋ", "p", "t", "k", "b", "d", "g", "f", "s", "θ", "ʃ", "v", "z", "ð", "ʒ", "h",
-        "i", "e", "u", "o", "ɪ", "ɛ", "ʊ", "ɔ",
-    ]
-    focus_embed_new_idx = ["i", "e", "u", "o", "ɪ", "ɛ", "ʊ", "ɔ"]
     # Reindex phonemes and vowels into the display order.
-    embed_df = embed_df.reindex(embed_new_idx)
-    focus_embed_df = focus_embed_df.reindex(focus_embed_new_idx)
+    embed_df = embed_df.reindex(EMBED_NEW_IDX)
+    focus_embed_df = focus_embed_df.reindex(FOCUS_EMBED_NEW_IDX)
 
     pca = PCA(n_components=3)
     reduced_data = pca.fit_transform(embed_df)
@@ -310,14 +310,8 @@ def plot_embed_updated(
     combined_df = pd.concat([combined_df, reduced_df], axis=1)
     focus_combined_df = pd.concat([focus_combined_df, focus_reduced_df], axis=1)
 
-    phoneme = pd.CategoricalDtype(
-        categories=[
-            "m", "n", "ŋ", "p", "t", "k", "b", "d", "g", "f", "s", "θ", "ʃ", "v", "z", "ð", "ʒ", "h",
-            "i", "e", "u", "o", "ɪ", "ɛ", "ʊ", "ɔ",
-        ],
-        ordered=True,
-    )
-    vowel = pd.CategoricalDtype(categories=["i", "e", "u", "o", "ɪ", "ɛ", "ʊ", "ɔ"], ordered=True)
+    phoneme = pd.CategoricalDtype(categories=EMBED_NEW_IDX, ordered=True)
+    vowel = pd.CategoricalDtype(categories=FOCUS_EMBED_NEW_IDX, ordered=True)
     combined_df["phoneme"] = combined_df["phoneme"].astype(phoneme)
     focus_combined_df["phoneme"] = focus_combined_df["phoneme"].astype(vowel)
 
@@ -369,15 +363,18 @@ def plot_embed_updated(
 def plot_aud_embed(
     aud_embed_store: Mapping[str, Sequence[Any]],
     embed_plot: str,
-) -> None:
+) -> int:
     combined_df = pd.DataFrame(aud_embed_store)
-    combined_df = combined_df[combined_df["vowel_label"] != "NA"].copy()
+    spectrogram_types = ["source", "target", "pred"]
+
+    # Remove any item that has an NA placeholder row so only complete source/target/pred triplets remain.
+    invalid_item_indices = combined_df.loc[combined_df["vowel_label"] == "NA", "item_index"].unique()
+    combined_df = combined_df[~combined_df["item_index"].isin(invalid_item_indices)].copy()
     if len(combined_df) == 0:
-        return
+        return 0
 
     # Assign IPA vowel order for sorting.
-    vowel_dtype = pd.CategoricalDtype(categories=AUD_EMBED_NEW_IDX, ordered=True)
-    spectrogram_types = ["source", "target", "pred"]
+    vowel_dtype = pd.CategoricalDtype(categories=FOCUS_EMBED_NEW_IDX, ordered=True)
     spectrogram_dtype = pd.CategoricalDtype(categories=spectrogram_types, ordered=True)
     combined_df["vowel_label"] = combined_df["vowel_label"].astype(vowel_dtype)
     combined_df["spectrogram_type"] = combined_df["spectrogram_type"].astype(spectrogram_dtype)
@@ -392,19 +389,18 @@ def plot_aud_embed(
     reduced_df["vowel_index"] = combined_df["vowel_index"].to_numpy()
     reduced_df["vowel_label"] = combined_df["vowel_label"].to_numpy()
     reduced_df["spectrogram_type"] = combined_df["spectrogram_type"].to_numpy()
-    reduced_df["token_label"] = reduced_df["word_ref"].astype(str) + reduced_df["vowel_index"].astype(str)
 
     cmap = plt.colormaps.get_cmap("tab20")
     plotted_vowels = [
         vowel_label
-        for vowel_label in AUD_EMBED_NEW_IDX
+        for vowel_label in FOCUS_EMBED_NEW_IDX
         if vowel_label in set(reduced_df["vowel_label"])
     ]
     colors = {
         vowel_label: "#{:02x}{:02x}{:02x}".format(
             *[int(channel * 255) for channel in cmap(i % 18)[:3]]
         )
-        for i, vowel_label in enumerate(AUD_EMBED_NEW_IDX)
+        for i, vowel_label in enumerate(FOCUS_EMBED_NEW_IDX)
     }
     fig = go.Figure()
     for spectrogram_type in spectrogram_types:
@@ -418,9 +414,7 @@ def plot_aud_embed(
                     x=plot_df["pc1"],
                     y=plot_df["pc2"],
                     z=plot_df["pc3"],
-                    mode="markers+text",
-                    text=plot_df["token_label"],
-                    textposition="top center",
+                    mode="markers",
                     name=vowel_label,
                     legendgroup=vowel_label,
                     marker={"size": 3, "color": colors[vowel_label]},
@@ -473,59 +467,50 @@ def plot_aud_embed(
                 "x": 0,
                 "y": 1.12,
             },
-            {
-                "type": "buttons",
-                "direction": "right",
-                "buttons": [
-                    {
-                        "label": "show text",
-                        "method": "restyle",
-                        "args": [{"mode": "markers+text"}],
-                    },
-                    {
-                        "label": "hide text",
-                        "method": "restyle",
-                        "args": [{"mode": "markers"}],
-                    },
-                ],
-                "x": 0.35,
-                "y": 1.12,
-            },
         ],
     )
     fig.write_html(embed_plot)
+    return int(combined_df["item_index"].nunique())
 
 
 # Plot within-word distance and similarity between first and second vowel embeddings.
 def plot_aud_vowel_relation(
     vowel_relation_store: Mapping[str, Sequence[Any]],
     embed_plot: str,
-) -> None:
+) -> int:
     spectrogram_types = ["source", "target", "pred"]
     spectrogram_dtype = pd.CategoricalDtype(categories=spectrogram_types, ordered=True)
 
     # Convert the recorded vowel-relation store into a dataframe for plotting.
     pair_df = pd.DataFrame(vowel_relation_store)
     if len(pair_df) == 0:
-        return
+        return 0
+
+    # Remove any item that has an NA placeholder row so only complete source/target/pred triplets remain.
+    invalid_item_indices = pair_df.loc[pair_df["vowel_pair"] == "NA", "item_index"].unique()
+    pair_df = pair_df[~pair_df["item_index"].isin(invalid_item_indices)].copy()
+    if len(pair_df) == 0:
+        return 0
 
     # Keep source, target, and predicted rows in a fixed display order.
     pair_df["spectrogram_type"] = pair_df["spectrogram_type"].astype(spectrogram_dtype)
     pair_df = pair_df.sort_values(["item_index", "spectrogram_type"])
 
-    # Use source backness groups as the plot color and legend groups.
-    cmap = plt.colormaps.get_cmap("tab10")
-    backness_group_order = ["back_back", "back_front", "front_back", "front_front"]
-    plotted_backness_groups = [
-        backness_group
-        for backness_group in backness_group_order
-        if backness_group in set(pair_df["source_backness_group"])
-    ]
+    # Build one combined source/target/pred vowel-pair label per item so the three rows share a color group.
+    combined_vowel_pair_by_item = {}
+    for item_index in sorted(pair_df["item_index"].unique()):
+        item_df = pair_df[pair_df["item_index"] == item_index].sort_values("spectrogram_type")
+        combined_vowel_pair_by_item[item_index] = ", ".join(item_df["vowel_pair"].tolist())
+    pair_df["combined_vowel_pair"] = pair_df["item_index"].map(combined_vowel_pair_by_item)
+
+    # Use the combined source/target/pred vowel-pair label as the plot color and legend group.
+    cmap = plt.colormaps.get_cmap("tab20")
+    plotted_combined_vowel_pairs = sorted(pair_df["combined_vowel_pair"].unique())
     colors = {
-        backness_group: "#{:02x}{:02x}{:02x}".format(
-            *[int(channel * 255) for channel in cmap(i % cmap.N)[:3]]
+        combined_vowel_pair: "#{:02x}{:02x}{:02x}".format(
+            *[int(channel * 255) for channel in cmap(i % 18)[:3]]
         )
-        for i, backness_group in enumerate(plotted_backness_groups)
+        for i, combined_vowel_pair in enumerate(plotted_combined_vowel_pairs)
     }
 
     fig = make_subplots(
@@ -572,30 +557,26 @@ def plot_aud_vowel_relation(
         col=2,
     )
 
-    word_trace_indices = []
-
-    # Plot individual words as points grouped by the backness pattern of the source vowel pair.
-    for backness_group in plotted_backness_groups:
-        plot_df = pair_df[pair_df["source_backness_group"] == backness_group].sort_values(
+    # Plot individual words as points grouped by the combined item-level vowel-pair label.
+    for combined_vowel_pair in plotted_combined_vowel_pairs:
+        plot_df = pair_df[pair_df["combined_vowel_pair"] == combined_vowel_pair].sort_values(
             ["spectrogram_type", "word_ref"]
         )
-        backness_mean_df = plot_df.groupby("spectrogram_type", observed=True)[["euclidean", "cosine"]].mean()
-        backness_mean_df = backness_mean_df.reindex(spectrogram_types).reset_index()
+        combined_vowel_pair_mean_df = plot_df.groupby("spectrogram_type", observed=True)[["euclidean", "cosine"]].mean()
+        combined_vowel_pair_mean_df = combined_vowel_pair_mean_df.reindex(spectrogram_types).reset_index()
 
         fig.add_trace(
             go.Scatter(
                 x=plot_df["spectrogram_type"],
                 y=plot_df["euclidean"],
-                mode="markers+text",
-                text=plot_df["vowel_pair"],
-                textposition="top center",
-                name=backness_group,
-                legendgroup=backness_group,
-                marker={"size": 5, "color": colors[backness_group], "opacity": 0.65},
-                customdata=plot_df[["word_ref", "source_backness_group", "vowel_pair", "first_vowel", "second_vowel"]],
+                mode="markers",
+                name=combined_vowel_pair,
+                legendgroup=combined_vowel_pair,
+                marker={"size": 5, "color": colors[combined_vowel_pair], "opacity": 0.65},
+                customdata=plot_df[["word_ref", "combined_vowel_pair", "vowel_pair", "first_vowel", "second_vowel"]],
                 hovertemplate=(
                     "word_ref=%{customdata[0]}<br>"
-                    "source_backness_group=%{customdata[1]}<br>"
+                    "combined_vowel_pair=%{customdata[1]}<br>"
                     "vowel_pair=%{customdata[2]}<br>"
                     "first_vowel=%{customdata[3]}<br>"
                     "second_vowel=%{customdata[4]}<br>"
@@ -607,21 +588,18 @@ def plot_aud_vowel_relation(
             row=1,
             col=1,
         )
-        word_trace_indices.append(len(fig.data) - 1)
         fig.add_trace(
             go.Scatter(
                 x=plot_df["spectrogram_type"],
                 y=plot_df["cosine"],
-                mode="markers+text",
-                text=plot_df["vowel_pair"],
-                textposition="top center",
-                name=backness_group,
-                legendgroup=backness_group,
-                marker={"size": 5, "color": colors[backness_group], "opacity": 0.65},
-                customdata=plot_df[["word_ref", "source_backness_group", "vowel_pair", "first_vowel", "second_vowel"]],
+                mode="markers",
+                name=combined_vowel_pair,
+                legendgroup=combined_vowel_pair,
+                marker={"size": 5, "color": colors[combined_vowel_pair], "opacity": 0.65},
+                customdata=plot_df[["word_ref", "combined_vowel_pair", "vowel_pair", "first_vowel", "second_vowel"]],
                 hovertemplate=(
                     "word_ref=%{customdata[0]}<br>"
-                    "source_backness_group=%{customdata[1]}<br>"
+                    "combined_vowel_pair=%{customdata[1]}<br>"
                     "vowel_pair=%{customdata[2]}<br>"
                     "first_vowel=%{customdata[3]}<br>"
                     "second_vowel=%{customdata[4]}<br>"
@@ -633,18 +611,17 @@ def plot_aud_vowel_relation(
             row=1,
             col=2,
         )
-        word_trace_indices.append(len(fig.data) - 1)
         fig.add_trace(
             go.Scatter(
-                x=backness_mean_df["spectrogram_type"],
-                y=backness_mean_df["euclidean"],
+                x=combined_vowel_pair_mean_df["spectrogram_type"],
+                y=combined_vowel_pair_mean_df["euclidean"],
                 mode="lines+markers",
-                name=f"{backness_group} mean",
-                legendgroup=backness_group,
-                line={"color": colors[backness_group], "width": 3},
-                marker={"size": 7, "color": colors[backness_group]},
+                name=f"{combined_vowel_pair} mean",
+                legendgroup=combined_vowel_pair,
+                line={"color": colors[combined_vowel_pair], "width": 3},
+                marker={"size": 7, "color": colors[combined_vowel_pair]},
                 hovertemplate=(
-                    f"source_backness_group={backness_group}<br>"
+                    f"combined_vowel_pair={combined_vowel_pair}<br>"
                     "spectrogram_type=%{x}<br>"
                     "mean euclidean=%{y}<extra></extra>"
                 ),
@@ -655,15 +632,15 @@ def plot_aud_vowel_relation(
         )
         fig.add_trace(
             go.Scatter(
-                x=backness_mean_df["spectrogram_type"],
-                y=backness_mean_df["cosine"],
+                x=combined_vowel_pair_mean_df["spectrogram_type"],
+                y=combined_vowel_pair_mean_df["cosine"],
                 mode="lines+markers",
-                name=f"{backness_group} mean",
-                legendgroup=backness_group,
-                line={"color": colors[backness_group], "width": 3},
-                marker={"size": 7, "color": colors[backness_group]},
+                name=f"{combined_vowel_pair} mean",
+                legendgroup=combined_vowel_pair,
+                line={"color": colors[combined_vowel_pair], "width": 3},
+                marker={"size": 7, "color": colors[combined_vowel_pair]},
                 hovertemplate=(
-                    f"source_backness_group={backness_group}<br>"
+                    f"combined_vowel_pair={combined_vowel_pair}<br>"
                     "spectrogram_type=%{x}<br>"
                     "mean cosine=%{y}<extra></extra>"
                 ),
@@ -676,26 +653,6 @@ def plot_aud_vowel_relation(
     fig.update_layout(
         title="Within-word spectrogram vowel relation",
         legend={"groupclick": "togglegroup"},
-        updatemenus=[
-            {
-                "type": "buttons",
-                "direction": "right",
-                "buttons": [
-                    {
-                        "label": "show text",
-                        "method": "restyle",
-                        "args": [{"mode": "markers+text"}, word_trace_indices],
-                    },
-                    {
-                        "label": "hide text",
-                        "method": "restyle",
-                        "args": [{"mode": "markers"}, word_trace_indices],
-                    },
-                ],
-                "x": 0,
-                "y": 1.12,
-            }
-        ],
     )
     fig.update_xaxes(
         title_text="spectrogram type",
@@ -714,3 +671,4 @@ def plot_aud_vowel_relation(
     )
     fig.update_yaxes(title_text="similarity", row=1, col=2)
     fig.write_html(embed_plot)
+    return int(pair_df["item_index"].nunique())

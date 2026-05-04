@@ -51,7 +51,6 @@ class AudioRecorder(TextRecorder):
             "first_vowel": [],
             "second_vowel": [],
             "vowel_pair": [],
-            "source_backness_group": [],
             "euclidean": [],
             "cosine": [],
         }
@@ -220,55 +219,49 @@ class AudioRecorder(TextRecorder):
                 self.aud_embed_store[f"mel_{mel_idx}"].append(value)
 
     # Calculate within-word vowel distances from the recorded audio embedding store.
-    def record_vowel_relation(self) -> int:
+    def record_vowel_relation(self) -> None:
         embed_df = pd.DataFrame(self.aud_embed_store)
 
-        # Remove placeholder rows before calculating vowel relations.
+        # Drop placeholder rows and stop early if no real vowel embeddings were recorded.
         embed_df = embed_df[embed_df["vowel_label"] != "NA"].copy()
         if len(embed_df) == 0:
-            return 0
+            return
 
         spectrogram_types = ["source", "target", "pred"]
         feature_cols = [col for col in embed_df.columns if col.startswith("mel_")]
-        relation_count = 0
 
-        # Process each evaluated word item.
+        # Go through all spectrogram types of all evaluated word items and record one relation row per type.
         for item_index in sorted(embed_df["item_index"].unique()):
-            item_frames = {}
             for spectrogram_type in spectrogram_types:
-                item_frames[spectrogram_type] = embed_df[
+                word_df = embed_df[
                     (embed_df["item_index"] == item_index)
                     & (embed_df["spectrogram_type"] == spectrogram_type)
                 ].sort_values("vowel_index")
+                if len(word_df) < 2:
+                    # Add a placeholder row when this spectrogram type does not provide a full vowel pair.
+                    self.aud_vowel_relation_store["spectrogram_type"].append(spectrogram_type)
+                    self.aud_vowel_relation_store["item_index"].append(item_index)
+                    self.aud_vowel_relation_store["word_ref"].append("NA")
+                    self.aud_vowel_relation_store["first_vowel"].append("NA")
+                    self.aud_vowel_relation_store["second_vowel"].append("NA")
+                    self.aud_vowel_relation_store["vowel_pair"].append("NA")
+                    self.aud_vowel_relation_store["euclidean"].append("NA")
+                    self.aud_vowel_relation_store["cosine"].append("NA")
+                    continue
 
-            # Keep an item only when source, target, and pred each provide two vowels.
-            if any(len(item_frames[spectrogram_type]) < 2 for spectrogram_type in spectrogram_types):
-                continue
-
-            # Use the source vowel pair to label the item by backness pattern.
-            source_df = item_frames["source"]
-            source_backness_group = (
-                self.language.vowel[source_df.iloc[0]["vowel_label"]][0]
-                + "_"
-                + self.language.vowel[source_df.iloc[1]["vowel_label"]][0]
-            )
-
-            for spectrogram_type in spectrogram_types:
-                # Calculate one vowel-relation row for the current item and spectrogram type.
-                word_df = item_frames[spectrogram_type]
-
-                # Extract the two vowel embeddings for the current word and spectrogram type.
+                # Pull out the first and second vowel embeddings for this word-level pair.
                 first_vowel = word_df.iloc[0]
                 second_vowel = word_df.iloc[1]
                 first_embed = first_vowel[feature_cols].astype(float).to_numpy()
                 second_embed = second_vowel[feature_cols].astype(float).to_numpy()
 
-                # Calculate Euclidean distance and cosine similarity between the two vowel embeddings.
+                # Measure how similar the two vowels are in the mel-embedding space.
                 euclidean = np.linalg.norm(first_embed - second_embed)
                 cosine = np.dot(first_embed, second_embed) / (
                     np.linalg.norm(first_embed) * np.linalg.norm(second_embed)
                 )
 
+                # Append the metadata and distance measures for this pair to the relation store.
                 self.aud_vowel_relation_store["spectrogram_type"].append(spectrogram_type)
                 self.aud_vowel_relation_store["item_index"].append(item_index)
                 self.aud_vowel_relation_store["word_ref"].append(first_vowel["word_ref"])
@@ -277,9 +270,5 @@ class AudioRecorder(TextRecorder):
                 self.aud_vowel_relation_store["vowel_pair"].append(
                     f"{first_vowel['vowel_label']}_{second_vowel['vowel_label']}"
                 )
-                self.aud_vowel_relation_store["source_backness_group"].append(source_backness_group)
                 self.aud_vowel_relation_store["euclidean"].append(euclidean)
                 self.aud_vowel_relation_store["cosine"].append(cosine)
-                relation_count += 1
-
-        return relation_count
