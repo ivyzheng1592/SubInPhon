@@ -259,10 +259,9 @@ def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_
     plt.rcParams.update({"font.size": 5})
     fig = plt.figure(figsize=(2.5, 2))
 
-    ax2 = fig.add_subplot(111, projection="3d")
-    ax2.set_position([0.12, 0.08, 0.76, 0.72])
+    ax = fig.add_subplot(111, projection="3d")
     for i in focus_reduced_df.index:
-        ax2.scatter(
+        ax.scatter(
             xs=focus_reduced_df.loc[i, "pc1"],
             ys=focus_reduced_df.loc[i, "pc2"],
             zs=focus_reduced_df.loc[i, "pc3"],
@@ -270,7 +269,7 @@ def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_
             color=focus_embed_colors[focus_reduced_df.loc[i, "phoneme"]],
             label=focus_reduced_df.loc[i, "phoneme"],
         )
-        ax2.text(
+        ax.text(
             x=focus_reduced_df.loc[i, "pc1"],
             y=focus_reduced_df.loc[i, "pc2"],
             z=focus_reduced_df.loc[i, "pc3"],
@@ -278,9 +277,9 @@ def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_
             ha="left",
             va="bottom",
         )
-    ax2.set_xlabel("pc1")
-    ax2.set_ylabel("pc2")
-    ax2.set_zlabel("pc3")
+    ax.set_xlabel("pc1")
+    ax.set_ylabel("pc2")
+    ax.set_zlabel("pc3")
     legend_handles = _build_legend_handles(FOCUS_EMBED_NEW_IDX, focus_embed_colors, marker_size=3)
     fig.legend(
         handles=legend_handles,
@@ -292,7 +291,7 @@ def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_
         handletextpad=0.2,
         columnspacing=0.5,
     )
-    push_text_free(fig, ax2)
+    push_text_free(fig, ax)
 
     plt.savefig(embed_plot, dpi=300)
     plt.close()
@@ -545,7 +544,6 @@ def plot_aud_embed(
     plt.rcParams.update({"font.size": 5})
     fig = plt.figure(figsize=(2.5, 2))
     ax = fig.add_subplot(111, projection="3d")
-    ax.set_position([0.12, 0.08, 0.76, 0.72])
     for vowel_label in FOCUS_EMBED_NEW_IDX:
         plot_df = reduced_df[reduced_df["vowel_label"] == vowel_label]
         if len(plot_df) == 0:
