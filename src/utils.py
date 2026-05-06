@@ -505,7 +505,10 @@ def plot_aud_embed(
     reduced_df["vowel_index"] = pred_df["vowel_index"].to_numpy()
     reduced_df["vowel_label"] = pred_df["vowel_label"].to_numpy()
 
-    colors = _build_color_map(FOCUS_EMBED_NEW_IDX, FOCUS_COLOR_PALETTE)
+    colors = {
+        vowel_label: _rgb_to_hex(color)
+        for vowel_label, color in _build_color_map(FOCUS_EMBED_NEW_IDX, FOCUS_COLOR_PALETTE).items()
+    }
 
     plt.rcParams.update({"font.size": 5})
     fig = plt.figure(figsize=(2.8, 2))
