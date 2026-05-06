@@ -1,7 +1,8 @@
 import os
-from typing import Any, Dict, Mapping, Sequence
+from typing import Any, Dict, List, Mapping, Sequence
 
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import numpy as np
 from nooverlap import push_text_free
 import pandas as pd
@@ -48,6 +49,23 @@ def _rgb_to_hex(color: str) -> str:
 
 def _build_color_map(labels: Sequence[Any], palette: Sequence[str]) -> Dict[Any, str]:
     return {label: palette[i % len(palette)] for i, label in enumerate(labels)}
+
+
+def _build_legend_handles(labels: Sequence[str], colors: Mapping[str, str], marker_size: float) -> List[Line2D]:
+    return [
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            linestyle="None",
+            markerfacecolor=colors[label],
+            markeredgecolor=colors[label],
+            markersize=marker_size,
+            alpha=1.0,
+            label=label,
+        )
+        for label in labels
+    ]
 
 
 # File I/O
@@ -239,7 +257,7 @@ def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_
     }
 
     plt.rcParams.update({"font.size": 5})
-    fig = plt.figure(figsize=(2.8, 2))
+    fig = plt.figure(figsize=(2.5, 2))
 
     ax2 = fig.add_subplot(111, projection="3d")
     for i in focus_reduced_df.index:
@@ -262,7 +280,17 @@ def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_
     ax2.set_xlabel("pc1")
     ax2.set_ylabel("pc2")
     ax2.set_zlabel("pc3")
-    ax2.legend(loc="upper left", bbox_to_anchor=(0.02, 0.98), frameon=False, fontsize=5)
+    legend_handles = _build_legend_handles(FOCUS_EMBED_NEW_IDX, focus_embed_colors, marker_size=3)
+    ax2.legend(
+        handles=legend_handles,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 1.08),
+        ncol=len(FOCUS_EMBED_NEW_IDX),
+        frameon=False,
+        fontsize=5,
+        handletextpad=0.2,
+        columnspacing=0.5,
+    )
     push_text_free(fig, ax2)
 
     plt.tight_layout()
@@ -515,7 +543,7 @@ def plot_aud_embed(
     }
 
     plt.rcParams.update({"font.size": 5})
-    fig = plt.figure(figsize=(2.8, 2))
+    fig = plt.figure(figsize=(2.5, 2))
     ax = fig.add_subplot(111, projection="3d")
     for vowel_label in FOCUS_EMBED_NEW_IDX:
         plot_df = reduced_df[reduced_df["vowel_label"] == vowel_label]
@@ -533,7 +561,17 @@ def plot_aud_embed(
     ax.set_xlabel("pc1")
     ax.set_ylabel("pc2")
     ax.set_zlabel("pc3")
-    ax.legend(loc="upper left", bbox_to_anchor=(0.02, 0.98), frameon=False, fontsize=5)
+    legend_handles = _build_legend_handles(FOCUS_EMBED_NEW_IDX, colors, marker_size=3)
+    ax.legend(
+        handles=legend_handles,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 1.08),
+        ncol=len(FOCUS_EMBED_NEW_IDX),
+        frameon=False,
+        fontsize=5,
+        handletextpad=0.2,
+        columnspacing=0.5,
+    )
     push_text_free(fig, ax)
 
     plt.tight_layout()
