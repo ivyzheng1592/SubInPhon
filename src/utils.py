@@ -260,6 +260,7 @@ def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_
     fig = plt.figure(figsize=(2.5, 2))
 
     ax2 = fig.add_subplot(111, projection="3d")
+    ax2.set_position([0.12, 0.08, 0.76, 0.72])
     for i in focus_reduced_df.index:
         ax2.scatter(
             xs=focus_reduced_df.loc[i, "pc1"],
@@ -281,10 +282,10 @@ def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_
     ax2.set_ylabel("pc2")
     ax2.set_zlabel("pc3")
     legend_handles = _build_legend_handles(FOCUS_EMBED_NEW_IDX, focus_embed_colors, marker_size=3)
-    ax2.legend(
+    fig.legend(
         handles=legend_handles,
         loc="upper center",
-        bbox_to_anchor=(0.5, 1.08),
+        bbox_to_anchor=(0.5, 0.98),
         ncol=len(FOCUS_EMBED_NEW_IDX),
         frameon=False,
         fontsize=5,
@@ -293,7 +294,6 @@ def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_
     )
     push_text_free(fig, ax2)
 
-    fig.subplots_adjust(top=0.78, bottom=0.08, left=0.02, right=0.98)
     plt.savefig(embed_plot, dpi=300)
     plt.close()
 
@@ -545,6 +545,7 @@ def plot_aud_embed(
     plt.rcParams.update({"font.size": 5})
     fig = plt.figure(figsize=(2.5, 2))
     ax = fig.add_subplot(111, projection="3d")
+    ax.set_position([0.12, 0.08, 0.76, 0.72])
     for vowel_label in FOCUS_EMBED_NEW_IDX:
         plot_df = reduced_df[reduced_df["vowel_label"] == vowel_label]
         if len(plot_df) == 0:
@@ -562,10 +563,10 @@ def plot_aud_embed(
     ax.set_ylabel("pc2")
     ax.set_zlabel("pc3")
     legend_handles = _build_legend_handles(FOCUS_EMBED_NEW_IDX, colors, marker_size=3)
-    ax.legend(
+    fig.legend(
         handles=legend_handles,
         loc="upper center",
-        bbox_to_anchor=(0.5, 1.08),
+        bbox_to_anchor=(0.5, 0.98),
         ncol=len(FOCUS_EMBED_NEW_IDX),
         frameon=False,
         fontsize=5,
@@ -574,7 +575,6 @@ def plot_aud_embed(
     )
     push_text_free(fig, ax)
 
-    fig.subplots_adjust(top=0.78, bottom=0.08, left=0.02, right=0.98)
     plt.savefig(embed_plot, dpi=300)
     plt.close()
     return int(pred_df["item_index"].nunique())
