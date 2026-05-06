@@ -262,10 +262,11 @@ def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_
     ax2.set_xlabel("pc1")
     ax2.set_ylabel("pc2")
     ax2.set_zlabel("pc3")
-    ax2.legend(loc="center left", bbox_to_anchor=(1.1, 0.5)).remove()
+    ax2.legend(loc="upper left", bbox_to_anchor=(0.02, 0.98), frameon=False, fontsize=5)
     push_text_free(fig, ax2)
 
-    plt.savefig(embed_plot, dpi=300)
+    plt.tight_layout()
+    plt.savefig(embed_plot, dpi=300, bbox_inches="tight")
     plt.close()
 
 
@@ -524,18 +525,19 @@ def plot_aud_embed(
             xs=plot_df["pc1"],
             ys=plot_df["pc2"],
             zs=plot_df["pc3"],
-            s=1,
+            s=0.1,
             color=colors[vowel_label],
-            alpha=0.6,
+            alpha=0.5,
             label=vowel_label,
         )
     ax.set_xlabel("pc1")
     ax.set_ylabel("pc2")
     ax.set_zlabel("pc3")
-    ax.legend(loc="center left", bbox_to_anchor=(1.1, 0.5)).remove()
+    ax.legend(loc="upper left", bbox_to_anchor=(0.02, 0.98), frameon=False, fontsize=5)
     push_text_free(fig, ax)
 
-    plt.savefig(embed_plot, dpi=300)
+    plt.tight_layout()
+    plt.savefig(embed_plot, dpi=300, bbox_inches="tight")
     plt.close()
     return int(pred_df["item_index"].nunique())
 
