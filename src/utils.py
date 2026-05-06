@@ -1,5 +1,5 @@
 import os
-from typing import Any, Mapping, Sequence
+from typing import Any, Dict, Mapping, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,6 +17,37 @@ EMBED_NEW_IDX = [
     "i", "e", "u", "o", "ɪ", "ɛ", "ʊ", "ɔ",
 ]
 FOCUS_EMBED_NEW_IDX = ["i", "e", "u", "o", "ɪ", "ɛ", "ʊ", "ɔ"]
+
+# Hand-picked embedding palette assembled from Plotly built-in continuous scales.
+# The first 9 colors come from `px.colors.sequential.matter`, the next 9 from
+# `px.colors.diverging.delta`, and the final 8 from a reordered subset of
+# `px.colors.diverging.Spectral` (the ColorBrewer Spectral palette).
+COLOR_PALETTE = [
+    "rgb(138, 29, 99)", "rgb(107, 24, 93)", "rgb(76, 21, 80)",
+    "rgb(250, 205, 145)", "rgb(246, 173, 119)", "rgb(240, 142, 98)",
+    "rgb(216, 80, 83)", "rgb(195, 56, 90)", "rgb(168, 40, 96)",
+    "rgb(18, 78, 43)", "rgb(34, 120, 36)", "rgb(115, 152, 5)", "rgb(195, 182, 59)",
+    "rgb(140, 193, 186)", "rgb(60, 154, 171)", "rgb(30, 110, 161)", "rgb(38, 62, 144)",
+    "rgb(239, 226, 156)",
+    "rgb(158,1,66)", "rgb(213,62,79)", "rgb(94,79,162)", "rgb(50,136,189)",
+    "rgb(244,109,67)", "rgb(253,174,97)", "rgb(102,194,165)", "rgb(171,221,164)",
+]
+
+# Focused vowel palette taken from a reordered 8-color subset of Plotly's
+# `px.colors.diverging.Spectral`, which is based on the ColorBrewer Spectral palette.
+FOCUS_COLOR_PALETTE = [
+    "rgb(158,1,66)", "rgb(213,62,79)", "rgb(94,79,162)", "rgb(50,136,189)",
+    "rgb(244,109,67)", "rgb(253,174,97)", "rgb(102,194,165)", "rgb(171,221,164)",
+]
+
+
+def _rgb_to_hex(color: str) -> str:
+    channels = color.removeprefix("rgb(").removesuffix(")").split(",")
+    return "#{:02x}{:02x}{:02x}".format(*(int(channel.strip()) for channel in channels))
+
+
+def _build_color_map(labels: Sequence[Any], palette: Sequence[str]) -> Dict[Any, str]:
+    return {label: palette[i % len(palette)] for i, label in enumerate(labels)}
 
 
 # File I/O
@@ -194,32 +225,27 @@ def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_
     embed_df = pd.DataFrame.from_dict(embed_store, orient="index")
     focus_embed_df = embed_df[embed_df.index.isin(focus_list)]
 
-    # Reindex phonemes and vowels into the display order.
-    embed_df = embed_df.reindex(EMBED_NEW_IDX)
+    # Reindex vowels into the display order.
     focus_embed_df = focus_embed_df.reindex(FOCUS_EMBED_NEW_IDX)
-
-    pca = PCA(n_components=3)
-    reduced_data = pca.fit_transform(embed_df)
-    reduced_df = pd.DataFrame(data=reduced_data, columns=["pc1", "pc2", "pc3"])
-    reduced_df["phoneme"] = embed_df.index
 
     # Reduce the focused vowel embeddings separately.
     focus_pca = PCA(n_components=3)
     focus_reduced_data = focus_pca.fit_transform(focus_embed_df)
     focus_reduced_df = pd.DataFrame(data=focus_reduced_data, columns=["pc1", "pc2", "pc3"])
     focus_reduced_df["phoneme"] = focus_embed_df.index
+    focus_embed_colors = _build_color_map(FOCUS_EMBED_NEW_IDX, FOCUS_COLOR_PALETTE)
 
     plt.rcParams.update({"font.size": 5})
-    fig = plt.figure(figsize=(8, 3))
+    fig = plt.figure(figsize=(2.8, 2))
 
-    ax2 = fig.add_subplot(131, projection="3d")
+    ax2 = fig.add_subplot(111, projection="3d")
     for i in focus_reduced_df.index:
         ax2.scatter(
             xs=focus_reduced_df.loc[i, "pc1"],
             ys=focus_reduced_df.loc[i, "pc2"],
             zs=focus_reduced_df.loc[i, "pc3"],
             s=5,
-            color=plt.colormaps.get_cmap("tab20")(i % 18),
+            color=focus_embed_colors[focus_reduced_df.loc[i, "phoneme"]],
             label=focus_reduced_df.loc[i, "phoneme"],
         )
         ax2.text(
@@ -233,34 +259,8 @@ def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_
     ax2.set_xlabel("pc1")
     ax2.set_ylabel("pc2")
     ax2.set_zlabel("pc3")
-    ax2.set_title("Vowel embedding")
     ax2.legend(loc="center left", bbox_to_anchor=(1.1, 0.5)).remove()
     push_text_free(fig, ax2)
-
-    ax1 = fig.add_subplot(132, projection="3d")
-    for i in reduced_df.index:
-        ax1.scatter(
-            xs=reduced_df.loc[i, "pc1"],
-            ys=reduced_df.loc[i, "pc2"],
-            zs=reduced_df.loc[i, "pc3"],
-            s=5,
-            color=plt.colormaps.get_cmap("tab20")(i % 18),
-            label=reduced_df.loc[i, "phoneme"],
-        )
-        ax1.text(
-            x=reduced_df.loc[i, "pc1"],
-            y=reduced_df.loc[i, "pc2"],
-            z=reduced_df.loc[i, "pc3"],
-            s=reduced_df.loc[i, "phoneme"],
-            ha="left",
-            va="bottom",
-        )
-    ax1.set_xlabel("pc1")
-    ax1.set_ylabel("pc2")
-    ax1.set_zlabel("pc3")
-    ax1.set_title("Phoneme embedding")
-    ax1.legend(ncols=2, loc="center left", bbox_to_anchor=(1.3, 0.5))
-    push_text_free(fig, ax1)
 
     plt.savefig(embed_plot, dpi=300)
     plt.close()
@@ -271,7 +271,6 @@ def plot_embed_updated(
     embed_store: Mapping[str, Mapping[str, Any]],
     focus_list: Sequence[str],
     embed_plot: str,
-    focus_embed_plot: str,
 ) -> None:
     dfs = []
     for key, value in embed_store.items():
@@ -319,48 +318,224 @@ def plot_embed_updated(
     combined_df = combined_df.sort_values(by=["phoneme", "epoch"], ascending=[True, True])
     focus_combined_df = focus_combined_df.sort_values(by=["phoneme", "epoch"], ascending=[True, True])
 
-    color_palette = [
-        "rgb(138, 29, 99)", "rgb(107, 24, 93)", "rgb(76, 21, 80)",
-        "rgb(250, 205, 145)", "rgb(246, 173, 119)", "rgb(240, 142, 98)",
-        "rgb(216, 80, 83)", "rgb(195, 56, 90)", "rgb(168, 40, 96)",
-        "rgb(18, 78, 43)", "rgb(34, 120, 36)", "rgb(115, 152, 5)", "rgb(195, 182, 59)",
-        "rgb(140, 193, 186)", "rgb(60, 154, 171)", "rgb(30, 110, 161)", "rgb(38, 62, 144)",
-        "rgb(239, 226, 156)",
-        "rgb(158,1,66)", "rgb(213,62,79)", "rgb(94,79,162)", "rgb(50,136,189)",
-        "rgb(244,109,67)", "rgb(253,174,97)", "rgb(102,194,165)", "rgb(171,221,164)",
-    ]
-    focus_color_palette = [
-        "rgb(158,1,66)", "rgb(213,62,79)", "rgb(94,79,162)", "rgb(50,136,189)",
-        "rgb(244,109,67)", "rgb(253,174,97)", "rgb(102,194,165)", "rgb(171,221,164)",
+    phoneme_labels = EMBED_NEW_IDX
+    vowel_labels = FOCUS_EMBED_NEW_IDX
+    phoneme_colors = _build_color_map(phoneme_labels, COLOR_PALETTE)
+    vowel_colors = _build_color_map(vowel_labels, FOCUS_COLOR_PALETTE)
+    epochs = sorted(combined_df["epoch"].unique())
+
+    # Build one 3D scatter trace from the selected dataframe rows.
+    def build_trace(
+        plot_df: pd.DataFrame,
+        label: str,
+        color: str,
+        visible: bool,
+    ) -> go.Scatter3d:
+        return go.Scatter3d(
+            x=plot_df["pc1"],
+            y=plot_df["pc2"],
+            z=plot_df["pc3"],
+            mode="markers",
+            name=label,
+            legendgroup=label,
+            marker={"size": 4, "color": color},
+            text=plot_df["phoneme"].astype(str),
+            hovertemplate=(
+                "phoneme=%{text}<br>"
+                "pc1=%{x}<br>pc2=%{y}<br>pc3=%{z}<extra></extra>"
+            ),
+            visible=visible,
+            showlegend=visible,
+        )
+
+    initial_epoch = epochs[0]
+    initial_phoneme_df = combined_df[combined_df["epoch"] == initial_epoch]
+    initial_vowel_df = focus_combined_df[focus_combined_df["epoch"] == initial_epoch]
+
+    traces = []
+    for phoneme_label in phoneme_labels:
+        plot_df = initial_phoneme_df[initial_phoneme_df["phoneme"] == phoneme_label]
+        traces.append(build_trace(plot_df, phoneme_label, phoneme_colors[phoneme_label], True))
+    for vowel_label in vowel_labels:
+        plot_df = initial_vowel_df[initial_vowel_df["phoneme"] == vowel_label]
+        traces.append(build_trace(plot_df, vowel_label, vowel_colors[vowel_label], False))
+
+    phoneme_trace_count = len(phoneme_labels)
+    vowel_trace_count = len(vowel_labels)
+
+    # Build one animation frame per epoch with phoneme traces followed by vowel traces.
+    frames = []
+    for epoch in epochs:
+        epoch_phoneme_df = combined_df[combined_df["epoch"] == epoch]
+        epoch_vowel_df = focus_combined_df[focus_combined_df["epoch"] == epoch]
+        frame_traces = []
+        for phoneme_label in phoneme_labels:
+            plot_df = epoch_phoneme_df[epoch_phoneme_df["phoneme"] == phoneme_label]
+            frame_traces.append(build_trace(plot_df, phoneme_label, phoneme_colors[phoneme_label], True))
+        for vowel_label in vowel_labels:
+            plot_df = epoch_vowel_df[epoch_vowel_df["phoneme"] == vowel_label]
+            frame_traces.append(build_trace(plot_df, vowel_label, vowel_colors[vowel_label], False))
+        frames.append(
+            go.Frame(
+                name=str(epoch),
+                data=frame_traces,
+                traces=list(range(phoneme_trace_count + vowel_trace_count)),
+            )
+        )
+
+    visibility_phoneme = [True] * phoneme_trace_count + [False] * vowel_trace_count
+    visibility_vowel = [False] * phoneme_trace_count + [True] * vowel_trace_count
+
+    slider_steps = [
+        {
+            "label": str(epoch),
+            "method": "animate",
+            "args": [
+                [str(epoch)],
+                {
+                    "mode": "immediate",
+                    "frame": {"duration": 0, "redraw": True},
+                    "transition": {"duration": 0},
+                },
+            ],
+        }
+        for epoch in epochs
     ]
 
-    fig = px.scatter_3d(
-        combined_df,
-        x="pc1",
-        y="pc2",
-        z="pc3",
-        color="phoneme",
-        color_discrete_sequence=color_palette,
-        animation_frame="epoch",
+    fig = go.Figure(data=traces, frames=frames)
+    fig.update_layout(
+        title="Phoneme embedding",
+        scene={
+            "xaxis_title": "pc1",
+            "yaxis_title": "pc2",
+            "zaxis_title": "pc3",
+        },
+        legend={"itemsizing": "constant"},
+        updatemenus=[
+            {
+                "type": "buttons",
+                "direction": "right",
+                "buttons": [
+                    {
+                        "label": "phoneme",
+                        "method": "update",
+                        "args": [
+                            {"visible": visibility_phoneme, "showlegend": visibility_phoneme},
+                            {"title": "Phoneme embedding"},
+                        ],
+                    },
+                    {
+                        "label": "vowel",
+                        "method": "update",
+                        "args": [
+                            {"visible": visibility_vowel, "showlegend": visibility_vowel},
+                            {"title": "Vowel embedding"},
+                        ],
+                    },
+                    {
+                        "label": "play",
+                        "method": "animate",
+                        "args": [
+                            None,
+                            {
+                                "fromcurrent": True,
+                                "frame": {"duration": 500, "redraw": True},
+                                "transition": {"duration": 0},
+                            },
+                        ],
+                    },
+                    {
+                        "label": "pause",
+                        "method": "animate",
+                        "args": [
+                            [None],
+                            {
+                                "mode": "immediate",
+                                "frame": {"duration": 0, "redraw": False},
+                                "transition": {"duration": 0},
+                            },
+                        ],
+                    },
+                ],
+                "x": 0,
+                "y": 1.15,
+            },
+        ],
+        sliders=[
+            {
+                "active": 0,
+                "currentvalue": {"prefix": "epoch="},
+                "pad": {"t": 40},
+                "steps": slider_steps,
+            },
+        ],
     )
     fig.write_html(embed_plot)
-    plt.close()
 
-    fig = px.scatter_3d(
-        focus_combined_df,
-        x="pc1",
-        y="pc2",
-        z="pc3",
-        color="phoneme",
-        color_discrete_sequence=focus_color_palette,
-        animation_frame="epoch",
-    )
-    fig.write_html(focus_embed_plot)
+
+# Plot one static 3D audio vowel embedding snapshot for predicted spectrograms.
+def plot_aud_embed(
+    aud_embed_store: Mapping[str, Sequence[Any]],
+    embed_plot: str,
+) -> int:
+    combined_df = pd.DataFrame(aud_embed_store)
+
+    # Remove any item that has an NA placeholder row so only complete source/target/pred triplets remain.
+    invalid_item_indices = combined_df.loc[combined_df["vowel_label"] == "NA", "item_index"].unique()
+    combined_df = combined_df[~combined_df["item_index"].isin(invalid_item_indices)].copy()
+    if len(combined_df) == 0:
+        return 0
+
+    # Keep only predicted spectrogram embeddings for the static plot.
+    pred_df = combined_df[combined_df["spectrogram_type"] == "pred"].copy()
+    if len(pred_df) == 0:
+        return 0
+
+    # Assign IPA vowel order for plotting and labeling.
+    vowel_dtype = pd.CategoricalDtype(categories=FOCUS_EMBED_NEW_IDX, ordered=True)
+    pred_df["vowel_label"] = pred_df["vowel_label"].astype(vowel_dtype)
+    pred_df = pred_df.sort_values(["vowel_label", "word_ref", "vowel_index"])
+
+    # Reduce predicted spectrogram embeddings in one shared PCA space.
+    feature_cols = [col for col in combined_df.columns if col.startswith("mel_")]
+    pca = PCA(n_components=3)
+    reduced_data = pca.fit_transform(pred_df[feature_cols])
+    reduced_df = pd.DataFrame(data=reduced_data, columns=["pc1", "pc2", "pc3"])
+    reduced_df["word_ref"] = pred_df["word_ref"].to_numpy()
+    reduced_df["vowel_index"] = pred_df["vowel_index"].to_numpy()
+    reduced_df["vowel_label"] = pred_df["vowel_label"].to_numpy()
+
+    colors = _build_color_map(FOCUS_EMBED_NEW_IDX, FOCUS_COLOR_PALETTE)
+
+    plt.rcParams.update({"font.size": 5})
+    fig = plt.figure(figsize=(2.8, 2))
+    ax = fig.add_subplot(111, projection="3d")
+    for vowel_label in FOCUS_EMBED_NEW_IDX:
+        plot_df = reduced_df[reduced_df["vowel_label"] == vowel_label]
+        if len(plot_df) == 0:
+            continue
+        ax.scatter(
+            xs=plot_df["pc1"],
+            ys=plot_df["pc2"],
+            zs=plot_df["pc3"],
+            s=1,
+            color=colors[vowel_label],
+            alpha=0.6,
+            label=vowel_label,
+        )
+    ax.set_xlabel("pc1")
+    ax.set_ylabel("pc2")
+    ax.set_zlabel("pc3")
+    ax.legend(loc="center left", bbox_to_anchor=(1.1, 0.5)).remove()
+    push_text_free(fig, ax)
+
+    plt.savefig(embed_plot, dpi=300)
     plt.close()
+    return int(pred_df["item_index"].nunique())
 
 
 # Plot interactive audio vowel embeddings for source, target, and predicted spectrograms.
-def plot_aud_embed(
+def plot_aud_embed_updated(
     aud_embed_store: Mapping[str, Sequence[Any]],
     embed_plot: str,
 ) -> int:
@@ -390,17 +565,14 @@ def plot_aud_embed(
     reduced_df["vowel_label"] = combined_df["vowel_label"].to_numpy()
     reduced_df["spectrogram_type"] = combined_df["spectrogram_type"].to_numpy()
 
-    cmap = plt.colormaps.get_cmap("tab20")
     plotted_vowels = [
         vowel_label
         for vowel_label in FOCUS_EMBED_NEW_IDX
         if vowel_label in set(reduced_df["vowel_label"])
     ]
     colors = {
-        vowel_label: "#{:02x}{:02x}{:02x}".format(
-            *[int(channel * 255) for channel in cmap(i % 18)[:3]]
-        )
-        for i, vowel_label in enumerate(FOCUS_EMBED_NEW_IDX)
+        vowel_label: _rgb_to_hex(color)
+        for vowel_label, color in _build_color_map(FOCUS_EMBED_NEW_IDX, FOCUS_COLOR_PALETTE).items()
     }
     fig = go.Figure()
     for spectrogram_type in spectrogram_types:
@@ -504,13 +676,10 @@ def plot_aud_vowel_relation(
     pair_df["combined_vowel_pair"] = pair_df["item_index"].map(combined_vowel_pair_by_item)
 
     # Use the combined source/target/pred vowel-pair label as the plot color and legend group.
-    cmap = plt.colormaps.get_cmap("tab20")
     plotted_combined_vowel_pairs = sorted(pair_df["combined_vowel_pair"].unique())
     colors = {
-        combined_vowel_pair: "#{:02x}{:02x}{:02x}".format(
-            *[int(channel * 255) for channel in cmap(i % 18)[:3]]
-        )
-        for i, combined_vowel_pair in enumerate(plotted_combined_vowel_pairs)
+        combined_vowel_pair: _rgb_to_hex(color)
+        for combined_vowel_pair, color in _build_color_map(plotted_combined_vowel_pairs, COLOR_PALETTE).items()
     }
 
     fig = make_subplots(

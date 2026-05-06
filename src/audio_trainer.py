@@ -295,7 +295,7 @@ class AudioTrainer:
             utils.save_to_file(phone_space, embed_file)
 
         # plot embedding
-        utils.plot_embed_updated(phone_spaces, focus, self.recorder.embed_plot, self.recorder.focus_embed_plot)
+        utils.plot_embed_updated(phone_spaces, focus, self.recorder.embed_plot)
         print(f"Run {self.recorder.run_num} embedding plots and files are saved for investigation")
 
     def evaluate_audio_embedding(
@@ -347,8 +347,12 @@ class AudioTrainer:
         utils.save_to_file(self.recorder.aud_embed_store, self.recorder.aud_embed_file)
         utils.save_to_file(self.recorder.aud_vowel_relation_store, self.recorder.aud_vowel_relation_file)
 
-        # Plot the source, target, and predicted vowel embeddings.
-        embed_item_count = utils.plot_aud_embed(
+        # Plot the predicted vowel embeddings and the interactive audio embedding views.
+        static_embed_item_count = utils.plot_aud_embed(
+            self.recorder.aud_embed_store,
+            self.recorder.pred_embed_plot,
+        )
+        embed_item_count = utils.plot_aud_embed_updated(
             self.recorder.aud_embed_store,
             self.recorder.aud_embed_plot,
         )
@@ -359,5 +363,7 @@ class AudioTrainer:
 
         print(
             f"Run {self.recorder.run_num} source, target, and predicted audio embedding plots are saved "
-            f"({embed_item_count} items in plot_aud_embed; {relation_item_count} items in plot_aud_vowel_relation)"
+            f"({static_embed_item_count} items in plot_aud_embed; "
+            f"{embed_item_count} items in plot_aud_embed_updated; "
+            f"{relation_item_count} items in plot_aud_vowel_relation)"
         )

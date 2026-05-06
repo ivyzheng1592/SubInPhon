@@ -246,5 +246,5 @@ class TextTrainer:
             utils.save_to_file(phone_space, embed_file)
 
         # plot embedding
-        utils.plot_embed_updated(phone_spaces, focus, self.recorder.embed_plot, self.recorder.focus_embed_plot)
+        utils.plot_embed_updated(phone_spaces, focus, self.recorder.embed_plot)
         print(f"Run {self.recorder.run_num} embedding plots and files are saved for investigation")

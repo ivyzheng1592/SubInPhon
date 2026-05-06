@@ -114,7 +114,6 @@ class TextRecorder:
         self.embed_plot_dir = os.path.join(output_dir, self.result_root + "_embed_plots")
         os.makedirs(self.embed_plot_dir, exist_ok=True)
         self.embed_plot = os.path.join(self.embed_plot_dir, self.run_root + "_embedding.html")
-        self.focus_embed_plot = os.path.join(self.embed_plot_dir, self.run_root + "_focus_embedding.html")
 
     # Add the shared run metadata fields to one recorder store.
     def _append_base_fields(self, store: Dict[str, List[Any]], epoch: int, record_type: str) -> None:
