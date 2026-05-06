@@ -233,7 +233,10 @@ def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_
     focus_reduced_data = focus_pca.fit_transform(focus_embed_df)
     focus_reduced_df = pd.DataFrame(data=focus_reduced_data, columns=["pc1", "pc2", "pc3"])
     focus_reduced_df["phoneme"] = focus_embed_df.index
-    focus_embed_colors = _build_color_map(FOCUS_EMBED_NEW_IDX, FOCUS_COLOR_PALETTE)
+    focus_embed_colors = {
+        phoneme: _rgb_to_hex(color)
+        for phoneme, color in _build_color_map(FOCUS_EMBED_NEW_IDX, FOCUS_COLOR_PALETTE).items()
+    }
 
     plt.rcParams.update({"font.size": 5})
     fig = plt.figure(figsize=(2.8, 2))
