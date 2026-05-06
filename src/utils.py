@@ -293,8 +293,8 @@ def plot_embed(embed_store: Mapping[str, Any], focus_list: Sequence[str], embed_
     )
     push_text_free(fig, ax2)
 
-    plt.tight_layout()
-    plt.savefig(embed_plot, dpi=300, bbox_inches="tight")
+    fig.subplots_adjust(top=0.78, bottom=0.08, left=0.02, right=0.98)
+    plt.savefig(embed_plot, dpi=300)
     plt.close()
 
 
@@ -574,8 +574,8 @@ def plot_aud_embed(
     )
     push_text_free(fig, ax)
 
-    plt.tight_layout()
-    plt.savefig(embed_plot, dpi=300, bbox_inches="tight")
+    fig.subplots_adjust(top=0.78, bottom=0.08, left=0.02, right=0.98)
+    plt.savefig(embed_plot, dpi=300)
     plt.close()
     return int(pred_df["item_index"].nunique())
 
