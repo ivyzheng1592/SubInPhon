@@ -51,7 +51,7 @@ n_mels = 128
 
 # Dataset hyperparameters
 data_proportion = 1.0
-text_data_split_ratio = [0.6, 0.2, 0.2]
+text_data_split_ratio = [0.8, 0.1, 0.1]
 audio_data_split_ratio = [0.8, 0.1, 0.1]
 
 # Model hyperparameters
@@ -92,7 +92,7 @@ audio_root = "/mnt/data/Projects/subinphon/dataset"
 lang_name = "EnglishBH_shortened"
 # Property options: "nonidentical," where identical surface vowels are avoided
 property = ""
-directionality = ["l2r"]
+directionality = ["l2r", "r2l"]
 conditions = ["harmony", "disharmony"]
 # Run mode options: "train and evaluate", "tuning", "inspection"
 run_mode = "train and evaluate"
