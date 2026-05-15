@@ -149,7 +149,10 @@ def _write_run_config(args: argparse.Namespace, trial_num: str, runs: range) -> 
         "feature": "fea",
         "audio": "aud",
     }[args.modality]
-    result_dir = os.path.join("results", trial_num + "_" + hp.lang_name + "_" + modality_suffix)
+    result_dir = os.path.join(
+        "results",
+        "_".join(part for part in [trial_num, hp.lang_name, hp.property, modality_suffix] if part),
+    )
     os.makedirs(result_dir, exist_ok=True)
     config_file = os.path.join(result_dir, "run_config.txt")
 

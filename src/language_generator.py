@@ -171,7 +171,7 @@ class BacknessHarmony(LanguagePattern):
 
         # Build the output paths for the CSV files and the count report.
         os.makedirs(output_dir, exist_ok=True)
-        root_parts = [self.registry_name, directionality, property]
+        root_parts = [self.registry_name, property, directionality]
         if run_num is not None:
             root_parts.append("run" + str(run_num))
         root = "_".join(part for part in root_parts if part)

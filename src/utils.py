@@ -314,8 +314,9 @@ def plot_embed_updated(
 
     # Extract run metadata from embedding file names.
     metadata = combined_df["file_name"].str.extract(
-        r"^(?P<language>.+)_(?P<modality>txt|fea|aud)_(?P<directionality>[^_]+)"
-        r"(?:_(?P<property>[^_]+))?_(?P<condition>[^_]+)_run(?P<run_num>\d+)"
+        r"^(?P<language>.+?)"
+        r"(?:_(?P<property>[^_]+))?_(?P<modality>txt|fea|aud)_(?P<directionality>[^_]+)"
+        r"_(?P<condition>[^_]+)_run(?P<run_num>\d+)"
         r"_epoch(?P<epoch>-?\d+)_(?P<suffix>.+)$"
     )
     metadata["property"] = metadata["property"].fillna("")

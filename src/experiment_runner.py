@@ -39,7 +39,7 @@ def prepare_annotations_file(
 ) -> str:
     output_dir = os.path.join(
         "data",
-        trial_num + "_" + hp.lang_name + "_generated_data",
+        "_".join(part for part in [trial_num, hp.lang_name, hp.property, "generated_data"] if part),
     )
     os.makedirs(output_dir, exist_ok=True)
     variant = "aud_vowel" if "aud_vowel" in language.variants else None
@@ -56,7 +56,10 @@ def prepare_annotations_file(
 
 
 def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -> None:
-    os.makedirs(os.path.join("results", trial_num + "_" + hp.lang_name + "_txt"), 
+    os.makedirs(os.path.join(
+        "results",
+        "_".join(part for part in [trial_num, hp.lang_name, hp.property, "txt"] if part),
+    ),
                 exist_ok=True)
 
     for directionality in hp.directionality:
@@ -134,7 +137,10 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
 
 
 def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -> None:
-    os.makedirs(os.path.join("results", trial_num + "_" + hp.lang_name + "_fea"), 
+    os.makedirs(os.path.join(
+        "results",
+        "_".join(part for part in [trial_num, hp.lang_name, hp.property, "fea"] if part),
+    ),
                 exist_ok=True)
 
     for directionality in hp.directionality:
@@ -216,7 +222,10 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
 
 
 def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -> None:
-    os.makedirs(os.path.join("results", trial_num + "_" + hp.lang_name + "_aud"), 
+    os.makedirs(os.path.join(
+        "results",
+        "_".join(part for part in [trial_num, hp.lang_name, hp.property, "aud"] if part),
+    ),
                 exist_ok=True)
 
     for directionality in hp.directionality:

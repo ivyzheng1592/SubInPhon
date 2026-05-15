@@ -58,7 +58,7 @@ class AudioRecorder(TextRecorder):
         # Build the audio embedding result directory.
         self.audio_embed_dir = os.path.join(
             "results",
-            trial_num + "_" + self.lang_name + "_" + modality,
+            "_".join(part for part in [trial_num, self.lang_name, self.property, modality] if part),
             self.result_root + "_aud_embed_plots",
         )
         os.makedirs(self.audio_embed_dir, exist_ok=True)

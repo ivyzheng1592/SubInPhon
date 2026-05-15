@@ -77,18 +77,17 @@ class TextRecorder:
                 })
 
         # Build the result files and directories for this run.
-        self.result_root = "_".join(part for part in [self.lang_name, self.modality] if part)
+        self.result_root = "_".join(
+            part for part in [self.lang_name, self.property, self.modality] if part
+        )
         self.run_root = "_".join(
-            part for part in [
-                self.result_root,
-                self.directionality,
-                self.property,
-                self.condition,
-                "run" + str(self.run_num),
-            ]
+            part for part in [self.result_root, self.directionality, self.condition, "run" + str(self.run_num)]
             if part
         )
-        output_dir = os.path.join("results", trial_num + "_" + self.lang_name + "_" + modality)
+        output_dir = os.path.join(
+            "results",
+            "_".join(part for part in [trial_num, self.lang_name, self.property, modality] if part),
+        )
 
         self.acc_file = os.path.join(output_dir, self.result_root + "_acc.csv")
         self.pred_file = os.path.join(output_dir, self.result_root + "_pred.csv")
