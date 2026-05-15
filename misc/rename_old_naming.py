@@ -3,7 +3,7 @@ import csv
 import re
 import shutil
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Dict, Optional, Sequence, Set, Tuple
 
 
 KNOWN_PROPERTIES = {"nonidentical"}
@@ -113,40 +113,29 @@ def property_from_run_config(file_path: Path) -> Optional[str]:
     return None
 
 
-def group_rows_by_property(file_path: Path) -> Tuple[List[str], Dict[str, List[Dict[str, str]]]]:
-    with open(file_path, "r", encoding="utf-8", newline="") as f:
-        reader = csv.DictReader(f)
-        fieldnames = reader.fieldnames or []
-        grouped_rows: Dict[str, List[Dict[str, str]]] = {}
-        for row in reader:
-            property_label = row.get("property", "") or ""
-            grouped_rows.setdefault(property_label, []).append(row)
-    return fieldnames, grouped_rows
+def property_from_csv(file_path: Path) -> Optional[str]:
+    try:
+        with open(file_path, "r", encoding="utf-8", newline="") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                return row.get("property", "") or ""
+    except OSError:
+        return None
+    return ""
 
 
 def move_file(source: Path, target: Path, apply: bool) -> None:
+    if source == target:
+        print(f"skip unchanged {source}")
+        return
+    if target.exists():
+        print(f"skip existing target {source} -> {target}")
+        return
     print(f"{source} -> {target}")
     if not apply:
         return
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(source), str(target))
-
-
-def write_grouped_csv(
-    source: Path,
-    target: Path,
-    fieldnames: Sequence[str],
-    rows: Iterable[Dict[str, str]],
-    apply: bool,
-) -> None:
-    print(f"{source} -> {target}")
-    if not apply:
-        return
-    target.parent.mkdir(parents=True, exist_ok=True)
-    with open(target, "w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
 
 
 def cleanup_empty_dirs(root: Path, apply: bool) -> None:
@@ -189,8 +178,6 @@ def migrate_data_root(project_root: Path, apply: bool) -> Set[Path]:
             property_label = file_info["property"]
             target_dir = data_root / join_name_parts([trial_num, lang_name, property_label, "generated_data"])
             target_file = target_dir / build_new_generated_name(file_info)
-            if target_file == file_path:
-                continue
             move_file(file_path, target_file, apply)
             changed_roots.add(directory)
             changed_roots.add(target_dir)
@@ -216,20 +203,16 @@ def migrate_results_root(project_root: Path, apply: bool) -> Set[Path]:
 
             relative_parts = file_path.relative_to(directory).parts
             if len(relative_parts) == 1 and file_path.name in {old_result_root + "_acc.csv", old_result_root + "_pred.csv"}:
-                fieldnames, grouped_rows = group_rows_by_property(file_path)
-                for property_label, rows in grouped_rows.items():
-                    target_dir = results_root / join_name_parts([trial_num, lang_name, property_label, modality])
-                    target_root = join_name_parts([lang_name, property_label, modality])
-                    target_file = target_dir / f"{target_root}{file_path.suffixes[0] if file_path.suffixes else ''}"
-                    if file_path.name.endswith("_acc.csv"):
-                        target_file = target_dir / f"{target_root}_acc.csv"
-                    else:
-                        target_file = target_dir / f"{target_root}_pred.csv"
-                    write_grouped_csv(file_path, target_file, fieldnames, rows, apply)
-                    changed_roots.add(directory)
-                    changed_roots.add(target_dir)
-                if apply:
-                    file_path.unlink()
+                property_label = property_from_csv(file_path) or ""
+                target_dir = results_root / join_name_parts([trial_num, lang_name, property_label, modality])
+                target_root = join_name_parts([lang_name, property_label, modality])
+                if file_path.name.endswith("_acc.csv"):
+                    target_file = target_dir / f"{target_root}_acc.csv"
+                else:
+                    target_file = target_dir / f"{target_root}_pred.csv"
+                move_file(file_path, target_file, apply)
+                changed_roots.add(directory)
+                changed_roots.add(target_dir)
                 continue
 
             property_label = infer_property_from_path_components(file_path, lang_name, modality)
@@ -244,8 +227,6 @@ def migrate_results_root(project_root: Path, apply: bool) -> Set[Path]:
                 for component in relative_parts
             ]
             target_file = target_dir.joinpath(*transformed_parts)
-            if target_file == file_path:
-                continue
             move_file(file_path, target_file, apply)
             changed_roots.add(directory)
             changed_roots.add(target_dir)
