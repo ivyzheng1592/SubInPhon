@@ -1,7 +1,7 @@
 import argparse
 import gc
 from pathlib import Path
-from typing import List, Sequence
+from typing import Callable, List, Sequence
 
 import pandas as pd
 
@@ -16,7 +16,7 @@ V_TRIALS = [
     "EnglishBH_expanded_fea_v",
 ]
 ALL_ACC_TRIALS = V_TRIALS + CV_TRIALS
-FAILED_RUN_KEYS = ["language", "modality", "directionality", "property", "condition", "run_num"]
+RUN_KEYS = ["language", "modality", "directionality", "property", "condition", "run_num"]
 CV_PRED_COLUMNS = [
     "language", "modality", "directionality", "property",
     "condition", "run_num", "epoch", "record_type",
@@ -36,6 +36,7 @@ VOWEL_TENSE = {"i": 1, "u": 1, "e": 1, "o": 1, "ɪ": 0, "ʊ": 0, "ɛ": 0, "ɔ": 
 
 
 def list_matching_files(base_dir: Path, trials: Sequence[str], pattern: str) -> List[Path]:
+    # Collects matching files from the requested trial folders.
     files: List[Path] = []
     for trial in trials:
         files.extend(sorted((base_dir / trial).rglob(pattern)))
@@ -43,16 +44,19 @@ def list_matching_files(base_dir: Path, trials: Sequence[str], pattern: str) -> 
 
 
 def label_model(df: pd.DataFrame) -> pd.DataFrame:
+    # Labels the model type from the modality column.
     df["model"] = df["modality"].str.contains("txt").map({True: "segment", False: "feature"})
     return df
 
 
 def label_directionality(df: pd.DataFrame) -> pd.DataFrame:
+    # Expands directionality abbreviations into analysis labels.
     df["directionality"] = df["directionality"].map({"l2r": "left-to-right", "r2l": "right-to-left"})
     return df
 
 
 def label_dataset(df: pd.DataFrame) -> pd.DataFrame:
+    # Labels each row as full, reduced, or expanded.
     df["property"] = df["property"].fillna("")
     df["dataset"] = "full"
     df.loc[df["property"] == "nonidentical", "dataset"] = "reduced"
@@ -61,6 +65,7 @@ def label_dataset(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def read_acc_files(base_dir: Path, trials: Sequence[str], with_trial: bool = False) -> pd.DataFrame:
+    # Reads and concatenates accuracy files from the requested trial folders.
     frames: List[pd.DataFrame] = []
     for trial in trials:
         for file_path in sorted((base_dir / trial).rglob("*acc.csv")):
@@ -72,6 +77,7 @@ def read_acc_files(base_dir: Path, trials: Sequence[str], with_trial: bool = Fal
 
 
 def build_failed_run_list(acc: pd.DataFrame) -> pd.DataFrame:
+    # Collects run keys for runs that fail the final test threshold.
     acc = acc.copy()
     acc["property"] = acc["property"].fillna("")
     return (
@@ -79,23 +85,25 @@ def build_failed_run_list(acc: pd.DataFrame) -> pd.DataFrame:
             (acc["epoch"] == 99)
             & (acc["record_type"] == "test")
             & ((acc["acc"] < 0.85) | (acc["loss"] > 0.05))
-        ][FAILED_RUN_KEYS]
+        ][RUN_KEYS]
         .drop_duplicates()
     )
 
 
 def filter_failed_runs(df: pd.DataFrame, failed_run_list: pd.DataFrame) -> pd.DataFrame:
+    # Removes rows belonging to failed runs.
     df = df.copy()
     df["property"] = df["property"].fillna("")
     return df.merge(
-        failed_run_list[FAILED_RUN_KEYS].drop_duplicates(),
-        on=FAILED_RUN_KEYS,
+        failed_run_list[RUN_KEYS].drop_duplicates(),
+        on=RUN_KEYS,
         how="left",
         indicator=True,
     ).loc[lambda x: x["_merge"] == "left_only"].drop(columns="_merge")
 
 
 def add_vowel_features(df: pd.DataFrame) -> pd.DataFrame:
+    # Adds vowel height, tense, and backness features for source and predicted vowels.
     for prefix in ["sr_v1", "sr_v2", "sr_v3", "pred_sr_v1", "pred_sr_v2", "pred_sr_v3"]:
         df[f"{prefix}_high"] = df[prefix].map(VOWEL_HIGH)
         df[f"{prefix}_tense"] = df[prefix].map(VOWEL_TENSE)
@@ -103,14 +111,23 @@ def add_vowel_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def iter_run_chunks(file_path: Path, usecols: Sequence[str], chunk_size: int = 200000):
-    carryover = pd.DataFrame(columns=usecols)
+def iter_run_chunks(
+    file_path: Path,
+    usecols: Sequence[str] | Callable[[str], bool],
+    output_columns: Sequence[str],
+    chunk_size: int = 200000,
+):
+    # Stores the last run from the previous read chunk.
+    carryover = pd.DataFrame(columns=output_columns)
     for chunk in pd.read_csv(file_path, usecols=usecols, chunksize=chunk_size):
+        # Prepends the previous incomplete run to the current read chunk.
         if not carryover.empty:
             chunk = pd.concat([carryover, chunk], ignore_index=True)
         chunk["property"] = chunk["property"].fillna("")
-        last_run = tuple(chunk.iloc[-1][FAILED_RUN_KEYS])
-        run_keys = chunk[FAILED_RUN_KEYS].apply(tuple, axis=1)
+        # Gets the run key of the last row in the current chunk.
+        last_run = tuple(chunk.iloc[-1][RUN_KEYS])
+        run_keys = chunk[RUN_KEYS].apply(tuple, axis=1)
+        # Splits the chunk into complete runs and the last run.
         complete_mask = run_keys != last_run
         complete_chunk = chunk.loc[complete_mask].copy()
         carryover = chunk.loc[~complete_mask].copy()
@@ -118,23 +135,31 @@ def iter_run_chunks(file_path: Path, usecols: Sequence[str], chunk_size: int = 2
             del chunk, run_keys, complete_mask, complete_chunk
             gc.collect()
             continue
-        for _, run_df in complete_chunk.groupby(FAILED_RUN_KEYS, sort=False):
+        # Yields one complete run at a time.
+        for _, run_df in complete_chunk.groupby(RUN_KEYS, sort=False):
             yield run_df.reset_index(drop=True)
         del chunk, run_keys, complete_mask, complete_chunk
         gc.collect()
+    # Yields the final run after the file has been fully read.
     if not carryover.empty:
         yield carryover.reset_index(drop=True)
 
 
 def append_csv(df: pd.DataFrame, output_file: Path, first_write: bool, source_file: Path, base_dir: Path) -> bool:
+    # Writes a dataframe to a CSV, using append mode after the first write.
     if df.empty:
         return first_write
     df.to_csv(output_file, mode="w" if first_write else "a", index=False, header=first_write)
-    print(f"wrote {output_file.relative_to(base_dir)} from {source_file.relative_to(base_dir)}")
+    run_key = ", ".join(f"{key}={df.iloc[0][key]}" for key in RUN_KEYS if key in df.columns)
+    print(
+        f"wrote {output_file.relative_to(base_dir)} from {source_file.relative_to(base_dir)}"
+        + (f" for {run_key}" if run_key else "")
+    )
     return False
 
 
 def clean_all_acc(base_dir: Path, output_dir: Path) -> None:
+    # Builds the cleaned all-accuracy summary across cv and v trials.
     acc = read_acc_files(base_dir, ALL_ACC_TRIALS, with_trial=True)
     failed_run_list = build_failed_run_list(acc)
     acc = filter_failed_runs(acc, failed_run_list)
@@ -155,8 +180,7 @@ def clean_all_acc(base_dir: Path, output_dir: Path) -> None:
 
 
 def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
-    acc = read_acc_files(base_dir, CV_TRIALS)
-    failed_run_list = build_failed_run_list(acc)
+    # Builds the cv prediction summary from per-run prediction data.
     output_file = output_dir / "cleaned_260518_EnglishBH_cv_pred.csv"
     output_file.unlink(missing_ok=True)
     first_write = True
@@ -165,10 +189,10 @@ def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
         trial_dir = base_dir / trial
         acc_files = sorted(trial_dir.rglob("*acc.csv"))
         pred_files = sorted(trial_dir.rglob("*pred.csv"))
-        if not acc_files or not pred_files:
-            continue
 
+        # Prepares the run-level accuracy totals used to infer syllable-structure errors.
         trial_acc = pd.concat((pd.read_csv(file_path) for file_path in acc_files), ignore_index=True)
+        failed_run_list = build_failed_run_list(trial_acc)
         trial_acc = filter_failed_runs(trial_acc, failed_run_list)
         trial_acc = label_model(trial_acc)
         trial_acc = label_directionality(trial_acc)
@@ -178,16 +202,22 @@ def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
         trial_acc["data_split"] = trial_acc["subset"].map({"train": 0.8, "test": 0.1})
         trial_acc["subset_data"] = trial_acc["total_data"] * trial_acc["data_split"]
         trial_acc["total_error"] = (trial_acc["subset_data"] * (1 - trial_acc["acc"])).astype(int)
-        trial_acc = trial_acc.drop(columns=["loss", "acc"])
+        trial_acc = trial_acc[
+            ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset", "total_data", "data_split", "subset_data", "total_error"]
+        ]
 
         for pred_file in pred_files:
-            for this_run in iter_run_chunks(pred_file, CV_PRED_COLUMNS):
+            for this_run in iter_run_chunks(pred_file, CV_PRED_COLUMNS, CV_PRED_COLUMNS):
+                # Labels each prediction row and derives consonant and vowel error indicators.
                 this_run = filter_failed_runs(this_run, failed_run_list)
                 this_run = label_model(this_run)
                 this_run = label_directionality(this_run)
                 this_run["dataset"] = "full"
                 this_run = this_run.rename(columns={"record_type": "subset"})
-                this_run["v_error"] = ((this_run["v1_error"] != 0) | (this_run["v2_error"] != 0)).astype(int)
+                this_run["v_error"] = (
+                    (this_run["v1_error"] != 0) 
+                    | (this_run["v2_error"] != 0)
+                ).astype(int)
                 this_run["c_error"] = (
                     (this_run["o1_error"] != 0)
                     | (this_run["o2_error"] != 0)
@@ -204,6 +234,7 @@ def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
                     .rename(columns={"size": "error_num"})
                 )
 
+                # Completes the four c_error x v_error combinations for each run, epoch, and subset.
                 run_keys = this_summary[
                     ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"]
                 ].drop_duplicates()
@@ -222,6 +253,7 @@ def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
                     on=["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"],
                     how="left",
                 )
+                # Replaces the 00 combination with the inferred syllable-structure error count.
                 mask = (this_summary["c_error"] == 0) & (this_summary["v_error"] == 0)
                 this_summary.loc[mask, "error_num"] = (
                     this_summary.loc[mask, "total_error"] - this_summary.loc[mask, "segment_error"]
@@ -251,16 +283,33 @@ def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
                     lambda row: 0 if row["total_error"] == 0 else row["error_num"] / row["total_error"],
                     axis=1,
                 )
+                this_summary = this_summary[
+                    [
+                        "model",
+                        "directionality",
+                        "dataset",
+                        "condition",
+                        "run_num",
+                        "epoch",
+                        "subset",
+                        "error_type",
+                        "error_num",
+                        "error_rate",
+                        "total_data",
+                        "data_split",
+                        "subset_data",
+                        "total_error",
+                    ]
+                ]
                 first_write = append_csv(this_summary, output_file, first_write, pred_file, base_dir)
                 del this_run, this_summary, run_keys, combos, mask
                 gc.collect()
-        del trial_acc, acc_files, pred_files
+        del trial_acc, failed_run_list, acc_files, pred_files
         gc.collect()
-    del acc, failed_run_list
-    gc.collect()
 
 
 def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
+    # Builds the v prediction summary and the vowel-height comparison summary.
     acc = read_acc_files(base_dir, V_TRIALS)
     failed_run_list = build_failed_run_list(acc)
     pred_summary_file = output_dir / "cleaned_260518_EnglishBH_v_pred.csv"
@@ -272,7 +321,8 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
 
     for trial in V_TRIALS:
         for pred_file in sorted((base_dir / trial).rglob("*pred.csv")):
-            for this_run in iter_run_chunks(pred_file, V_PRED_COLUMNS):
+            for this_run in iter_run_chunks(pred_file, lambda col: col in V_PRED_COLUMNS, V_PRED_COLUMNS):
+                # Restores any missing expanded-dataset columns before selecting the analysis columns.
                 missing_cols = [col for col in V_PRED_COLUMNS if col not in this_run.columns]
                 for col in missing_cols:
                     this_run[col] = pd.NA
@@ -284,6 +334,7 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                 this_run = this_run.rename(columns={"record_type": "subset"})
                 this_run = add_vowel_features(this_run)
 
+                # Derives feature-level vowel error indicators for each prediction row.
                 expanded_mask = this_run["dataset"] == "expanded"
                 this_run["high_error"] = (
                     (this_run["sr_v1_high"] != this_run["pred_sr_v1_high"])
@@ -336,6 +387,7 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                     "harmony_error",
                 ] = 1
 
+                # Summarizes prediction counts by run, epoch, subset, and vowel error pattern.
                 this_summary = (
                     this_run.groupby(
                         [
@@ -348,6 +400,7 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                     .rename(columns={"size": "error_num"})
                 )
 
+                # Summarizes input height-pattern counts for full harmony data.
                 this_input_height_summary = this_run[
                     (this_run["dataset"] == "full") & (this_run["condition"] == "harmony")
                 ].copy()
@@ -381,6 +434,7 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                 this_input_height_summary["error_num"] = this_input_height_summary["error_num"].fillna(0).astype(int)
                 this_input_height_summary["error_rate"] = this_input_height_summary["error_rate"].fillna(0.0)
 
+                # Summarizes predicted height-pattern counts for full harmony data.
                 this_output_height_summary = this_run[
                     (this_run["dataset"] == "full") & (this_run["condition"] == "harmony")
                 ].copy()
@@ -414,6 +468,7 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                 this_output_height_summary["error_num"] = this_output_height_summary["error_num"].fillna(0).astype(int)
                 this_output_height_summary["error_rate"] = this_output_height_summary["error_rate"].fillna(0.0)
 
+                # Combines the input and predicted height-pattern summaries.
                 this_height_summary = this_input_height_summary.merge(
                     this_output_height_summary,
                     on=["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
