@@ -102,6 +102,7 @@ def filter_failed_runs(df: pd.DataFrame, acc: pd.DataFrame) -> pd.DataFrame:
 
 def clean_all_acc(base_dir: Path, output_dir: Path) -> None:
     acc = read_acc_files(base_dir, ALL_ACC_TRIALS)
+    input_files = list_matching_files(base_dir, ALL_ACC_TRIALS, "*acc.csv")
     acc = filter_failed_runs(acc, acc)
     acc["model"] = label_model(acc["modality"])
     acc["directionality"] = label_directionality(acc["directionality"])
@@ -113,7 +114,7 @@ def clean_all_acc(base_dir: Path, output_dir: Path) -> None:
     ]
     output_file = output_dir / "cleaned_260518_EnglishBH_all_acc.csv"
     acc.to_csv(output_file, index=False)
-    print(f"wrote {output_file}")
+    print(f"wrote {output_file} from {', '.join(str(path) for path in input_files)}")
 
 
 def build_cv_acc_summary(base_dir: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -324,21 +325,23 @@ def summarize_height_chunk(chunk: pd.DataFrame) -> pd.DataFrame:
 
 def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
     acc, acc_summary = build_cv_acc_summary(base_dir)
+    input_files = list_matching_files(base_dir, CV_TRIALS, "*pred.csv")
     output_file = output_dir / "cleaned_260518_EnglishBH_cv_pred.csv"
     output_file.unlink(missing_ok=True)
     first_write = True
 
-    for file_path in list_matching_files(base_dir, CV_TRIALS, "*pred.csv"):
+    for file_path in input_files:
         for chunk in pd.read_csv(file_path, usecols=CV_PRED_COLUMNS, chunksize=200000):
             chunk = filter_failed_runs(chunk, acc)
             if chunk.empty:
                 continue
             summary = summarize_cv_pred_chunk(chunk, acc_summary)
-            first_write = append_csv(summary, output_file, first_write)
+            first_write = append_csv(summary, output_file, first_write, file_path)
 
 
 def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
     acc = read_acc_files(base_dir, V_TRIALS)
+    input_files = list_matching_files(base_dir, V_TRIALS, "*pred.csv")
     pred_output = output_dir / "cleaned_260518_EnglishBH_v_pred.csv"
     height_output = output_dir / "cleaned_260518_EnglishBH_v_height.csv"
     pred_output.unlink(missing_ok=True)
@@ -346,7 +349,7 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
     first_pred_write = True
     first_height_write = True
 
-    for file_path in list_matching_files(base_dir, V_TRIALS, "*pred.csv"):
+    for file_path in input_files:
         for chunk in pd.read_csv(file_path, chunksize=200000):
             missing_cols = [col for col in V_PRED_COLUMNS if col not in chunk.columns]
             for col in missing_cols:
@@ -357,15 +360,15 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                 continue
             pred_summary = summarize_v_pred_chunk(chunk)
             height_summary = summarize_height_chunk(chunk)
-            first_pred_write = append_csv(pred_summary, pred_output, first_pred_write)
-            first_height_write = append_csv(height_summary, height_output, first_height_write)
+            first_pred_write = append_csv(pred_summary, pred_output, first_pred_write, file_path)
+            first_height_write = append_csv(height_summary, height_output, first_height_write, file_path)
 
 
-def append_csv(df: pd.DataFrame, output_file: Path, first_write: bool) -> bool:
+def append_csv(df: pd.DataFrame, output_file: Path, first_write: bool, input_file: Path) -> bool:
     if df.empty:
         return first_write
     df.to_csv(output_file, mode="w" if first_write else "a", index=False, header=first_write)
-    print(f"wrote {output_file}")
+    print(f"wrote {output_file} from {input_file}")
     return False
 
 
