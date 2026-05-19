@@ -102,7 +102,7 @@ def filter_failed_runs(df: pd.DataFrame, acc: pd.DataFrame) -> pd.DataFrame:
 
 def clean_all_acc(base_dir: Path, output_dir: Path) -> None:
     acc = read_acc_files(base_dir, ALL_ACC_TRIALS)
-    input_files = list_matching_files(base_dir, ALL_ACC_TRIALS, "*acc.csv")
+    input_files = [path.relative_to(base_dir) for path in list_matching_files(base_dir, ALL_ACC_TRIALS, "*acc.csv")]
     acc = filter_failed_runs(acc, acc)
     acc["model"] = label_model(acc["modality"])
     acc["directionality"] = label_directionality(acc["directionality"])
@@ -114,7 +114,7 @@ def clean_all_acc(base_dir: Path, output_dir: Path) -> None:
     ]
     output_file = output_dir / "cleaned_260518_EnglishBH_all_acc.csv"
     acc.to_csv(output_file, index=False)
-    print(f"wrote {output_file} from {', '.join(str(path) for path in input_files)}")
+    print(f"wrote {output_file.relative_to(base_dir)} from {', '.join(str(path) for path in input_files)}")
 
 
 def build_cv_acc_summary(base_dir: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -336,7 +336,7 @@ def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
             if chunk.empty:
                 continue
             summary = summarize_cv_pred_chunk(chunk, acc_summary)
-            first_write = append_csv(summary, output_file, first_write, file_path)
+            first_write = append_csv(summary, output_file, first_write, file_path, base_dir)
 
 
 def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
@@ -360,15 +360,15 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                 continue
             pred_summary = summarize_v_pred_chunk(chunk)
             height_summary = summarize_height_chunk(chunk)
-            first_pred_write = append_csv(pred_summary, pred_output, first_pred_write, file_path)
-            first_height_write = append_csv(height_summary, height_output, first_height_write, file_path)
+            first_pred_write = append_csv(pred_summary, pred_output, first_pred_write, file_path, base_dir)
+            first_height_write = append_csv(height_summary, height_output, first_height_write, file_path, base_dir)
 
 
-def append_csv(df: pd.DataFrame, output_file: Path, first_write: bool, input_file: Path) -> bool:
+def append_csv(df: pd.DataFrame, output_file: Path, first_write: bool, input_file: Path, base_dir: Path) -> bool:
     if df.empty:
         return first_write
     df.to_csv(output_file, mode="w" if first_write else "a", index=False, header=first_write)
-    print(f"wrote {output_file} from {input_file}")
+    print(f"wrote {output_file.relative_to(base_dir)} from {input_file.relative_to(base_dir)}")
     return False
 
 
