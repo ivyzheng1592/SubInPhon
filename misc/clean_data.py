@@ -111,7 +111,9 @@ def clean_all_acc(base_dir: Path, output_dir: Path) -> None:
     acc = acc[
         ["language", "model", "directionality", "dataset", "error_record", "condition", "run_num", "subset", "epoch", "loss", "acc"]
     ]
-    acc.to_csv(output_dir / "cleaned_260518_EnglishBH_all_acc.csv", index=False)
+    output_file = output_dir / "cleaned_260518_EnglishBH_all_acc.csv"
+    acc.to_csv(output_file, index=False)
+    print(f"wrote {output_file}")
 
 
 def build_cv_acc_summary(base_dir: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -363,6 +365,7 @@ def append_csv(df: pd.DataFrame, output_file: Path, first_write: bool) -> bool:
     if df.empty:
         return first_write
     df.to_csv(output_file, mode="w" if first_write else "a", index=False, header=first_write)
+    print(f"wrote {output_file}")
     return False
 
 
