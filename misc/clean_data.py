@@ -1,4 +1,5 @@
 import argparse
+import gc
 from pathlib import Path
 from typing import List, Sequence
 
@@ -78,7 +79,7 @@ def build_failed_run_list(acc: pd.DataFrame) -> pd.DataFrame:
             (acc["epoch"] == 99)
             & (acc["record_type"] == "test")
             & ((acc["acc"] < 0.85) | (acc["loss"] > 0.05))
-        ][FAILED_RUN_KEYS + ["epoch", "record_type"]]
+        ][FAILED_RUN_KEYS]
         .drop_duplicates()
     )
 
@@ -100,6 +101,29 @@ def add_vowel_features(df: pd.DataFrame) -> pd.DataFrame:
         df[f"{prefix}_tense"] = df[prefix].map(VOWEL_TENSE)
         df[f"{prefix}_back"] = df[prefix].map(VOWEL_BACK)
     return df
+
+
+def iter_run_chunks(file_path: Path, usecols: Sequence[str], chunk_size: int = 200000):
+    carryover = pd.DataFrame(columns=usecols)
+    for chunk in pd.read_csv(file_path, usecols=usecols, chunksize=chunk_size):
+        if not carryover.empty:
+            chunk = pd.concat([carryover, chunk], ignore_index=True)
+        chunk["property"] = chunk["property"].fillna("")
+        last_run = tuple(chunk.iloc[-1][FAILED_RUN_KEYS])
+        run_keys = chunk[FAILED_RUN_KEYS].apply(tuple, axis=1)
+        complete_mask = run_keys != last_run
+        complete_chunk = chunk.loc[complete_mask].copy()
+        carryover = chunk.loc[~complete_mask].copy()
+        if complete_chunk.empty:
+            del chunk, run_keys, complete_mask, complete_chunk
+            gc.collect()
+            continue
+        for _, run_df in complete_chunk.groupby(FAILED_RUN_KEYS, sort=False):
+            yield run_df.reset_index(drop=True)
+        del chunk, run_keys, complete_mask, complete_chunk
+        gc.collect()
+    if not carryover.empty:
+        yield carryover.reset_index(drop=True)
 
 
 def append_csv(df: pd.DataFrame, output_file: Path, first_write: bool, source_file: Path, base_dir: Path) -> bool:
@@ -126,6 +150,8 @@ def clean_all_acc(base_dir: Path, output_dir: Path) -> None:
     acc.to_csv(output_file, index=False)
     input_files = [path.relative_to(base_dir) for path in list_matching_files(base_dir, ALL_ACC_TRIALS, "*acc.csv")]
     print(f"wrote {output_file.relative_to(base_dir)} from {', '.join(str(path) for path in input_files)}")
+    del acc, failed_run_list, input_files
+    gc.collect()
 
 
 def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
@@ -155,85 +181,83 @@ def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
         trial_acc = trial_acc.drop(columns=["loss", "acc"])
 
         for pred_file in pred_files:
-            this_run = pd.read_csv(pred_file, usecols=CV_PRED_COLUMNS)
-            this_run = filter_failed_runs(this_run, failed_run_list)
-            this_run = label_model(this_run)
-            this_run = label_directionality(this_run)
-            this_run["dataset"] = "full"
-            this_run = this_run.rename(columns={"record_type": "subset"})
-            this_run["v_error"] = ((this_run["v1_error"] != 0) | (this_run["v2_error"] != 0)).astype(int)
-            this_run["c_error"] = (
-                (this_run["o1_error"] != 0)
-                | (this_run["o2_error"] != 0)
-                | (this_run["c1_error"] != 0)
-                | (this_run["c2_error"] != 0)
-            ).astype(int)
-            this_run["pred_sr_v1_back"] = this_run["pred_sr_v1"].map(VOWEL_BACK)
-            this_run["pred_sr_v2_back"] = this_run["pred_sr_v2"].map(VOWEL_BACK)
-            this_run["harmony_error"] = 0
-            this_run.loc[
-                ((this_run["condition"] == "harmony") & (this_run["pred_sr_v1_back"] != this_run["pred_sr_v2_back"]))
-                | ((this_run["condition"] == "disharmony") & (this_run["pred_sr_v1_back"] == this_run["pred_sr_v2_back"])),
-                "harmony_error",
-            ] = 1
+            for this_run in iter_run_chunks(pred_file, CV_PRED_COLUMNS):
+                this_run = filter_failed_runs(this_run, failed_run_list)
+                this_run = label_model(this_run)
+                this_run = label_directionality(this_run)
+                this_run["dataset"] = "full"
+                this_run = this_run.rename(columns={"record_type": "subset"})
+                this_run["v_error"] = ((this_run["v1_error"] != 0) | (this_run["v2_error"] != 0)).astype(int)
+                this_run["c_error"] = (
+                    (this_run["o1_error"] != 0)
+                    | (this_run["o2_error"] != 0)
+                    | (this_run["c1_error"] != 0)
+                    | (this_run["c2_error"] != 0)
+                ).astype(int)
 
-            this_summary = (
-                this_run.groupby(
-                    ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset", "c_error", "v_error"],
-                    as_index=False,
+                this_summary = (
+                    this_run.groupby(
+                        ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset", "c_error", "v_error"],
+                        as_index=False,
+                    )
+                    .size()
+                    .rename(columns={"size": "error_num"})
                 )
-                .size()
-                .rename(columns={"size": "error_num"})
-            )
 
-            run_keys = this_summary[
-                ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"]
-            ].drop_duplicates()
-            combos = pd.MultiIndex.from_product([[0, 1], [0, 1]], names=["c_error", "v_error"]).to_frame(index=False)
-            this_summary = run_keys.merge(combos, how="cross").merge(
-                this_summary,
-                on=["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset", "c_error", "v_error"],
-                how="left",
-            )
-            this_summary["error_num"] = this_summary["error_num"].fillna(0).astype(int)
-            this_summary["segment_error"] = this_summary.groupby(
-                ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"]
-            )["error_num"].transform("sum")
-            this_summary = this_summary.merge(
-                trial_acc,
-                on=["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"],
-                how="left",
-            )
-            mask = (this_summary["c_error"] == 0) & (this_summary["v_error"] == 0)
-            this_summary.loc[mask, "error_num"] = (
-                this_summary.loc[mask, "total_error"] - this_summary.loc[mask, "segment_error"]
-            )
-            this_summary["error_type"] = this_summary.apply(
-                lambda row: "consonant only"
-                if row["c_error"] == 1 and row["v_error"] == 0
-                else "vowel only"
-                if row["c_error"] == 0 and row["v_error"] == 1
-                else "consonant and vowel"
-                if row["c_error"] == 1 and row["v_error"] == 1
-                else "syllable structure",
-                axis=1,
-            )
-            this_summary["error_type"] = pd.Categorical(
-                this_summary["error_type"],
-                categories=[
-                    "syllable structure",
-                    "consonant and vowel",
-                    "consonant only",
-                    "vowel only",
-                ],
-                ordered=True,
-            )
-            this_summary = this_summary.drop(columns=["c_error", "v_error", "segment_error"])
-            this_summary["error_rate"] = this_summary.apply(
-                lambda row: 0 if row["total_error"] == 0 else row["error_num"] / row["total_error"],
-                axis=1,
-            )
-            first_write = append_csv(this_summary, output_file, first_write, pred_file, base_dir)
+                run_keys = this_summary[
+                    ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"]
+                ].drop_duplicates()
+                combos = pd.MultiIndex.from_product([[0, 1], [0, 1]], names=["c_error", "v_error"]).to_frame(index=False)
+                this_summary = run_keys.merge(combos, how="cross").merge(
+                    this_summary,
+                    on=["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset", "c_error", "v_error"],
+                    how="left",
+                )
+                this_summary["error_num"] = this_summary["error_num"].fillna(0).astype(int)
+                this_summary["segment_error"] = this_summary.groupby(
+                    ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"]
+                )["error_num"].transform("sum")
+                this_summary = this_summary.merge(
+                    trial_acc,
+                    on=["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"],
+                    how="left",
+                )
+                mask = (this_summary["c_error"] == 0) & (this_summary["v_error"] == 0)
+                this_summary.loc[mask, "error_num"] = (
+                    this_summary.loc[mask, "total_error"] - this_summary.loc[mask, "segment_error"]
+                )
+                this_summary["error_type"] = this_summary.apply(
+                    lambda row: "consonant only"
+                    if row["c_error"] == 1 and row["v_error"] == 0
+                    else "vowel only"
+                    if row["c_error"] == 0 and row["v_error"] == 1
+                    else "consonant and vowel"
+                    if row["c_error"] == 1 and row["v_error"] == 1
+                    else "syllable structure",
+                    axis=1,
+                )
+                this_summary["error_type"] = pd.Categorical(
+                    this_summary["error_type"],
+                    categories=[
+                        "syllable structure",
+                        "consonant and vowel",
+                        "consonant only",
+                        "vowel only",
+                    ],
+                    ordered=True,
+                )
+                this_summary = this_summary.drop(columns=["c_error", "v_error", "segment_error"])
+                this_summary["error_rate"] = this_summary.apply(
+                    lambda row: 0 if row["total_error"] == 0 else row["error_num"] / row["total_error"],
+                    axis=1,
+                )
+                first_write = append_csv(this_summary, output_file, first_write, pred_file, base_dir)
+                del this_run, this_summary, run_keys, combos, mask
+                gc.collect()
+        del trial_acc, acc_files, pred_files
+        gc.collect()
+    del acc, failed_run_list
+    gc.collect()
 
 
 def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
@@ -248,173 +272,190 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
 
     for trial in V_TRIALS:
         for pred_file in sorted((base_dir / trial).rglob("*pred.csv")):
-            this_run = pd.read_csv(pred_file)
-            missing_cols = [col for col in V_PRED_COLUMNS if col not in this_run.columns]
-            for col in missing_cols:
-                this_run[col] = pd.NA
-            this_run = this_run[V_PRED_COLUMNS].copy()
-            this_run = filter_failed_runs(this_run, failed_run_list)
-            this_run = label_model(this_run)
-            this_run = label_directionality(this_run)
-            this_run = label_dataset(this_run)
-            this_run = this_run.rename(columns={"record_type": "subset"})
-            this_run = add_vowel_features(this_run)
+            for this_run in iter_run_chunks(pred_file, V_PRED_COLUMNS):
+                missing_cols = [col for col in V_PRED_COLUMNS if col not in this_run.columns]
+                for col in missing_cols:
+                    this_run[col] = pd.NA
+                this_run = this_run[V_PRED_COLUMNS].copy()
+                this_run = filter_failed_runs(this_run, failed_run_list)
+                this_run = label_model(this_run)
+                this_run = label_directionality(this_run)
+                this_run = label_dataset(this_run)
+                this_run = this_run.rename(columns={"record_type": "subset"})
+                this_run = add_vowel_features(this_run)
 
-            expanded_mask = this_run["dataset"] == "expanded"
-            this_run["high_error"] = (
-                (this_run["sr_v1_high"] != this_run["pred_sr_v1_high"])
-                | (this_run["sr_v2_high"] != this_run["pred_sr_v2_high"])
-                | (expanded_mask & (this_run["sr_v3_high"] != this_run["pred_sr_v3_high"]))
-            ).astype(int)
-            this_run["tense_error"] = (
-                (this_run["sr_v1_tense"] != this_run["pred_sr_v1_tense"])
-                | (this_run["sr_v2_tense"] != this_run["pred_sr_v2_tense"])
-                | (expanded_mask & (this_run["sr_v3_tense"] != this_run["pred_sr_v3_tense"]))
-            ).astype(int)
-            this_run["back_error"] = (
-                (this_run["sr_v1_back"] != this_run["pred_sr_v1_back"])
-                | (this_run["sr_v2_back"] != this_run["pred_sr_v2_back"])
-                | (expanded_mask & (this_run["sr_v3_back"] != this_run["pred_sr_v3_back"]))
-            ).astype(int)
+                expanded_mask = this_run["dataset"] == "expanded"
+                this_run["high_error"] = (
+                    (this_run["sr_v1_high"] != this_run["pred_sr_v1_high"])
+                    | (this_run["sr_v2_high"] != this_run["pred_sr_v2_high"])
+                    | (expanded_mask & (this_run["sr_v3_high"] != this_run["pred_sr_v3_high"]))
+                ).astype(int)
+                this_run["tense_error"] = (
+                    (this_run["sr_v1_tense"] != this_run["pred_sr_v1_tense"])
+                    | (this_run["sr_v2_tense"] != this_run["pred_sr_v2_tense"])
+                    | (expanded_mask & (this_run["sr_v3_tense"] != this_run["pred_sr_v3_tense"]))
+                ).astype(int)
+                this_run["back_error"] = (
+                    (this_run["sr_v1_back"] != this_run["pred_sr_v1_back"])
+                    | (this_run["sr_v2_back"] != this_run["pred_sr_v2_back"])
+                    | (expanded_mask & (this_run["sr_v3_back"] != this_run["pred_sr_v3_back"]))
+                ).astype(int)
 
-            pred_triplets = this_run["pred_sr_v1_back"].astype("Int64").astype(str).str.cat(
-                [
-                    this_run["pred_sr_v2_back"].astype("Int64").astype(str),
-                    this_run["pred_sr_v3_back"].astype("Int64").astype(str),
-                ],
-                sep="",
-            )
-            this_run["harmony_error"] = 0
-            this_run.loc[
-                expanded_mask & (this_run["condition"] == "harmony") & ~pred_triplets.isin(["000", "111"]),
-                "harmony_error",
-            ] = 1
-            this_run.loc[
-                expanded_mask
-                & (this_run["condition"] == "disharmony")
-                & (this_run["directionality"] == "left-to-right")
-                & ~pred_triplets.isin(["100", "011"]),
-                "harmony_error",
-            ] = 1
-            this_run.loc[
-                expanded_mask
-                & (this_run["condition"] == "disharmony")
-                & (this_run["directionality"] == "right-to-left")
-                & ~pred_triplets.isin(["110", "001"]),
-                "harmony_error",
-            ] = 1
-            this_run.loc[
-                (~expanded_mask) & (this_run["condition"] == "harmony") & (this_run["pred_sr_v1_back"] != this_run["pred_sr_v2_back"]),
-                "harmony_error",
-            ] = 1
-            this_run.loc[
-                (~expanded_mask) & (this_run["condition"] == "disharmony") & (this_run["pred_sr_v1_back"] == this_run["pred_sr_v2_back"]),
-                "harmony_error",
-            ] = 1
-
-            this_summary = (
-                this_run.groupby(
+                pred_triplets = this_run["pred_sr_v1_back"].astype("Int64").astype(str).str.cat(
                     [
-                        "model", "directionality", "dataset", "condition", "run_num", "epoch", "subset",
-                        "v1_error", "v2_error", "high_error", "tense_error", "back_error", "harmony_error",
+                        this_run["pred_sr_v2_back"].astype("Int64").astype(str),
+                        this_run["pred_sr_v3_back"].astype("Int64").astype(str),
                     ],
-                    as_index=False,
+                    sep="",
                 )
-                .size()
-                .rename(columns={"size": "error_num"})
-            )
+                this_run["harmony_error"] = 0
+                this_run.loc[
+                    expanded_mask & (this_run["condition"] == "harmony") & ~pred_triplets.isin(["000", "111"]),
+                    "harmony_error",
+                ] = 1
+                this_run.loc[
+                    expanded_mask
+                    & (this_run["condition"] == "disharmony")
+                    & (this_run["directionality"] == "left-to-right")
+                    & ~pred_triplets.isin(["100", "011"]),
+                    "harmony_error",
+                ] = 1
+                this_run.loc[
+                    expanded_mask
+                    & (this_run["condition"] == "disharmony")
+                    & (this_run["directionality"] == "right-to-left")
+                    & ~pred_triplets.isin(["110", "001"]),
+                    "harmony_error",
+                ] = 1
+                this_run.loc[
+                    (~expanded_mask) & (this_run["condition"] == "harmony") & (this_run["pred_sr_v1_back"] != this_run["pred_sr_v2_back"]),
+                    "harmony_error",
+                ] = 1
+                this_run.loc[
+                    (~expanded_mask) & (this_run["condition"] == "disharmony") & (this_run["pred_sr_v1_back"] == this_run["pred_sr_v2_back"]),
+                    "harmony_error",
+                ] = 1
 
-            this_input_height_summary = this_run[
-                (this_run["dataset"] == "full") & (this_run["condition"] == "harmony")
-            ].copy()
-            this_input_height_summary["v_high"] = (
-                this_input_height_summary["sr_v1_high"].astype("Int64").astype(str)
-                + this_input_height_summary["sr_v2_high"].astype("Int64").astype(str)
-            )
-            this_input_height_summary["v_agree"] = (
-                this_input_height_summary["sr_v1_high"] == this_input_height_summary["sr_v2_high"]
-            ).astype(int)
-            this_input_height_summary = (
-                this_input_height_summary.groupby(
-                    ["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
-                    as_index=False,
+                this_summary = (
+                    this_run.groupby(
+                        [
+                            "model", "directionality", "dataset", "condition", "run_num", "epoch", "subset",
+                            "v1_error", "v2_error", "high_error", "tense_error", "back_error", "harmony_error",
+                        ],
+                        as_index=False,
+                    )
+                    .size()
+                    .rename(columns={"size": "error_num"})
                 )
-                .size()
-                .rename(columns={"size": "error_num"})
-            )
-            this_input_height_summary["error_rate"] = this_input_height_summary.groupby(
-                ["model", "directionality", "dataset", "condition", "run_num"]
-            )["error_num"].transform(lambda s: s / s.sum())
-            input_run_keys = this_input_height_summary[
-                ["model", "directionality", "dataset", "condition", "run_num"]
-            ].drop_duplicates()
-            input_combos = this_input_height_summary[["v_high", "v_agree"]].drop_duplicates()
-            this_input_height_summary = input_run_keys.merge(input_combos, how="cross").merge(
-                this_input_height_summary,
-                on=["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
-                how="left",
-            )
-            this_input_height_summary["error_num"] = this_input_height_summary["error_num"].fillna(0).astype(int)
-            this_input_height_summary["error_rate"] = this_input_height_summary["error_rate"].fillna(0.0)
 
-            this_output_height_summary = this_run[
-                (this_run["dataset"] == "full") & (this_run["condition"] == "harmony")
-            ].copy()
-            this_output_height_summary["v_high"] = (
-                this_output_height_summary["pred_sr_v1_high"].astype("Int64").astype(str)
-                + this_output_height_summary["pred_sr_v2_high"].astype("Int64").astype(str)
-            )
-            this_output_height_summary["v_agree"] = (
-                this_output_height_summary["pred_sr_v1_high"] == this_output_height_summary["pred_sr_v2_high"]
-            ).astype(int)
-            this_output_height_summary = (
-                this_output_height_summary.groupby(
-                    ["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
-                    as_index=False,
+                this_input_height_summary = this_run[
+                    (this_run["dataset"] == "full") & (this_run["condition"] == "harmony")
+                ].copy()
+                this_input_height_summary["v_high"] = (
+                    this_input_height_summary["sr_v1_high"].astype("Int64").astype(str)
+                    + this_input_height_summary["sr_v2_high"].astype("Int64").astype(str)
                 )
-                .size()
-                .rename(columns={"size": "error_num"})
-            )
-            this_output_height_summary["error_rate"] = this_output_height_summary.groupby(
-                ["model", "directionality", "dataset", "condition", "run_num"]
-            )["error_num"].transform(lambda s: s / s.sum())
-            output_run_keys = this_output_height_summary[
-                ["model", "directionality", "dataset", "condition", "run_num"]
-            ].drop_duplicates()
-            output_combos = this_output_height_summary[["v_high", "v_agree"]].drop_duplicates()
-            this_output_height_summary = output_run_keys.merge(output_combos, how="cross").merge(
-                this_output_height_summary,
-                on=["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
-                how="left",
-            )
-            this_output_height_summary["error_num"] = this_output_height_summary["error_num"].fillna(0).astype(int)
-            this_output_height_summary["error_rate"] = this_output_height_summary["error_rate"].fillna(0.0)
+                this_input_height_summary["v_agree"] = (
+                    this_input_height_summary["sr_v1_high"] == this_input_height_summary["sr_v2_high"]
+                ).astype(int)
+                this_input_height_summary = (
+                    this_input_height_summary.groupby(
+                        ["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
+                        as_index=False,
+                    )
+                    .size()
+                    .rename(columns={"size": "error_num"})
+                )
+                this_input_height_summary["error_rate"] = this_input_height_summary.groupby(
+                    ["model", "directionality", "dataset", "condition", "run_num"]
+                )["error_num"].transform(lambda s: s / s.sum())
+                input_run_keys = this_input_height_summary[
+                    ["model", "directionality", "dataset", "condition", "run_num"]
+                ].drop_duplicates()
+                input_combos = this_input_height_summary[["v_high", "v_agree"]].drop_duplicates()
+                this_input_height_summary = input_run_keys.merge(input_combos, how="cross").merge(
+                    this_input_height_summary,
+                    on=["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
+                    how="left",
+                )
+                this_input_height_summary["error_num"] = this_input_height_summary["error_num"].fillna(0).astype(int)
+                this_input_height_summary["error_rate"] = this_input_height_summary["error_rate"].fillna(0.0)
 
-            this_height_summary = this_input_height_summary.merge(
-                this_output_height_summary,
-                on=["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
-                how="outer",
-                suffixes=("_input", "_output"),
-            )
-            for col in ["error_num_input", "error_num_output"]:
-                this_height_summary[col] = this_height_summary[col].fillna(0).astype(int)
-            for col in ["error_rate_input", "error_rate_output"]:
-                this_height_summary[col] = this_height_summary[col].fillna(0.0)
-            this_height_summary["error_num_diff"] = (
-                this_height_summary["error_num_output"] - this_height_summary["error_num_input"]
-            )
-            this_height_summary["error_rate_diff"] = (
-                this_height_summary["error_rate_output"] - this_height_summary["error_rate_input"]
-            )
+                this_output_height_summary = this_run[
+                    (this_run["dataset"] == "full") & (this_run["condition"] == "harmony")
+                ].copy()
+                this_output_height_summary["v_high"] = (
+                    this_output_height_summary["pred_sr_v1_high"].astype("Int64").astype(str)
+                    + this_output_height_summary["pred_sr_v2_high"].astype("Int64").astype(str)
+                )
+                this_output_height_summary["v_agree"] = (
+                    this_output_height_summary["pred_sr_v1_high"] == this_output_height_summary["pred_sr_v2_high"]
+                ).astype(int)
+                this_output_height_summary = (
+                    this_output_height_summary.groupby(
+                        ["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
+                        as_index=False,
+                    )
+                    .size()
+                    .rename(columns={"size": "error_num"})
+                )
+                this_output_height_summary["error_rate"] = this_output_height_summary.groupby(
+                    ["model", "directionality", "dataset", "condition", "run_num"]
+                )["error_num"].transform(lambda s: s / s.sum())
+                output_run_keys = this_output_height_summary[
+                    ["model", "directionality", "dataset", "condition", "run_num"]
+                ].drop_duplicates()
+                output_combos = this_output_height_summary[["v_high", "v_agree"]].drop_duplicates()
+                this_output_height_summary = output_run_keys.merge(output_combos, how="cross").merge(
+                    this_output_height_summary,
+                    on=["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
+                    how="left",
+                )
+                this_output_height_summary["error_num"] = this_output_height_summary["error_num"].fillna(0).astype(int)
+                this_output_height_summary["error_rate"] = this_output_height_summary["error_rate"].fillna(0.0)
 
-            first_pred_write = append_csv(this_summary, pred_summary_file, first_pred_write, pred_file, base_dir)
-            first_vowel_height_write = append_csv(
-                this_height_summary,
-                vowel_height_file,
-                first_vowel_height_write,
-                pred_file,
-                base_dir,
-            )
+                this_height_summary = this_input_height_summary.merge(
+                    this_output_height_summary,
+                    on=["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
+                    how="outer",
+                    suffixes=("_input", "_output"),
+                )
+                for col in ["error_num_input", "error_num_output"]:
+                    this_height_summary[col] = this_height_summary[col].fillna(0).astype(int)
+                for col in ["error_rate_input", "error_rate_output"]:
+                    this_height_summary[col] = this_height_summary[col].fillna(0.0)
+                this_height_summary["error_num_diff"] = (
+                    this_height_summary["error_num_output"] - this_height_summary["error_num_input"]
+                )
+                this_height_summary["error_rate_diff"] = (
+                    this_height_summary["error_rate_output"] - this_height_summary["error_rate_input"]
+                )
+
+                first_pred_write = append_csv(this_summary, pred_summary_file, first_pred_write, pred_file, base_dir)
+                first_vowel_height_write = append_csv(
+                    this_height_summary,
+                    vowel_height_file,
+                    first_vowel_height_write,
+                    pred_file,
+                    base_dir,
+                )
+                del (
+                    this_run,
+                    missing_cols,
+                    expanded_mask,
+                    pred_triplets,
+                    this_summary,
+                    this_input_height_summary,
+                    input_run_keys,
+                    input_combos,
+                    this_output_height_summary,
+                    output_run_keys,
+                    output_combos,
+                    this_height_summary,
+                )
+                gc.collect()
+    del acc, failed_run_list
+    gc.collect()
 
 
 def main() -> None:
