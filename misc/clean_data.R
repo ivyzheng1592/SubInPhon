@@ -102,7 +102,7 @@ failed_run_list <-
            epoch, record_type, .keep_all = TRUE)
 
 # clean accuracy data
-acc_summary <- 
+acc <- 
   # remove failed runs
   anti_join(acc, failed_run_list, 
             by = c("language", "modality", "directionality",
@@ -117,10 +117,8 @@ acc_summary <-
          data_split = case_when(subset == "train" ~ 0.8,
                                 subset == "test" ~ 0.1),
          subset_data = total_data * data_split,
-         total_error = as.integer(subset_data * (1-acc))) %>% 
-  group_by(model, directionality, dataset, condition, run_num) %>% 
-  summarise(total_error = sum(total_error))
-acc_summary
+         total_error = as.integer(subset_data * (1-acc)))
+acc
 
 # read and append prediction data
 pred_summary_file <- "cleaned_260518_EnglishBH_cv_pred"
@@ -172,19 +170,23 @@ for (trial in trials) {
     
     this_summary <- this_run %>% 
       # consonant and vowel errors
-      group_by(model, directionality, dataset,
-               condition, run_num, epoch, subset,
+      group_by(model, directionality, dataset, 
+               condition, run_num, epoch, subset, 
                c_error, v_error) %>% 
       summarise(error_num = n(), .groups = "drop") %>% 
-      # syllable structure errors
-      complete(nesting(model, directionality, dataset, condition, run_num), 
-               c_error, v_error,
+      # add the epochs with no consonant and/or vowel errors
+      complete(nesting(model, directionality, dataset, 
+                       condition, run_num), 
+               nesting(epoch, subset), c_error, v_error, 
                fill = list(error_num = 0)) %>% 
-      group_by(model, directionality, dataset, condition, run_num) %>% 
+      # syllable structure errors
+      group_by(model, directionality, dataset, condition, 
+               run_num, epoch, subset) %>% 
       mutate(segment_error = sum(error_num)) %>% 
-      left_join(acc_summary, 
-                by = c("model", "directionality", "dataset", "condition", "run_num"),
+      left_join(acc, by = c("model", "directionality", "dataset", "condition", 
+                            "run_num", "epoch", "subset"),
                 keep = FALSE) %>% 
+      select(-loss, -acc) %>% 
       mutate(error_num = if_else(c_error == 0 & v_error == 0,
                                  total_error - segment_error,
                                  error_num)) %>% 
