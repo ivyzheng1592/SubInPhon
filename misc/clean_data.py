@@ -189,6 +189,7 @@ def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
         trial_dir = base_dir / trial
         acc_files = sorted(trial_dir.rglob("*acc.csv"))
         pred_files = sorted(trial_dir.rglob("*pred.csv"))
+        print(f"processing {trial_dir.relative_to(base_dir)} with {len(acc_files)} acc files and {len(pred_files)} pred files")
 
         # Prepares the run-level accuracy totals used to infer syllable-structure errors.
         trial_acc = pd.concat((pd.read_csv(file_path) for file_path in acc_files), ignore_index=True)
@@ -207,9 +208,12 @@ def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
         ]
 
         for pred_file in pred_files:
+            print(f"reading {pred_file.relative_to(base_dir)}")
             for this_run in iter_run_chunks(pred_file, CV_PRED_COLUMNS, CV_PRED_COLUMNS):
                 # Labels each prediction row and derives consonant and vowel error indicators.
                 this_run = filter_failed_runs(this_run, failed_run_list)
+                if this_run.empty:
+                    continue
                 this_run = label_model(this_run)
                 this_run = label_directionality(this_run)
                 this_run["dataset"] = "full"
@@ -320,7 +324,11 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
     first_vowel_height_write = True
 
     for trial in V_TRIALS:
-        for pred_file in sorted((base_dir / trial).rglob("*pred.csv")):
+        trial_dir = base_dir / trial
+        pred_files = sorted(trial_dir.rglob("*pred.csv"))
+        print(f"processing {trial_dir.relative_to(base_dir)} with {len(pred_files)} pred files")
+        for pred_file in pred_files:
+            print(f"reading {pred_file.relative_to(base_dir)}")
             for this_run in iter_run_chunks(pred_file, lambda col: col in V_PRED_COLUMNS, V_PRED_COLUMNS):
                 # Restores any missing expanded-dataset columns before selecting the analysis columns.
                 missing_cols = [col for col in V_PRED_COLUMNS if col not in this_run.columns]
@@ -329,6 +337,8 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                 this_run = this_run[V_PRED_COLUMNS].copy()
                 this_run["v3_error"] = this_run["v3_error"].fillna(0).astype(int)
                 this_run = filter_failed_runs(this_run, failed_run_list)
+                if this_run.empty:
+                    continue
                 this_run = label_model(this_run)
                 this_run = label_directionality(this_run)
                 this_run = label_dataset(this_run)
