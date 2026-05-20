@@ -327,6 +327,7 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                 for col in missing_cols:
                     this_run[col] = pd.NA
                 this_run = this_run[V_PRED_COLUMNS].copy()
+                this_run["v3_error"] = this_run["v3_error"].fillna(0).astype(int)
                 this_run = filter_failed_runs(this_run, failed_run_list)
                 this_run = label_model(this_run)
                 this_run = label_directionality(this_run)
