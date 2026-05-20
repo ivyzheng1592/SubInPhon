@@ -392,7 +392,7 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                     this_run.groupby(
                         [
                             "model", "directionality", "dataset", "condition", "run_num", "epoch", "subset",
-                            "v1_error", "v2_error", "high_error", "tense_error", "back_error", "harmony_error",
+                            "v1_error", "v2_error", "v3_error", "high_error", "tense_error", "back_error", "harmony_error",
                         ],
                         as_index=False,
                     )
