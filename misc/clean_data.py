@@ -218,6 +218,13 @@ def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
                 this_run = label_directionality(this_run)
                 this_run["dataset"] = "full"
                 this_run = this_run.rename(columns={"record_type": "subset"})
+                run_acc = trial_acc[
+                    (trial_acc["model"] == this_run["model"].iat[0])
+                    & (trial_acc["directionality"] == this_run["directionality"].iat[0])
+                    & (trial_acc["dataset"] == this_run["dataset"].iat[0])
+                    & (trial_acc["condition"] == this_run["condition"].iat[0])
+                    & (trial_acc["run_num"] == this_run["run_num"].iat[0])
+                ]
                 this_run["v_error"] = (
                     (this_run["v1_error"] != 0) 
                     | (this_run["v2_error"] != 0)
@@ -239,7 +246,7 @@ def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
                 )
 
                 # Completes the four c_error x v_error combinations for each run, epoch, and subset.
-                run_keys = this_summary[
+                run_keys = run_acc[
                     ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"]
                 ].drop_duplicates()
                 combos = pd.MultiIndex.from_product([[0, 1], [0, 1]], names=["c_error", "v_error"]).to_frame(index=False)
@@ -306,7 +313,7 @@ def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
                     ]
                 ]
                 first_write = append_csv(this_summary, output_file, first_write, pred_file, base_dir)
-                del this_run, this_summary, run_keys, combos, mask
+                del this_run, run_acc, this_summary, run_keys, combos, mask
                 gc.collect()
         del trial_acc, failed_run_list, acc_files, pred_files
         gc.collect()
@@ -316,6 +323,11 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
     # Builds the v prediction summary and the vowel-height comparison summary.
     acc = read_acc_files(base_dir, V_TRIALS)
     failed_run_list = build_failed_run_list(acc)
+    acc = filter_failed_runs(acc, failed_run_list)
+    acc = label_model(acc)
+    acc = label_directionality(acc)
+    acc = label_dataset(acc)
+    acc = acc.rename(columns={"record_type": "subset"})
     pred_summary_file = output_dir / "cleaned_260518_EnglishBH_v_pred.csv"
     vowel_height_file = output_dir / "cleaned_260518_EnglishBH_v_height.csv"
     pred_summary_file.unlink(missing_ok=True)
@@ -343,6 +355,13 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                 this_run = label_directionality(this_run)
                 this_run = label_dataset(this_run)
                 this_run = this_run.rename(columns={"record_type": "subset"})
+                run_acc = acc[
+                    (acc["model"] == this_run["model"].iat[0])
+                    & (acc["directionality"] == this_run["directionality"].iat[0])
+                    & (acc["dataset"] == this_run["dataset"].iat[0])
+                    & (acc["condition"] == this_run["condition"].iat[0])
+                    & (acc["run_num"] == this_run["run_num"].iat[0])
+                ]
                 this_run = add_vowel_features(this_run)
 
                 # Derives feature-level vowel error indicators for each prediction row.
@@ -410,7 +429,7 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                     .size()
                     .rename(columns={"size": "error_num"})
                 )
-                run_keys = this_summary[
+                run_keys = run_acc[
                     ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"]
                 ].drop_duplicates()
                 error_keys = this_summary[
@@ -542,6 +561,7 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                 )
                 del (
                     this_run,
+                    run_acc,
                     missing_cols,
                     expanded_mask,
                     pred_triplets,
