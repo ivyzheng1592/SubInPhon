@@ -248,7 +248,7 @@ def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
                     on=["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset", "c_error", "v_error"],
                     how="left",
                 )
-                this_summary["error_num"] = this_summary["error_num"].fillna(0).astype(int)
+                this_summary["error_num"] = pd.to_numeric(this_summary["error_num"], errors="coerce").fillna(0).astype(int)
                 this_summary["segment_error"] = this_summary.groupby(
                     ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"]
                 )["error_num"].transform("sum")
@@ -335,7 +335,7 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                 for col in missing_cols:
                     this_run[col] = pd.NA
                 this_run = this_run[V_PRED_COLUMNS].copy()
-                this_run["v3_error"] = this_run["v3_error"].fillna(0).astype(int)
+                this_run["v3_error"] = pd.to_numeric(this_run["v3_error"], errors="coerce").fillna(0).astype(int)
                 this_run = filter_failed_runs(this_run, failed_run_list)
                 if this_run.empty:
                     continue
@@ -410,6 +410,33 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                     .size()
                     .rename(columns={"size": "error_num"})
                 )
+                run_keys = this_summary[
+                    ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"]
+                ].drop_duplicates()
+                error_keys = this_summary[
+                    ["v1_error", "v2_error", "v3_error", "high_error", "tense_error", "back_error", "harmony_error"]
+                ].drop_duplicates()
+                this_summary = run_keys.merge(error_keys, how="cross").merge(
+                    this_summary,
+                    on=[
+                        "model",
+                        "directionality",
+                        "dataset",
+                        "condition",
+                        "run_num",
+                        "epoch",
+                        "subset",
+                        "v1_error",
+                        "v2_error",
+                        "v3_error",
+                        "high_error",
+                        "tense_error",
+                        "back_error",
+                        "harmony_error",
+                    ],
+                    how="left",
+                )
+                this_summary["error_num"] = pd.to_numeric(this_summary["error_num"], errors="coerce").fillna(0).astype(int)
 
                 # Summarizes input height-pattern counts for full harmony data.
                 this_input_height_summary = this_run[
@@ -442,8 +469,12 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                     on=["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
                     how="left",
                 )
-                this_input_height_summary["error_num"] = this_input_height_summary["error_num"].fillna(0).astype(int)
-                this_input_height_summary["error_rate"] = this_input_height_summary["error_rate"].fillna(0.0)
+                this_input_height_summary["error_num"] = pd.to_numeric(
+                    this_input_height_summary["error_num"], errors="coerce"
+                ).fillna(0).astype(int)
+                this_input_height_summary["error_rate"] = pd.to_numeric(
+                    this_input_height_summary["error_rate"], errors="coerce"
+                ).fillna(0.0)
 
                 # Summarizes predicted height-pattern counts for full harmony data.
                 this_output_height_summary = this_run[
@@ -476,8 +507,12 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                     on=["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
                     how="left",
                 )
-                this_output_height_summary["error_num"] = this_output_height_summary["error_num"].fillna(0).astype(int)
-                this_output_height_summary["error_rate"] = this_output_height_summary["error_rate"].fillna(0.0)
+                this_output_height_summary["error_num"] = pd.to_numeric(
+                    this_output_height_summary["error_num"], errors="coerce"
+                ).fillna(0).astype(int)
+                this_output_height_summary["error_rate"] = pd.to_numeric(
+                    this_output_height_summary["error_rate"], errors="coerce"
+                ).fillna(0.0)
 
                 # Combines the input and predicted height-pattern summaries.
                 this_height_summary = this_input_height_summary.merge(
@@ -487,9 +522,9 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                     suffixes=("_input", "_output"),
                 )
                 for col in ["error_num_input", "error_num_output"]:
-                    this_height_summary[col] = this_height_summary[col].fillna(0).astype(int)
+                    this_height_summary[col] = pd.to_numeric(this_height_summary[col], errors="coerce").fillna(0).astype(int)
                 for col in ["error_rate_input", "error_rate_output"]:
-                    this_height_summary[col] = this_height_summary[col].fillna(0.0)
+                    this_height_summary[col] = pd.to_numeric(this_height_summary[col], errors="coerce").fillna(0.0)
                 this_height_summary["error_num_diff"] = (
                     this_height_summary["error_num_output"] - this_height_summary["error_num_input"]
                 )
@@ -511,6 +546,8 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                     expanded_mask,
                     pred_triplets,
                     this_summary,
+                    run_keys,
+                    error_keys,
                     this_input_height_summary,
                     input_run_keys,
                     input_combos,
