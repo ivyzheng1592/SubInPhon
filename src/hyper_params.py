@@ -6,11 +6,11 @@ When {property} is empty, that segment is omitted from file names.
         - {src} + ".mp3"
         - {src} + ".wav"
 - "data"
-    - {feature_file}.xlsx
+    - {base_lang_name} + "_features.xlsx"
     - {trial_num} + "_" + {lang_name} + "_{property}" + "_generated_data"
-        - {registry_name} + "_{property}_" + {directionality} + "_run" + {run_num} + "_harmony.csv"
-        - {registry_name} + "_{property}_" + {directionality} + "_run" + {run_num} + "_disharmony.csv"
-        - {registry_name} + "_{property}_" + {directionality} + "_run" + {run_num} + "_template_counts.xlsx"
+        - {lang_name} + "_{property}_" + {directionality} + "_run" + {run_num} + "_harmony.csv"
+        - {lang_name} + "_{property}_" + {directionality} + "_run" + {run_num} + "_disharmony.csv"
+        - {lang_name} + "_{property}_" + {directionality} + "_run" + {run_num} + "_template_counts.xlsx"
 - "results"
     - {trial_num} + "_" + {lang_name} + "_{property}_" + {modality}
         - {lang_name} + "_{property}_" + {modality} + "_acc.csv"

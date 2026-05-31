@@ -116,11 +116,7 @@ class AudioDataset(Dataset):
         return torch.from_numpy(signal), sr
 
     def _resampling(self, signal: torch.Tensor, sr: int) -> torch.Tensor:
-        # in this project, we expect all sr == self.sample_rate
-        assert (
-            sr == self.sample_rate
-        ), f"All audio data should have {self.sample_rate} sample rate!"
-
+        # Normalize any mismatched source sample rate to the project rate.
         if sr != self.sample_rate:
             resampler = T.Resample(orig_freq=sr, new_freq=self.sample_rate).to(self.device)
             signal = resampler(signal)
