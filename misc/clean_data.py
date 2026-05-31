@@ -1,4 +1,3 @@
-import argparse
 import gc
 from pathlib import Path
 from typing import Callable, List, Sequence
@@ -582,14 +581,8 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Clean SubInPhon result CSVs in Python.")
-    parser.add_argument("--base-dir", default=".", help="Directory containing the trial folders.")
-    parser.add_argument("--output-dir", default=".", help="Directory where the cleaned CSV files will be written.")
-    args = parser.parse_args()
-
-    base_dir = Path(args.base_dir).resolve()
-    output_dir = Path(args.output_dir).resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
+    base_dir = Path(".").resolve()
+    output_dir = base_dir
 
     clean_all_acc(base_dir, output_dir)
     clean_cv_pred(base_dir, output_dir)
