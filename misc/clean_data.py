@@ -36,10 +36,15 @@ VOWEL_TENSE = {"i": 1, "u": 1, "e": 1, "o": 1, "ɪ": 0, "ʊ": 0, "ɛ": 0, "ɔ": 
 
 def resolve_trial_dirs(base_dir: Path, trial: str) -> List[Path]:
     # Finds folders whose names match the canonical trial name or end with it.
-    return sorted(
+    trial_dirs = sorted(
         path for path in base_dir.iterdir()
         if path.is_dir() and (path.name == trial or path.name.endswith("_" + trial))
     )
+    print(
+        f"resolved {trial} to "
+        + (", ".join(str(path.relative_to(base_dir)) for path in trial_dirs) if trial_dirs else "no folders")
+    )
+    return trial_dirs
 
 
 def list_matching_files(base_dir: Path, trials: Sequence[str], pattern: str) -> List[Path]:
