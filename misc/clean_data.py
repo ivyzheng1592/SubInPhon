@@ -776,8 +776,8 @@ def main() -> None:
     print(f"Saving files to: {data_dir}")
 
     filtered_acc_df, included_run_df = clean_acc(results_dir, data_dir, min_acc, max_loss)
-    #clean_v_pred(results_dir, data_dir, included_run_df, filtered_acc_df)
-    #clean_cv_pred(results_dir, data_dir, included_run_df, filtered_acc_df)
+    clean_v_pred(results_dir, data_dir, included_run_df, filtered_acc_df)
+    clean_cv_pred(results_dir, data_dir, included_run_df, filtered_acc_df)
 
 
 if __name__ == "__main__":
