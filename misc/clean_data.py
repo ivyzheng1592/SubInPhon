@@ -1,614 +1,775 @@
 import gc
 from pathlib import Path
-from typing import Callable, List, Sequence
 
 import pandas as pd
 
-
-CV_TRIALS = ["EnglishBH_txt_cv", "EnglishBH_fea_cv"]
-V_TRIALS = [
-    "EnglishBH_txt_v",
-    "EnglishBH_fea_v",
-    "EnglishBH_nonidentical_txt_v",
-    "EnglishBH_nonidentical_fea_v",
-    "EnglishBH_expanded_txt_v",
-    "EnglishBH_expanded_fea_v",
+RUN_KEY_COLUMNS = [
+    "language",
+    "modality",
+    "directionality",
+    "property",
+    "condition",
+    "run_num",
 ]
-ALL_ACC_TRIALS = V_TRIALS + CV_TRIALS
-RUN_KEYS = ["language", "modality", "directionality", "property", "condition", "run_num"]
-CV_PRED_COLUMNS = [
-    "language", "modality", "directionality", "property",
-    "condition", "run_num", "epoch", "record_type",
-    "v1_error", "v2_error", "o1_error", "o2_error",
-    "c1_error", "c2_error", "pred_sr_v1", "pred_sr_v2",
+V_REQUIRED_COLUMNS = [
+    "v1_error",
+    "v2_error",
+    "v3_error",
+    "sr_v1",
+    "sr_v2",
+    "sr_v3",
+    "pred_sr_v1",
+    "pred_sr_v2",
+    "pred_sr_v3",
 ]
-V_PRED_COLUMNS = [
-    "language", "modality", "directionality", "property",
-    "condition", "run_num", "epoch", "record_type",
-    "v1_error", "v2_error", "v3_error",
-    "sr_v1", "sr_v2", "sr_v3",
-    "pred_sr_v1", "pred_sr_v2", "pred_sr_v3",
+CV_REQUIRED_COLUMNS = [
+    "v1_error",
+    "v2_error",
+    "o1_error",
+    "o2_error",
+    "c1_error",
+    "c2_error",
+    "pred_sr_v1",
+    "pred_sr_v2",
 ]
-VOWEL_BACK = {"i": 0, "ɪ": 0, "e": 0, "ɛ": 0, "u": 1, "ʊ": 1, "o": 1, "ɔ": 1}
-VOWEL_HIGH = {"i": 1, "ɪ": 1, "u": 1, "ʊ": 1, "e": 0, "ɛ": 0, "o": 0, "ɔ": 0}
-VOWEL_TENSE = {"i": 1, "u": 1, "e": 1, "o": 1, "ɪ": 0, "ʊ": 0, "ɛ": 0, "ɔ": 0}
+HIGH_VOWELS = {"i", "ɪ", "u", "ʊ"}
+MID_VOWELS = {"e", "ɛ", "o", "ɔ"}
+TENSE_VOWELS = {"i", "u", "e", "o"}
+LAX_VOWELS = {"ɪ", "ʊ", "ɛ", "ɔ"}
+FRONT_VOWELS = {"i", "ɪ", "e", "ɛ"}
+BACK_VOWELS = {"u", "ʊ", "o", "ɔ"}
 
 
-def resolve_trial_dirs(base_dir: Path, trial: str) -> List[Path]:
-    # Finds folders whose names match the canonical trial name or end with it.
-    trial_dirs = sorted(
-        path for path in base_dir.iterdir()
-        if path.is_dir() and (path.name == trial or path.name.endswith("_" + trial))
+def filter_included_runs(df: pd.DataFrame, included_run_df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty or included_run_df.empty:
+        return df.copy()
+
+    filtered_df = df.copy()
+    filtered_df["property"] = filtered_df["property"].fillna("")
+    filtered_df = filtered_df.merge(
+        included_run_df[RUN_KEY_COLUMNS].drop_duplicates(),
+        on=RUN_KEY_COLUMNS,
+        how="inner",
     )
-    print(
-        f"resolved {trial} to "
-        + (", ".join(str(path.relative_to(base_dir)) for path in trial_dirs) if trial_dirs else "no folders")
-    )
-    return trial_dirs
+    return filtered_df.reset_index(drop=True)
 
 
-def list_matching_files(base_dir: Path, trials: Sequence[str], pattern: str) -> List[Path]:
-    # Collects matching files from the requested trial folders.
-    files: List[Path] = []
-    for trial in trials:
-        for trial_dir in resolve_trial_dirs(base_dir, trial):
-            files.extend(sorted(trial_dir.rglob(pattern)))
-    return files
+def append_csv(df: pd.DataFrame, output_file: Path, first_write: bool) -> bool:
+    if df.empty:
+        return first_write
+
+    df.to_csv(output_file, mode="w" if first_write else "a", index=False, header=first_write)
+    del df
+    gc.collect()
+    return False
 
 
-def label_model(df: pd.DataFrame) -> pd.DataFrame:
-    # Labels the model type from the modality column.
-    df["model"] = df["modality"].str.contains("txt").map({True: "segment", False: "feature"})
-    return df
+def iter_runs_from_pred_file(file_path: Path, chunk_size: int = 200000):
+    carryover = pd.DataFrame()
 
+    for chunk in pd.read_csv(file_path, chunksize=chunk_size):
+        chunk["property"] = chunk["property"].fillna("")
 
-def label_directionality(df: pd.DataFrame) -> pd.DataFrame:
-    # Expands directionality abbreviations into analysis labels.
-    df["directionality"] = df["directionality"].map({"l2r": "left-to-right", "r2l": "right-to-left"})
-    return df
-
-
-def label_dataset(df: pd.DataFrame) -> pd.DataFrame:
-    # Labels each row as full, reduced, or expanded.
-    df["property"] = df["property"].fillna("")
-    df["dataset"] = "full"
-    df.loc[df["property"] == "nonidentical", "dataset"] = "reduced"
-    df.loc[df["language"].str.contains("expanded"), "dataset"] = "expanded"
-    return df
-
-
-def read_acc_files(base_dir: Path, trials: Sequence[str], with_trial: bool = False) -> pd.DataFrame:
-    # Reads and concatenates accuracy files from the requested trial folders.
-    frames: List[pd.DataFrame] = []
-    for trial in trials:
-        for trial_dir in resolve_trial_dirs(base_dir, trial):
-            for file_path in sorted(trial_dir.rglob("*acc.csv")):
-                this_run = pd.read_csv(file_path)
-                if with_trial:
-                    this_run["trial"] = trial
-                frames.append(this_run)
-    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-
-
-def build_failed_run_list(acc: pd.DataFrame) -> pd.DataFrame:
-    # Collects run keys for runs that fail the final test threshold.
-    acc = acc.copy()
-    acc["property"] = acc["property"].fillna("")
-    return (
-        acc[
-            (acc["epoch"] == 99)
-            & (acc["record_type"] == "test")
-            & ((acc["acc"] < 0.85) | (acc["loss"] > 0.05))
-        ][RUN_KEYS]
-        .drop_duplicates()
-    )
-
-
-def filter_failed_runs(df: pd.DataFrame, failed_run_list: pd.DataFrame) -> pd.DataFrame:
-    # Removes rows belonging to failed runs.
-    df = df.copy()
-    df["property"] = df["property"].fillna("")
-    return df.merge(
-        failed_run_list[RUN_KEYS].drop_duplicates(),
-        on=RUN_KEYS,
-        how="left",
-        indicator=True,
-    ).loc[lambda x: x["_merge"] == "left_only"].drop(columns="_merge")
-
-
-def add_vowel_features(df: pd.DataFrame) -> pd.DataFrame:
-    # Adds vowel height, tense, and backness features for source and predicted vowels.
-    for prefix in ["sr_v1", "sr_v2", "sr_v3", "pred_sr_v1", "pred_sr_v2", "pred_sr_v3"]:
-        df[f"{prefix}_high"] = df[prefix].map(VOWEL_HIGH)
-        df[f"{prefix}_tense"] = df[prefix].map(VOWEL_TENSE)
-        df[f"{prefix}_back"] = df[prefix].map(VOWEL_BACK)
-    return df
-
-
-def iter_run_chunks(
-    file_path: Path,
-    usecols: Sequence[str] | Callable[[str], bool],
-    output_columns: Sequence[str],
-    chunk_size: int = 200000,
-):
-    # Stores the last run from the previous read chunk.
-    carryover = pd.DataFrame(columns=output_columns)
-    for chunk in pd.read_csv(file_path, usecols=usecols, chunksize=chunk_size):
-        # Prepends the previous incomplete run to the current read chunk.
         if not carryover.empty:
             chunk = pd.concat([carryover, chunk], ignore_index=True)
-        chunk["property"] = chunk["property"].fillna("")
-        # Gets the run key of the last row in the current chunk.
-        last_run = tuple(chunk.iloc[-1][RUN_KEYS])
-        run_keys = chunk[RUN_KEYS].apply(tuple, axis=1)
-        # Splits the chunk into complete runs and the last run.
-        complete_mask = run_keys != last_run
+
+        run_keys = chunk[RUN_KEY_COLUMNS].apply(tuple, axis=1)
+        last_run_key = run_keys.iloc[-1]
+        complete_mask = run_keys != last_run_key
+
         complete_chunk = chunk.loc[complete_mask].copy()
         carryover = chunk.loc[~complete_mask].copy()
+
         if complete_chunk.empty:
-            del chunk, run_keys, complete_mask, complete_chunk
-            gc.collect()
             continue
-        # Yields one complete run at a time.
-        for _, run_df in complete_chunk.groupby(RUN_KEYS, sort=False):
+
+        for _, run_df in complete_chunk.groupby(RUN_KEY_COLUMNS, sort=False):
             yield run_df.reset_index(drop=True)
-        del chunk, run_keys, complete_mask, complete_chunk
-        gc.collect()
-    # Yields the final run after the file has been fully read.
+
     if not carryover.empty:
         yield carryover.reset_index(drop=True)
 
 
-def append_csv(df: pd.DataFrame, output_file: Path, first_write: bool, source_file: Path, base_dir: Path) -> bool:
-    # Writes a dataframe to a CSV, using append mode after the first write.
-    if df.empty:
-        return first_write
-    df.to_csv(output_file, mode="w" if first_write else "a", index=False, header=first_write)
-    run_key = ", ".join(f"{key}={df.iloc[0][key]}" for key in RUN_KEYS if key in df.columns)
-    print(
-        f"wrote {output_file.relative_to(base_dir)} from {source_file.relative_to(base_dir)}"
-        + (f" for {run_key}" if run_key else "")
+def is_included_run(run_df: pd.DataFrame, included_run_df: pd.DataFrame) -> bool:
+    if run_df.empty or included_run_df.empty:
+        return False
+
+    run_key_df = run_df[RUN_KEY_COLUMNS].drop_duplicates()
+    return not run_key_df.merge(
+        included_run_df[RUN_KEY_COLUMNS].drop_duplicates(),
+        on=RUN_KEY_COLUMNS,
+        how="inner",
+    ).empty
+
+
+def relabel_columns(df: pd.DataFrame) -> pd.DataFrame:
+    labeled_df = df.copy()
+    labeled_df["model"] = labeled_df["modality"].map({"txt": "segment"}).fillna("feature")
+    labeled_df["directionality"] = labeled_df["directionality"].map(
+        {"l2r": "left-to-right"}
+    ).fillna("right-to-left")
+    labeled_df["dataset"] = "full"
+    labeled_df.loc[labeled_df["language"].str.contains("expanded", na=False), "dataset"] = "expanded"
+    labeled_df.loc[labeled_df["property"] == "nonidentical", "dataset"] = "reduced"
+    return labeled_df
+
+
+def ensure_columns(df: pd.DataFrame, required_columns: list[str]) -> pd.DataFrame:
+    normalized_df = df.copy()
+    for column in required_columns:
+        if column not in normalized_df.columns:
+            normalized_df[column] = pd.NA
+    return normalized_df
+
+
+def _map_high(series: pd.Series) -> pd.Series:
+    return series.map(lambda value: 1 if value in HIGH_VOWELS else 0 if value in MID_VOWELS else pd.NA)
+
+
+def _map_tense(series: pd.Series) -> pd.Series:
+    return series.map(lambda value: 1 if value in TENSE_VOWELS else 0 if value in LAX_VOWELS else pd.NA)
+
+
+def _map_back(series: pd.Series) -> pd.Series:
+    return series.map(lambda value: 0 if value in FRONT_VOWELS else 1 if value in BACK_VOWELS else pd.NA)
+
+
+def clean_v_run_df(run_df: pd.DataFrame) -> pd.DataFrame:
+    cleaned_df = run_df.copy()
+
+    for prefix in ["sr_v1", "sr_v2", "sr_v3", "pred_sr_v1", "pred_sr_v2", "pred_sr_v3"]:
+        cleaned_df[f"{prefix}_high"] = _map_high(cleaned_df[prefix])
+        cleaned_df[f"{prefix}_tense"] = _map_tense(cleaned_df[prefix])
+        cleaned_df[f"{prefix}_back"] = _map_back(cleaned_df[prefix])
+
+    cleaned_df["high_error"] = 0
+    cleaned_df.loc[
+        (cleaned_df["dataset"] == "expanded")
+        & (
+            (cleaned_df["sr_v1_high"] != cleaned_df["pred_sr_v1_high"])
+            | (cleaned_df["sr_v2_high"] != cleaned_df["pred_sr_v2_high"])
+            | (cleaned_df["sr_v3_high"] != cleaned_df["pred_sr_v3_high"])
+        ),
+        "high_error",
+    ] = 1
+    cleaned_df.loc[
+        (cleaned_df["dataset"] != "expanded")
+        & (
+            (cleaned_df["sr_v1_high"] != cleaned_df["pred_sr_v1_high"])
+            | (cleaned_df["sr_v2_high"] != cleaned_df["pred_sr_v2_high"])
+        ),
+        "high_error",
+    ] = 1
+
+    cleaned_df["tense_error"] = 0
+    cleaned_df.loc[
+        (cleaned_df["dataset"] == "expanded")
+        & (
+            (cleaned_df["sr_v1_tense"] != cleaned_df["pred_sr_v1_tense"])
+            | (cleaned_df["sr_v2_tense"] != cleaned_df["pred_sr_v2_tense"])
+            | (cleaned_df["sr_v3_tense"] != cleaned_df["pred_sr_v3_tense"])
+        ),
+        "tense_error",
+    ] = 1
+    cleaned_df.loc[
+        (cleaned_df["dataset"] != "expanded")
+        & (
+            (cleaned_df["sr_v1_tense"] != cleaned_df["pred_sr_v1_tense"])
+            | (cleaned_df["sr_v2_tense"] != cleaned_df["pred_sr_v2_tense"])
+        ),
+        "tense_error",
+    ] = 1
+
+    cleaned_df["back_error"] = 0
+    cleaned_df.loc[
+        (cleaned_df["dataset"] == "expanded")
+        & (
+            (cleaned_df["sr_v1_back"] != cleaned_df["pred_sr_v1_back"])
+            | (cleaned_df["sr_v2_back"] != cleaned_df["pred_sr_v2_back"])
+            | (cleaned_df["sr_v3_back"] != cleaned_df["pred_sr_v3_back"])
+        ),
+        "back_error",
+    ] = 1
+    cleaned_df.loc[
+        (cleaned_df["dataset"] != "expanded")
+        & (
+            (cleaned_df["sr_v1_back"] != cleaned_df["pred_sr_v1_back"])
+            | (cleaned_df["sr_v2_back"] != cleaned_df["pred_sr_v2_back"])
+        ),
+        "back_error",
+    ] = 1
+
+    pred_back_triplet = (
+        cleaned_df["pred_sr_v1_back"].astype("Int64").astype(str)
+        + cleaned_df["pred_sr_v2_back"].astype("Int64").astype(str)
+        + cleaned_df["pred_sr_v3_back"].astype("Int64").astype(str)
     )
-    return False
+    cleaned_df["harmony_error"] = 0
+    cleaned_df.loc[
+        (cleaned_df["dataset"] == "expanded")
+        & (cleaned_df["condition"] == "harmony")
+        & ~pred_back_triplet.isin(["000", "111"]),
+        "harmony_error",
+    ] = 1
+    cleaned_df.loc[
+        (cleaned_df["dataset"] == "expanded")
+        & (cleaned_df["condition"] == "disharmony")
+        & (cleaned_df["directionality"] == "left-to-right")
+        & ~pred_back_triplet.isin(["100", "011"]),
+        "harmony_error",
+    ] = 1
+    cleaned_df.loc[
+        (cleaned_df["dataset"] == "expanded")
+        & (cleaned_df["condition"] == "disharmony")
+        & (cleaned_df["directionality"] == "right-to-left")
+        & ~pred_back_triplet.isin(["110", "001"]),
+        "harmony_error",
+    ] = 1
+    cleaned_df.loc[
+        (cleaned_df["dataset"] != "expanded")
+        & (cleaned_df["condition"] == "harmony")
+        & (cleaned_df["pred_sr_v1_back"] != cleaned_df["pred_sr_v2_back"]),
+        "harmony_error",
+    ] = 1
+    cleaned_df.loc[
+        (cleaned_df["dataset"] != "expanded")
+        & (cleaned_df["condition"] == "disharmony")
+        & (cleaned_df["pred_sr_v1_back"] == cleaned_df["pred_sr_v2_back"]),
+        "harmony_error",
+    ] = 1
+
+    return cleaned_df
 
 
-def clean_all_acc(base_dir: Path, output_dir: Path) -> None:
-    # Builds the cleaned all-accuracy summary across cv and v trials.
-    acc = read_acc_files(base_dir, ALL_ACC_TRIALS, with_trial=True)
-    failed_run_list = build_failed_run_list(acc)
-    acc = filter_failed_runs(acc, failed_run_list)
-    acc = label_model(acc)
-    acc = label_directionality(acc)
-    acc = label_dataset(acc)
-    acc["error_record"] = acc["trial"].str.contains("cv").map({True: "cv", False: "v"})
-    acc = acc.rename(columns={"record_type": "subset"})
-    acc = acc[
-        ["language", "model", "directionality", "dataset", "error_record", "condition", "run_num", "subset", "epoch", "loss", "acc"]
+def clean_cv_run_df(run_df: pd.DataFrame) -> pd.DataFrame:
+    cleaned_df = run_df.copy()
+
+    cleaned_df["v_error"] = (
+        ~((cleaned_df["v1_error"] == 0) & (cleaned_df["v2_error"] == 0))
+    ).astype(int)
+    cleaned_df["c_error"] = (
+        ~(
+            (cleaned_df["o1_error"] == 0)
+            & (cleaned_df["o2_error"] == 0)
+            & (cleaned_df["c1_error"] == 0)
+            & (cleaned_df["c2_error"] == 0)
+        )
+    ).astype(int)
+    cleaned_df["pred_sr_v1_back"] = _map_back(cleaned_df["pred_sr_v1"])
+    cleaned_df["pred_sr_v2_back"] = _map_back(cleaned_df["pred_sr_v2"])
+    cleaned_df["harmony_error"] = 0
+    cleaned_df.loc[
+        (cleaned_df["condition"] == "harmony")
+        & (cleaned_df["pred_sr_v1_back"] != cleaned_df["pred_sr_v2_back"]),
+        "harmony_error",
+    ] = 1
+    cleaned_df.loc[
+        (cleaned_df["condition"] == "disharmony")
+        & (cleaned_df["pred_sr_v1_back"] == cleaned_df["pred_sr_v2_back"]),
+        "harmony_error",
+    ] = 1
+
+    return cleaned_df
+
+
+def build_cv_acc_df(filtered_acc_df: pd.DataFrame) -> pd.DataFrame:
+    cv_acc_df = filtered_acc_df[filtered_acc_df["error_record"] == "cv"].copy()
+    if cv_acc_df.empty:
+        return cv_acc_df
+
+    cv_acc_df["total_data"] = 167968
+    cv_acc_df["data_split"] = cv_acc_df["subset"].map({"train": 0.8, "test": 0.1})
+    cv_acc_df["subset_data"] = cv_acc_df["total_data"] * cv_acc_df["data_split"]
+    cv_acc_df["total_error"] = (cv_acc_df["subset_data"] * (1 - cv_acc_df["acc"])).astype(int)
+    return cv_acc_df
+
+
+def build_v_acc_df(filtered_acc_df: pd.DataFrame) -> pd.DataFrame:
+    return filtered_acc_df[filtered_acc_df["error_record"] == "v"].copy()
+
+
+def summarize_v_run(run_df: pd.DataFrame, v_acc_df: pd.DataFrame) -> pd.DataFrame:
+    run_acc_df = v_acc_df[
+        (v_acc_df["model"] == run_df["model"].iat[0])
+        & (v_acc_df["directionality"] == run_df["directionality"].iat[0])
+        & (v_acc_df["dataset"] == run_df["dataset"].iat[0])
+        & (v_acc_df["condition"] == run_df["condition"].iat[0])
+        & (v_acc_df["run_num"] == run_df["run_num"].iat[0])
+    ].copy()
+
+    if run_acc_df.empty:
+        return pd.DataFrame()
+
+    summary_df = (
+        run_df.groupby(
+            [
+                "model",
+                "directionality",
+                "dataset",
+                "condition",
+                "run_num",
+                "epoch",
+                "subset",
+                "v1_error",
+                "v2_error",
+                "high_error",
+                "tense_error",
+                "back_error",
+                "harmony_error",
+            ],
+            as_index=False,
+        )
+        .size()
+        .rename(columns={"size": "error_num"})
+    )
+
+    run_keys = run_acc_df[
+        ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"]
+    ].drop_duplicates()
+    error_keys = summary_df[
+        ["v1_error", "v2_error", "high_error", "tense_error", "back_error", "harmony_error"]
+    ].drop_duplicates()
+    summary_df = run_keys.merge(error_keys, how="cross").merge(
+        summary_df,
+        on=[
+            "model",
+            "directionality",
+            "dataset",
+            "condition",
+            "run_num",
+            "epoch",
+            "subset",
+            "v1_error",
+            "v2_error",
+            "high_error",
+            "tense_error",
+            "back_error",
+            "harmony_error",
+        ],
+        how="left",
+    )
+    summary_df["error_num"] = pd.to_numeric(summary_df["error_num"], errors="coerce").fillna(0).astype(int)
+    return summary_df.reset_index(drop=True)
+
+
+def summarize_v_height_run(run_df: pd.DataFrame) -> pd.DataFrame:
+    harmony_df = run_df[
+        (run_df["dataset"] == "full") & (run_df["condition"] == "harmony")
+    ].copy()
+
+    if harmony_df.empty:
+        return pd.DataFrame()
+
+    input_height_df = harmony_df.copy()
+    input_height_df["v_high"] = (
+        input_height_df["sr_v1_high"].astype("Int64").astype(str)
+        + input_height_df["sr_v2_high"].astype("Int64").astype(str)
+    )
+    input_height_df["v_agree"] = pd.NA
+    input_height_df.loc[input_height_df["sr_v1_high"] == input_height_df["sr_v2_high"], "v_agree"] = 1
+    input_height_df.loc[input_height_df["sr_v1_high"] != input_height_df["sr_v2_high"], "v_agree"] = 0
+    input_height_df = (
+        input_height_df.groupby(
+            ["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
+            as_index=False,
+        )
+        .size()
+        .rename(columns={"size": "error_num"})
+    )
+    input_height_df["error_rate"] = input_height_df.groupby(
+        ["model", "directionality", "dataset", "condition", "run_num"]
+    )["error_num"].transform(lambda s: s / s.sum() if s.sum() else 0)
+    input_run_keys = input_height_df[
+        ["model", "directionality", "dataset", "condition", "run_num"]
+    ].drop_duplicates()
+    input_combos = input_height_df[["v_high", "v_agree"]].drop_duplicates()
+    input_height_df = input_run_keys.merge(input_combos, how="cross").merge(
+        input_height_df,
+        on=["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
+        how="left",
+    )
+    input_height_df["error_num"] = pd.to_numeric(input_height_df["error_num"], errors="coerce").fillna(0).astype(int)
+    input_height_df["error_rate"] = pd.to_numeric(input_height_df["error_rate"], errors="coerce").fillna(0.0)
+
+    output_height_df = harmony_df.copy()
+    output_height_df["v_high"] = (
+        output_height_df["pred_sr_v1_high"].astype("Int64").astype(str)
+        + output_height_df["pred_sr_v2_high"].astype("Int64").astype(str)
+    )
+    output_height_df["v_agree"] = pd.NA
+    output_height_df.loc[
+        output_height_df["pred_sr_v1_high"] == output_height_df["pred_sr_v2_high"], "v_agree"
+    ] = 1
+    output_height_df.loc[
+        output_height_df["pred_sr_v1_high"] != output_height_df["pred_sr_v2_high"], "v_agree"
+    ] = 0
+    output_height_df = (
+        output_height_df.groupby(
+            ["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
+            as_index=False,
+        )
+        .size()
+        .rename(columns={"size": "error_num"})
+    )
+    output_height_df["error_rate"] = output_height_df.groupby(
+        ["model", "directionality", "dataset", "condition", "run_num"]
+    )["error_num"].transform(lambda s: s / s.sum() if s.sum() else 0)
+    output_run_keys = output_height_df[
+        ["model", "directionality", "dataset", "condition", "run_num"]
+    ].drop_duplicates()
+    output_combos = output_height_df[["v_high", "v_agree"]].drop_duplicates()
+    output_height_df = output_run_keys.merge(output_combos, how="cross").merge(
+        output_height_df,
+        on=["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
+        how="left",
+    )
+    output_height_df["error_num"] = pd.to_numeric(output_height_df["error_num"], errors="coerce").fillna(0).astype(int)
+    output_height_df["error_rate"] = pd.to_numeric(output_height_df["error_rate"], errors="coerce").fillna(0.0)
+
+    v_height_df = input_height_df.merge(
+        output_height_df,
+        on=["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
+        how="outer",
+        suffixes=("_input", "_output"),
+    )
+    for column in ["error_num_input", "error_num_output"]:
+        v_height_df[column] = pd.to_numeric(v_height_df[column], errors="coerce").fillna(0).astype(int)
+    for column in ["error_rate_input", "error_rate_output"]:
+        v_height_df[column] = pd.to_numeric(v_height_df[column], errors="coerce").fillna(0.0)
+    v_height_df["error_num_diff"] = v_height_df["error_num_output"] - v_height_df["error_num_input"]
+    v_height_df["error_rate_diff"] = v_height_df["error_rate_output"] - v_height_df["error_rate_input"]
+    return v_height_df.reset_index(drop=True)
+
+
+def summarize_cv_run(run_df: pd.DataFrame, cv_acc_df: pd.DataFrame) -> pd.DataFrame:
+    run_acc_df = cv_acc_df[
+        (cv_acc_df["model"] == run_df["model"].iat[0])
+        & (cv_acc_df["directionality"] == run_df["directionality"].iat[0])
+        & (cv_acc_df["dataset"] == run_df["dataset"].iat[0])
+        & (cv_acc_df["condition"] == run_df["condition"].iat[0])
+        & (cv_acc_df["run_num"] == run_df["run_num"].iat[0])
+    ].copy()
+
+    if run_acc_df.empty:
+        return pd.DataFrame()
+
+    summary_df = (
+        run_df.groupby(
+            ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset", "c_error", "v_error"],
+            as_index=False,
+        )
+        .size()
+        .rename(columns={"size": "error_num"})
+    )
+
+    run_keys = run_acc_df[
+        ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"]
+    ].drop_duplicates()
+    error_combos = pd.MultiIndex.from_product([[0, 1], [0, 1]], names=["c_error", "v_error"]).to_frame(index=False)
+    summary_df = run_keys.merge(error_combos, how="cross").merge(
+        summary_df,
+        on=["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset", "c_error", "v_error"],
+        how="left",
+    )
+    summary_df["error_num"] = pd.to_numeric(summary_df["error_num"], errors="coerce").fillna(0).astype(int)
+
+    summary_df["segment_error"] = summary_df.groupby(
+        ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"]
+    )["error_num"].transform("sum")
+    summary_df = summary_df.merge(
+        run_acc_df,
+        on=["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"],
+        how="left",
+    )
+    summary_df = summary_df.drop(columns=["language", "error_record", "loss", "acc"])
+    summary_df.loc[
+        (summary_df["c_error"] == 0) & (summary_df["v_error"] == 0),
+        "error_num",
+    ] = (
+        summary_df.loc[(summary_df["c_error"] == 0) & (summary_df["v_error"] == 0), "total_error"]
+        - summary_df.loc[(summary_df["c_error"] == 0) & (summary_df["v_error"] == 0), "segment_error"]
+    )
+    summary_df["error_type"] = pd.Categorical(
+        summary_df.apply(
+            lambda row: "consonant only"
+            if row["c_error"] == 1 and row["v_error"] == 0
+            else "vowel only"
+            if row["c_error"] == 0 and row["v_error"] == 1
+            else "consonant and vowel"
+            if row["c_error"] == 1 and row["v_error"] == 1
+            else "syllable structure",
+            axis=1,
+        ),
+        categories=[
+            "syllable structure",
+            "consonant and vowel",
+            "consonant only",
+            "vowel only",
+        ],
+        ordered=True,
+    )
+    summary_df = summary_df.drop(columns=["c_error", "v_error", "segment_error"])
+    summary_df["error_rate"] = summary_df.apply(
+        lambda row: 0 if row["total_error"] == 0 else row["error_num"] / row["total_error"],
+        axis=1,
+    )
+
+    return summary_df[
+        [
+            "model",
+            "directionality",
+            "dataset",
+            "condition",
+            "run_num",
+            "epoch",
+            "subset",
+            "error_type",
+            "error_num",
+            "error_rate",
+            "total_data",
+            "data_split",
+            "subset_data",
+            "total_error",
+        ]
+    ].reset_index(drop=True)
+
+
+def filter_failed_runs(df: pd.DataFrame, failed_run_df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty or failed_run_df.empty:
+        return df.copy()
+
+    filtered_df = df.copy()
+    filtered_df["property"] = filtered_df["property"].fillna("")
+    filtered_df = filtered_df.merge(
+        failed_run_df[RUN_KEY_COLUMNS].drop_duplicates(),
+        on=RUN_KEY_COLUMNS,
+        how="left",
+        indicator=True,
+    )
+    filtered_df = (
+        filtered_df[filtered_df["_merge"] == "left_only"]
+        .drop(columns="_merge")
+        .reset_index(drop=True)
+    )
+    return filtered_df
+
+
+def clean_acc(
+    results_dir: Path,
+    data_dir: Path,
+    min_acc: float,
+    max_loss: float,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    acc_files = sorted(results_dir.rglob("*acc.csv"))
+
+    if not acc_files:
+        print(f"No acc.csv files found under: {results_dir}")
+        empty_df = pd.DataFrame()
+        return empty_df, empty_df
+
+    frames = []
+    for file_path in acc_files:
+        print(f"Reading acc file: {file_path}")
+        this_df = pd.read_csv(file_path)
+        top_level_folder = file_path.relative_to(results_dir).parts[0]
+        this_df["error_record"] = "cv" if "_cv" in top_level_folder else "v"
+        frames.append(this_df)
+
+    all_acc_df = pd.concat(frames, ignore_index=True)
+    all_acc_df["property"] = all_acc_df["property"].fillna("")
+
+    failed_run_df = (
+        all_acc_df[
+            (all_acc_df["epoch"] == 99)
+            & (all_acc_df["acc"] < min_acc)
+            & (all_acc_df["loss"] > max_loss)
+        ][RUN_KEY_COLUMNS]
+        .drop_duplicates()
+        .reset_index(drop=True)
+    )
+    failed_run_file = data_dir / "cleaned_260531_EnglishBH_failed_run.csv"
+    failed_run_df.to_csv(failed_run_file, index=False)
+    print(f"Saved {len(failed_run_df)} failed runs to: {failed_run_file}")
+
+    filtered_acc_df = all_acc_df.merge(
+        failed_run_df,
+        on=RUN_KEY_COLUMNS,
+        how="left",
+        indicator=True,
+    )
+    filtered_acc_df = (
+        filtered_acc_df[filtered_acc_df["_merge"] == "left_only"]
+        .drop(columns="_merge")
+        .reset_index(drop=True)
+    )
+    included_run_df = filtered_acc_df[RUN_KEY_COLUMNS].drop_duplicates().reset_index(drop=True)
+    filtered_acc_df = relabel_columns(filtered_acc_df)
+    filtered_acc_df = filtered_acc_df.rename(columns={"record_type": "subset"})
+    filtered_acc_df = filtered_acc_df[
+        [
+            "language",
+            "model",
+            "directionality",
+            "dataset",
+            "error_record",
+            "condition",
+            "run_num",
+            "epoch",
+            "subset",
+            "loss",
+            "acc",
+        ]
     ]
-    output_file = output_dir / "cleaned_260518_EnglishBH_all_acc.csv"
-    acc.to_csv(output_file, index=False)
-    input_files = [path.relative_to(base_dir) for path in list_matching_files(base_dir, ALL_ACC_TRIALS, "*acc.csv")]
-    print(f"wrote {output_file.relative_to(base_dir)} from {', '.join(str(path) for path in input_files)}")
-    del acc, failed_run_list, input_files
-    gc.collect()
+    filtered_acc_file = data_dir / "cleaned_260531_EnglishBH_all_acc.csv"
+    filtered_acc_df.to_csv(filtered_acc_file, index=False)
+
+    filtered_run_df = (
+        filtered_acc_df[
+            [
+                "language",
+                "model",
+                "directionality",
+                "dataset",
+                "error_record",
+                "condition",
+                "run_num",
+            ]
+        ]
+        .drop_duplicates()
+        .groupby(
+            [
+                "language",
+                "model",
+                "directionality",
+                "dataset",
+                "error_record",
+                "condition",
+            ],
+            as_index=False,
+        )
+        .size()
+        .rename(columns={"size": "n"})
+    )
+    filtered_run_file = data_dir / "cleaned_260531_EnglishBH_run_list.csv"
+    filtered_run_df.to_csv(filtered_run_file, index=False)
+
+    print(
+        f"Combined {len(acc_files)} acc files into {len(all_acc_df)} rows, "
+        f"then kept {len(filtered_acc_df)} rows after removing failed runs"
+    )
+    print(f"Saved filtered acc data to: {filtered_acc_file}")
+    print(f"Saved filtered run summary to: {filtered_run_file}")
+    return filtered_acc_df, included_run_df
 
 
-def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
-    # Builds the cv prediction summary from per-run prediction data.
-    output_file = output_dir / "cleaned_260518_EnglishBH_cv_pred.csv"
+def clean_v_pred(results_dir: Path, data_dir: Path, included_run_df: pd.DataFrame, filtered_acc_df: pd.DataFrame) -> None:
+    v_dirs = sorted(path for path in results_dir.iterdir() if path.is_dir() and path.name.endswith("_v"))
+    pred_files = sorted(file_path for folder in v_dirs for file_path in folder.rglob("*pred.csv"))
+    v_acc_df = build_v_acc_df(filtered_acc_df)
+    output_file = data_dir / "cleaned_260531_EnglishBH_v_pred.csv"
+    v_height_file = data_dir / "cleaned_260531_EnglishBH_v_height.csv"
+    output_file.unlink(missing_ok=True)
+    v_height_file.unlink(missing_ok=True)
+    first_write = True
+    first_v_height_write = True
+
+    if not pred_files:
+        print(f"No pred.csv files found under v folders in: {results_dir}")
+        return
+
+    for file_path in pred_files:
+        print(f"Reading v pred file: {file_path}")
+        for run_df in iter_runs_from_pred_file(file_path):
+            if not is_included_run(run_df, included_run_df):
+                continue
+            run_df = ensure_columns(run_df, V_REQUIRED_COLUMNS)
+            run_df = relabel_columns(run_df)
+            run_df = run_df.rename(columns={"record_type": "subset"})
+            run_df = clean_v_run_df(run_df)
+            summary_df = summarize_v_run(run_df, v_acc_df)
+            v_height_df = summarize_v_height_run(run_df)
+            first_write = append_csv(summary_df, output_file, first_write)
+            first_v_height_write = append_csv(v_height_df, v_height_file, first_v_height_write)
+            if not summary_df.empty:
+                print(
+                    "Appended v summary for "
+                    f"language={run_df['language'].iat[0]}, "
+                    f"model={run_df['model'].iat[0]}, "
+                    f"directionality={run_df['directionality'].iat[0]}, "
+                    f"dataset={run_df['dataset'].iat[0]}, "
+                    f"condition={run_df['condition'].iat[0]}, "
+                    f"run_num={run_df['run_num'].iat[0]}"
+                )
+            if not v_height_df.empty:
+                print(
+                    "Appended v height summary for "
+                    f"language={run_df['language'].iat[0]}, "
+                    f"model={run_df['model'].iat[0]}, "
+                    f"directionality={run_df['directionality'].iat[0]}, "
+                    f"dataset={run_df['dataset'].iat[0]}, "
+                    f"condition={run_df['condition'].iat[0]}, "
+                    f"run_num={run_df['run_num'].iat[0]}"
+                )
+
+    print(f"Saved v summary data to: {output_file}")
+    print(f"Saved v height data to: {v_height_file}")
+
+
+def clean_cv_pred(results_dir: Path, data_dir: Path, included_run_df: pd.DataFrame, filtered_acc_df: pd.DataFrame) -> None:
+    cv_dirs = sorted(path for path in results_dir.iterdir() if path.is_dir() and path.name.endswith("_cv"))
+    pred_files = sorted(file_path for folder in cv_dirs for file_path in folder.rglob("*pred.csv"))
+    cv_acc_df = build_cv_acc_df(filtered_acc_df)
+    output_file = data_dir / "cleaned_260531_EnglishBH_cv_pred.csv"
     output_file.unlink(missing_ok=True)
     first_write = True
 
-    for trial in CV_TRIALS:
-        trial_dirs = resolve_trial_dirs(base_dir, trial)
-        acc_files: List[Path] = []
-        pred_files: List[Path] = []
-        for trial_dir in trial_dirs:
-            acc_files.extend(sorted(trial_dir.rglob("*acc.csv")))
-            pred_files.extend(sorted(trial_dir.rglob("*pred.csv")))
-        print(f"processing {trial} across {len(trial_dirs)} folders with {len(acc_files)} acc files and {len(pred_files)} pred files")
+    if not pred_files:
+        print(f"No pred.csv files found under cv folders in: {results_dir}")
+        return
 
-        # Prepares the run-level accuracy totals used to infer syllable-structure errors.
-        trial_acc = pd.concat((pd.read_csv(file_path) for file_path in acc_files), ignore_index=True)
-        failed_run_list = build_failed_run_list(trial_acc)
-        trial_acc = filter_failed_runs(trial_acc, failed_run_list)
-        trial_acc = label_model(trial_acc)
-        trial_acc = label_directionality(trial_acc)
-        trial_acc["dataset"] = "full"
-        trial_acc = trial_acc.rename(columns={"record_type": "subset"})
-        trial_acc["total_data"] = 167968
-        trial_acc["data_split"] = trial_acc["subset"].map({"train": 0.8, "test": 0.1})
-        trial_acc["subset_data"] = trial_acc["total_data"] * trial_acc["data_split"]
-        trial_acc["total_error"] = (trial_acc["subset_data"] * (1 - trial_acc["acc"])).astype(int)
-        trial_acc = trial_acc[
-            ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset", "total_data", "data_split", "subset_data", "total_error"]
-        ]
-
-        for pred_file in pred_files:
-            print(f"reading {pred_file.relative_to(base_dir)}")
-            for this_run in iter_run_chunks(pred_file, CV_PRED_COLUMNS, CV_PRED_COLUMNS):
-                # Labels each prediction row and derives consonant and vowel error indicators.
-                this_run = filter_failed_runs(this_run, failed_run_list)
-                if this_run.empty:
-                    continue
-                this_run = label_model(this_run)
-                this_run = label_directionality(this_run)
-                this_run["dataset"] = "full"
-                this_run = this_run.rename(columns={"record_type": "subset"})
-                run_acc = trial_acc[
-                    (trial_acc["model"] == this_run["model"].iat[0])
-                    & (trial_acc["directionality"] == this_run["directionality"].iat[0])
-                    & (trial_acc["dataset"] == this_run["dataset"].iat[0])
-                    & (trial_acc["condition"] == this_run["condition"].iat[0])
-                    & (trial_acc["run_num"] == this_run["run_num"].iat[0])
-                ]
-                this_run["v_error"] = (
-                    (this_run["v1_error"] != 0) 
-                    | (this_run["v2_error"] != 0)
-                ).astype(int)
-                this_run["c_error"] = (
-                    (this_run["o1_error"] != 0)
-                    | (this_run["o2_error"] != 0)
-                    | (this_run["c1_error"] != 0)
-                    | (this_run["c2_error"] != 0)
-                ).astype(int)
-
-                this_summary = (
-                    this_run.groupby(
-                        ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset", "c_error", "v_error"],
-                        as_index=False,
-                    )
-                    .size()
-                    .rename(columns={"size": "error_num"})
+    for file_path in pred_files:
+        print(f"Reading cv pred file: {file_path}")
+        for run_df in iter_runs_from_pred_file(file_path):
+            if not is_included_run(run_df, included_run_df):
+                continue
+            run_df = ensure_columns(run_df, CV_REQUIRED_COLUMNS)
+            run_df = relabel_columns(run_df)
+            run_df = run_df.rename(columns={"record_type": "subset"})
+            run_df = clean_cv_run_df(run_df)
+            summary_df = summarize_cv_run(run_df, cv_acc_df)
+            first_write = append_csv(summary_df, output_file, first_write)
+            if not summary_df.empty:
+                print(
+                    "Appended cv summary for "
+                    f"language={run_df['language'].iat[0]}, "
+                    f"model={run_df['model'].iat[0]}, "
+                    f"directionality={run_df['directionality'].iat[0]}, "
+                    f"dataset={run_df['dataset'].iat[0]}, "
+                    f"condition={run_df['condition'].iat[0]}, "
+                    f"run_num={run_df['run_num'].iat[0]}"
                 )
 
-                # Completes the four c_error x v_error combinations for each run, epoch, and subset.
-                run_keys = run_acc[
-                    ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"]
-                ].drop_duplicates()
-                combos = pd.MultiIndex.from_product([[0, 1], [0, 1]], names=["c_error", "v_error"]).to_frame(index=False)
-                this_summary = run_keys.merge(combos, how="cross").merge(
-                    this_summary,
-                    on=["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset", "c_error", "v_error"],
-                    how="left",
-                )
-                this_summary["error_num"] = pd.to_numeric(this_summary["error_num"], errors="coerce").fillna(0).astype(int)
-                this_summary["segment_error"] = this_summary.groupby(
-                    ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"]
-                )["error_num"].transform("sum")
-                this_summary = this_summary.merge(
-                    trial_acc,
-                    on=["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"],
-                    how="left",
-                )
-                # Replaces the 00 combination with the inferred syllable-structure error count.
-                mask = (this_summary["c_error"] == 0) & (this_summary["v_error"] == 0)
-                this_summary.loc[mask, "error_num"] = (
-                    this_summary.loc[mask, "total_error"] - this_summary.loc[mask, "segment_error"]
-                )
-                this_summary["error_type"] = this_summary.apply(
-                    lambda row: "consonant only"
-                    if row["c_error"] == 1 and row["v_error"] == 0
-                    else "vowel only"
-                    if row["c_error"] == 0 and row["v_error"] == 1
-                    else "consonant and vowel"
-                    if row["c_error"] == 1 and row["v_error"] == 1
-                    else "syllable structure",
-                    axis=1,
-                )
-                this_summary["error_type"] = pd.Categorical(
-                    this_summary["error_type"],
-                    categories=[
-                        "syllable structure",
-                        "consonant and vowel",
-                        "consonant only",
-                        "vowel only",
-                    ],
-                    ordered=True,
-                )
-                this_summary = this_summary.drop(columns=["c_error", "v_error", "segment_error"])
-                this_summary["error_rate"] = this_summary.apply(
-                    lambda row: 0 if row["total_error"] == 0 else row["error_num"] / row["total_error"],
-                    axis=1,
-                )
-                this_summary = this_summary[
-                    [
-                        "model",
-                        "directionality",
-                        "dataset",
-                        "condition",
-                        "run_num",
-                        "epoch",
-                        "subset",
-                        "error_type",
-                        "error_num",
-                        "error_rate",
-                        "total_data",
-                        "data_split",
-                        "subset_data",
-                        "total_error",
-                    ]
-                ]
-                first_write = append_csv(this_summary, output_file, first_write, pred_file, base_dir)
-                del this_run, run_acc, this_summary, run_keys, combos, mask
-                gc.collect()
-        del trial_acc, failed_run_list, trial_dirs, acc_files, pred_files
-        gc.collect()
-
-
-def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
-    # Builds the v prediction summary and the vowel-height comparison summary.
-    acc = read_acc_files(base_dir, V_TRIALS)
-    failed_run_list = build_failed_run_list(acc)
-    acc = filter_failed_runs(acc, failed_run_list)
-    acc = label_model(acc)
-    acc = label_directionality(acc)
-    acc = label_dataset(acc)
-    acc = acc.rename(columns={"record_type": "subset"})
-    pred_summary_file = output_dir / "cleaned_260518_EnglishBH_v_pred.csv"
-    vowel_height_file = output_dir / "cleaned_260518_EnglishBH_v_height.csv"
-    pred_summary_file.unlink(missing_ok=True)
-    vowel_height_file.unlink(missing_ok=True)
-    first_pred_write = True
-    first_vowel_height_write = True
-
-    for trial in V_TRIALS:
-        trial_dirs = resolve_trial_dirs(base_dir, trial)
-        pred_files: List[Path] = []
-        for trial_dir in trial_dirs:
-            pred_files.extend(sorted(trial_dir.rglob("*pred.csv")))
-        print(f"processing {trial} across {len(trial_dirs)} folders with {len(pred_files)} pred files")
-        for pred_file in pred_files:
-            print(f"reading {pred_file.relative_to(base_dir)}")
-            for this_run in iter_run_chunks(pred_file, lambda col: col in V_PRED_COLUMNS, V_PRED_COLUMNS):
-                # Restores any missing expanded-dataset columns before selecting the analysis columns.
-                missing_cols = [col for col in V_PRED_COLUMNS if col not in this_run.columns]
-                for col in missing_cols:
-                    this_run[col] = pd.NA
-                this_run = this_run[V_PRED_COLUMNS].copy()
-                this_run["v3_error"] = pd.to_numeric(this_run["v3_error"], errors="coerce").fillna(0).astype(int)
-                this_run = filter_failed_runs(this_run, failed_run_list)
-                if this_run.empty:
-                    continue
-                this_run = label_model(this_run)
-                this_run = label_directionality(this_run)
-                this_run = label_dataset(this_run)
-                this_run = this_run.rename(columns={"record_type": "subset"})
-                run_acc = acc[
-                    (acc["model"] == this_run["model"].iat[0])
-                    & (acc["directionality"] == this_run["directionality"].iat[0])
-                    & (acc["dataset"] == this_run["dataset"].iat[0])
-                    & (acc["condition"] == this_run["condition"].iat[0])
-                    & (acc["run_num"] == this_run["run_num"].iat[0])
-                ]
-                this_run = add_vowel_features(this_run)
-
-                # Derives feature-level vowel error indicators for each prediction row.
-                expanded_mask = this_run["dataset"] == "expanded"
-                this_run["high_error"] = (
-                    (this_run["sr_v1_high"] != this_run["pred_sr_v1_high"])
-                    | (this_run["sr_v2_high"] != this_run["pred_sr_v2_high"])
-                    | (expanded_mask & (this_run["sr_v3_high"] != this_run["pred_sr_v3_high"]))
-                ).astype(int)
-                this_run["tense_error"] = (
-                    (this_run["sr_v1_tense"] != this_run["pred_sr_v1_tense"])
-                    | (this_run["sr_v2_tense"] != this_run["pred_sr_v2_tense"])
-                    | (expanded_mask & (this_run["sr_v3_tense"] != this_run["pred_sr_v3_tense"]))
-                ).astype(int)
-                this_run["back_error"] = (
-                    (this_run["sr_v1_back"] != this_run["pred_sr_v1_back"])
-                    | (this_run["sr_v2_back"] != this_run["pred_sr_v2_back"])
-                    | (expanded_mask & (this_run["sr_v3_back"] != this_run["pred_sr_v3_back"]))
-                ).astype(int)
-
-                pred_triplets = this_run["pred_sr_v1_back"].astype("Int64").astype(str).str.cat(
-                    [
-                        this_run["pred_sr_v2_back"].astype("Int64").astype(str),
-                        this_run["pred_sr_v3_back"].astype("Int64").astype(str),
-                    ],
-                    sep="",
-                )
-                this_run["harmony_error"] = 0
-                this_run.loc[
-                    expanded_mask & (this_run["condition"] == "harmony") & ~pred_triplets.isin(["000", "111"]),
-                    "harmony_error",
-                ] = 1
-                this_run.loc[
-                    expanded_mask
-                    & (this_run["condition"] == "disharmony")
-                    & (this_run["directionality"] == "left-to-right")
-                    & ~pred_triplets.isin(["100", "011"]),
-                    "harmony_error",
-                ] = 1
-                this_run.loc[
-                    expanded_mask
-                    & (this_run["condition"] == "disharmony")
-                    & (this_run["directionality"] == "right-to-left")
-                    & ~pred_triplets.isin(["110", "001"]),
-                    "harmony_error",
-                ] = 1
-                this_run.loc[
-                    (~expanded_mask) & (this_run["condition"] == "harmony") & (this_run["pred_sr_v1_back"] != this_run["pred_sr_v2_back"]),
-                    "harmony_error",
-                ] = 1
-                this_run.loc[
-                    (~expanded_mask) & (this_run["condition"] == "disharmony") & (this_run["pred_sr_v1_back"] == this_run["pred_sr_v2_back"]),
-                    "harmony_error",
-                ] = 1
-
-                # Summarizes prediction counts by run, epoch, subset, and vowel error pattern.
-                this_summary = (
-                    this_run.groupby(
-                        [
-                            "model", "directionality", "dataset", "condition", "run_num", "epoch", "subset",
-                            "v1_error", "v2_error", "v3_error", "high_error", "tense_error", "back_error", "harmony_error",
-                        ],
-                        as_index=False,
-                    )
-                    .size()
-                    .rename(columns={"size": "error_num"})
-                )
-                run_keys = run_acc[
-                    ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"]
-                ].drop_duplicates()
-                error_keys = this_summary[
-                    ["v1_error", "v2_error", "v3_error", "high_error", "tense_error", "back_error", "harmony_error"]
-                ].drop_duplicates()
-                this_summary = run_keys.merge(error_keys, how="cross").merge(
-                    this_summary,
-                    on=[
-                        "model",
-                        "directionality",
-                        "dataset",
-                        "condition",
-                        "run_num",
-                        "epoch",
-                        "subset",
-                        "v1_error",
-                        "v2_error",
-                        "v3_error",
-                        "high_error",
-                        "tense_error",
-                        "back_error",
-                        "harmony_error",
-                    ],
-                    how="left",
-                )
-                this_summary["error_num"] = pd.to_numeric(this_summary["error_num"], errors="coerce").fillna(0).astype(int)
-
-                # Summarizes input height-pattern counts for full harmony data.
-                this_input_height_summary = this_run[
-                    (this_run["dataset"] == "full") & (this_run["condition"] == "harmony")
-                ].copy()
-                this_input_height_summary["v_high"] = (
-                    this_input_height_summary["sr_v1_high"].astype("Int64").astype(str)
-                    + this_input_height_summary["sr_v2_high"].astype("Int64").astype(str)
-                )
-                this_input_height_summary["v_agree"] = (
-                    this_input_height_summary["sr_v1_high"] == this_input_height_summary["sr_v2_high"]
-                ).astype(int)
-                this_input_height_summary = (
-                    this_input_height_summary.groupby(
-                        ["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
-                        as_index=False,
-                    )
-                    .size()
-                    .rename(columns={"size": "error_num"})
-                )
-                this_input_height_summary["error_rate"] = this_input_height_summary.groupby(
-                    ["model", "directionality", "dataset", "condition", "run_num"]
-                )["error_num"].transform(lambda s: s / s.sum())
-                input_run_keys = this_input_height_summary[
-                    ["model", "directionality", "dataset", "condition", "run_num"]
-                ].drop_duplicates()
-                input_combos = this_input_height_summary[["v_high", "v_agree"]].drop_duplicates()
-                this_input_height_summary = input_run_keys.merge(input_combos, how="cross").merge(
-                    this_input_height_summary,
-                    on=["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
-                    how="left",
-                )
-                this_input_height_summary["error_num"] = pd.to_numeric(
-                    this_input_height_summary["error_num"], errors="coerce"
-                ).fillna(0).astype(int)
-                this_input_height_summary["error_rate"] = pd.to_numeric(
-                    this_input_height_summary["error_rate"], errors="coerce"
-                ).fillna(0.0)
-
-                # Summarizes predicted height-pattern counts for full harmony data.
-                this_output_height_summary = this_run[
-                    (this_run["dataset"] == "full") & (this_run["condition"] == "harmony")
-                ].copy()
-                this_output_height_summary["v_high"] = (
-                    this_output_height_summary["pred_sr_v1_high"].astype("Int64").astype(str)
-                    + this_output_height_summary["pred_sr_v2_high"].astype("Int64").astype(str)
-                )
-                this_output_height_summary["v_agree"] = (
-                    this_output_height_summary["pred_sr_v1_high"] == this_output_height_summary["pred_sr_v2_high"]
-                ).astype(int)
-                this_output_height_summary = (
-                    this_output_height_summary.groupby(
-                        ["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
-                        as_index=False,
-                    )
-                    .size()
-                    .rename(columns={"size": "error_num"})
-                )
-                this_output_height_summary["error_rate"] = this_output_height_summary.groupby(
-                    ["model", "directionality", "dataset", "condition", "run_num"]
-                )["error_num"].transform(lambda s: s / s.sum())
-                output_run_keys = this_output_height_summary[
-                    ["model", "directionality", "dataset", "condition", "run_num"]
-                ].drop_duplicates()
-                output_combos = this_output_height_summary[["v_high", "v_agree"]].drop_duplicates()
-                this_output_height_summary = output_run_keys.merge(output_combos, how="cross").merge(
-                    this_output_height_summary,
-                    on=["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
-                    how="left",
-                )
-                this_output_height_summary["error_num"] = pd.to_numeric(
-                    this_output_height_summary["error_num"], errors="coerce"
-                ).fillna(0).astype(int)
-                this_output_height_summary["error_rate"] = pd.to_numeric(
-                    this_output_height_summary["error_rate"], errors="coerce"
-                ).fillna(0.0)
-
-                # Combines the input and predicted height-pattern summaries.
-                this_height_summary = this_input_height_summary.merge(
-                    this_output_height_summary,
-                    on=["model", "directionality", "dataset", "condition", "run_num", "v_high", "v_agree"],
-                    how="outer",
-                    suffixes=("_input", "_output"),
-                )
-                for col in ["error_num_input", "error_num_output"]:
-                    this_height_summary[col] = pd.to_numeric(this_height_summary[col], errors="coerce").fillna(0).astype(int)
-                for col in ["error_rate_input", "error_rate_output"]:
-                    this_height_summary[col] = pd.to_numeric(this_height_summary[col], errors="coerce").fillna(0.0)
-                this_height_summary["error_num_diff"] = (
-                    this_height_summary["error_num_output"] - this_height_summary["error_num_input"]
-                )
-                this_height_summary["error_rate_diff"] = (
-                    this_height_summary["error_rate_output"] - this_height_summary["error_rate_input"]
-                )
-
-                first_pred_write = append_csv(this_summary, pred_summary_file, first_pred_write, pred_file, base_dir)
-                first_vowel_height_write = append_csv(
-                    this_height_summary,
-                    vowel_height_file,
-                    first_vowel_height_write,
-                    pred_file,
-                    base_dir,
-                )
-                del (
-                    this_run,
-                    run_acc,
-                    missing_cols,
-                    expanded_mask,
-                    pred_triplets,
-                    this_summary,
-                    run_keys,
-                    error_keys,
-                    this_input_height_summary,
-                    input_run_keys,
-                    input_combos,
-                    this_output_height_summary,
-                    output_run_keys,
-                    output_combos,
-                    this_height_summary,
-                )
-                gc.collect()
-        del trial_dirs, pred_files
-        gc.collect()
-    del acc, failed_run_list
-    gc.collect()
+    print(f"Saved cv summary data to: {output_file}")
 
 
 def main() -> None:
-    base_dir = Path(".").resolve()
-    output_dir = base_dir
+    # Edit these paths as needed for a given run.
+    results_dir = Path("results")
+    data_dir = Path("data")
+    min_acc = 0.85
+    max_loss = 0.05
 
-    clean_all_acc(base_dir, output_dir)
-    clean_cv_pred(base_dir, output_dir)
-    clean_v_pred(base_dir, output_dir)
+    results_dir = results_dir.expanduser().resolve()
+    data_dir = data_dir.expanduser().resolve()
+
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"Reading files from: {results_dir}")
+    print(f"Saving files to: {data_dir}")
+
+    filtered_acc_df, included_run_df = clean_acc(results_dir, data_dir, min_acc, max_loss)
+    clean_v_pred(results_dir, data_dir, included_run_df, filtered_acc_df)
+    clean_cv_pred(results_dir, data_dir, included_run_df, filtered_acc_df)
 
 
 if __name__ == "__main__":

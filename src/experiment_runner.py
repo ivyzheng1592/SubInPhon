@@ -147,7 +147,7 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
         for condition in hp.conditions:
             print(" - Instantiating language pattern:")
             language = languages[hp.lang_name]
-            feature_file = os.path.join("data", "EnglishBH_features.xlsx")
+            feature_file = os.path.join("data", f"{language.lang_name}_features.xlsx")
 
             for run_num in runs:
                 set_seed(hp.base_seed + run_num)
