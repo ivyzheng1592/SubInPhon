@@ -598,8 +598,8 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
 
 
 def main() -> None:
-    base_dir = Path(".").resolve()
-    output_dir = base_dir
+    base_dir = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/results"
+    output_dir = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/data"
 
     clean_all_acc(base_dir, output_dir)
     clean_cv_pred(base_dir, output_dir)
