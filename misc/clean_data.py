@@ -581,8 +581,10 @@ def clean_acc(
     failed_run_keys_df = (
         all_acc_df[
             (all_acc_df["epoch"] == 99)
-            & (all_acc_df["acc"] < min_acc)
-            & (all_acc_df["loss"] > max_loss)
+            & (
+                (all_acc_df["acc"] < min_acc)
+                | (all_acc_df["loss"] > max_loss)
+            )
         ][RUN_KEY_COLUMNS]
         .drop_duplicates()
         .reset_index(drop=True)
@@ -762,8 +764,8 @@ def main() -> None:
     # Edit these paths as needed for a given run.
     results_dir = Path("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/results")
     data_dir = Path("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/data")
-    min_acc = 0.85
-    max_loss = 0.05
+    min_acc = 0.8
+    max_loss = 0.1
 
     results_dir = results_dir.expanduser().resolve()
     data_dir = data_dir.expanduser().resolve()
