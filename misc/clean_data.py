@@ -753,16 +753,11 @@ def clean_cv_pred(results_dir: Path, data_dir: Path, included_run_df: pd.DataFra
 
 
 def main() -> None:
-<<<<<<< HEAD
-    base_dir = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/results"
-    output_dir = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/data"
-=======
     # Edit these paths as needed for a given run.
-    results_dir = Path("results")
-    data_dir = Path("data")
+    results_dir = Path("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/results")
+    data_dir = Path("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/data")
     min_acc = 0.85
     max_loss = 0.05
->>>>>>> 0968832595583f29fa54efef63c50b9fda0e6ab8
 
     results_dir = results_dir.expanduser().resolve()
     data_dir = data_dir.expanduser().resolve()
@@ -773,8 +768,8 @@ def main() -> None:
     print(f"Saving files to: {data_dir}")
 
     filtered_acc_df, included_run_df = clean_acc(results_dir, data_dir, min_acc, max_loss)
-    clean_v_pred(results_dir, data_dir, included_run_df, filtered_acc_df)
-    clean_cv_pred(results_dir, data_dir, included_run_df, filtered_acc_df)
+    #clean_v_pred(results_dir, data_dir, included_run_df, filtered_acc_df)
+    #clean_cv_pred(results_dir, data_dir, included_run_df, filtered_acc_df)
 
 
 if __name__ == "__main__":
