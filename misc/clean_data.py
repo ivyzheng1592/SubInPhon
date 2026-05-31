@@ -34,11 +34,20 @@ VOWEL_HIGH = {"i": 1, "ɪ": 1, "u": 1, "ʊ": 1, "e": 0, "ɛ": 0, "o": 0, "ɔ": 0
 VOWEL_TENSE = {"i": 1, "u": 1, "e": 1, "o": 1, "ɪ": 0, "ʊ": 0, "ɛ": 0, "ɔ": 0}
 
 
+def resolve_trial_dirs(base_dir: Path, trial: str) -> List[Path]:
+    # Finds folders whose names match the canonical trial name or end with it.
+    return sorted(
+        path for path in base_dir.iterdir()
+        if path.is_dir() and (path.name == trial or path.name.endswith("_" + trial))
+    )
+
+
 def list_matching_files(base_dir: Path, trials: Sequence[str], pattern: str) -> List[Path]:
     # Collects matching files from the requested trial folders.
     files: List[Path] = []
     for trial in trials:
-        files.extend(sorted((base_dir / trial).rglob(pattern)))
+        for trial_dir in resolve_trial_dirs(base_dir, trial):
+            files.extend(sorted(trial_dir.rglob(pattern)))
     return files
 
 
@@ -67,11 +76,12 @@ def read_acc_files(base_dir: Path, trials: Sequence[str], with_trial: bool = Fal
     # Reads and concatenates accuracy files from the requested trial folders.
     frames: List[pd.DataFrame] = []
     for trial in trials:
-        for file_path in sorted((base_dir / trial).rglob("*acc.csv")):
-            this_run = pd.read_csv(file_path)
-            if with_trial:
-                this_run["trial"] = trial
-            frames.append(this_run)
+        for trial_dir in resolve_trial_dirs(base_dir, trial):
+            for file_path in sorted(trial_dir.rglob("*acc.csv")):
+                this_run = pd.read_csv(file_path)
+                if with_trial:
+                    this_run["trial"] = trial
+                frames.append(this_run)
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
@@ -185,10 +195,13 @@ def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
     first_write = True
 
     for trial in CV_TRIALS:
-        trial_dir = base_dir / trial
-        acc_files = sorted(trial_dir.rglob("*acc.csv"))
-        pred_files = sorted(trial_dir.rglob("*pred.csv"))
-        print(f"processing {trial_dir.relative_to(base_dir)} with {len(acc_files)} acc files and {len(pred_files)} pred files")
+        trial_dirs = resolve_trial_dirs(base_dir, trial)
+        acc_files: List[Path] = []
+        pred_files: List[Path] = []
+        for trial_dir in trial_dirs:
+            acc_files.extend(sorted(trial_dir.rglob("*acc.csv")))
+            pred_files.extend(sorted(trial_dir.rglob("*pred.csv")))
+        print(f"processing {trial} across {len(trial_dirs)} folders with {len(acc_files)} acc files and {len(pred_files)} pred files")
 
         # Prepares the run-level accuracy totals used to infer syllable-structure errors.
         trial_acc = pd.concat((pd.read_csv(file_path) for file_path in acc_files), ignore_index=True)
@@ -314,7 +327,7 @@ def clean_cv_pred(base_dir: Path, output_dir: Path) -> None:
                 first_write = append_csv(this_summary, output_file, first_write, pred_file, base_dir)
                 del this_run, run_acc, this_summary, run_keys, combos, mask
                 gc.collect()
-        del trial_acc, failed_run_list, acc_files, pred_files
+        del trial_acc, failed_run_list, trial_dirs, acc_files, pred_files
         gc.collect()
 
 
@@ -335,9 +348,11 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
     first_vowel_height_write = True
 
     for trial in V_TRIALS:
-        trial_dir = base_dir / trial
-        pred_files = sorted(trial_dir.rglob("*pred.csv"))
-        print(f"processing {trial_dir.relative_to(base_dir)} with {len(pred_files)} pred files")
+        trial_dirs = resolve_trial_dirs(base_dir, trial)
+        pred_files: List[Path] = []
+        for trial_dir in trial_dirs:
+            pred_files.extend(sorted(trial_dir.rglob("*pred.csv")))
+        print(f"processing {trial} across {len(trial_dirs)} folders with {len(pred_files)} pred files")
         for pred_file in pred_files:
             print(f"reading {pred_file.relative_to(base_dir)}")
             for this_run in iter_run_chunks(pred_file, lambda col: col in V_PRED_COLUMNS, V_PRED_COLUMNS):
@@ -576,6 +591,8 @@ def clean_v_pred(base_dir: Path, output_dir: Path) -> None:
                     this_height_summary,
                 )
                 gc.collect()
+        del trial_dirs, pred_files
+        gc.collect()
     del acc, failed_run_list
     gc.collect()
 
