@@ -583,16 +583,17 @@ def clean_acc(
             (all_acc_df["epoch"] == 99)
             & (all_acc_df["acc"] < min_acc)
             & (all_acc_df["loss"] > max_loss)
-        ][RUN_KEY_COLUMNS]
-        .drop_duplicates()
+        ]
+        .sort_values(RUN_KEY_COLUMNS + ["record_type"])
         .reset_index(drop=True)
     )
     failed_run_file = data_dir / "cleaned_260531_EnglishBH_failed_run.csv"
     failed_run_df.to_csv(failed_run_file, index=False)
     print(f"Saved {len(failed_run_df)} failed runs to: {failed_run_file}")
 
+    failed_run_keys_df = failed_run_df[RUN_KEY_COLUMNS].drop_duplicates().reset_index(drop=True)
     filtered_acc_df = all_acc_df.merge(
-        failed_run_df,
+        failed_run_keys_df,
         on=RUN_KEY_COLUMNS,
         how="left",
         indicator=True,
