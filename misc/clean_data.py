@@ -255,19 +255,6 @@ def clean_cv_run_df(run_df: pd.DataFrame) -> pd.DataFrame:
             & (cleaned_df["c2_error"] == 0)
         )
     ).astype(int)
-    cleaned_df["pred_sr_v1_back"] = _map_back(cleaned_df["pred_sr_v1"])
-    cleaned_df["pred_sr_v2_back"] = _map_back(cleaned_df["pred_sr_v2"])
-    cleaned_df["harmony_error"] = 0
-    cleaned_df.loc[
-        (cleaned_df["condition"] == "harmony")
-        & (cleaned_df["pred_sr_v1_back"] != cleaned_df["pred_sr_v2_back"]),
-        "harmony_error",
-    ] = 1
-    cleaned_df.loc[
-        (cleaned_df["condition"] == "disharmony")
-        & (cleaned_df["pred_sr_v1_back"] == cleaned_df["pred_sr_v2_back"]),
-        "harmony_error",
-    ] = 1
 
     return cleaned_df
 
@@ -312,6 +299,7 @@ def summarize_v_run(run_df: pd.DataFrame, v_acc_df: pd.DataFrame) -> pd.DataFram
                 "subset",
                 "v1_error",
                 "v2_error",
+                "v3_error",
                 "high_error",
                 "tense_error",
                 "back_error",
@@ -327,7 +315,7 @@ def summarize_v_run(run_df: pd.DataFrame, v_acc_df: pd.DataFrame) -> pd.DataFram
         ["model", "directionality", "dataset", "condition", "run_num", "epoch", "subset"]
     ].drop_duplicates()
     error_keys = summary_df[
-        ["v1_error", "v2_error", "high_error", "tense_error", "back_error", "harmony_error"]
+        ["v1_error", "v2_error", "v3_error", "high_error", "tense_error", "back_error", "harmony_error"]
     ].drop_duplicates()
     summary_df = run_keys.merge(error_keys, how="cross").merge(
         summary_df,
@@ -341,6 +329,7 @@ def summarize_v_run(run_df: pd.DataFrame, v_acc_df: pd.DataFrame) -> pd.DataFram
             "subset",
             "v1_error",
             "v2_error",
+            "v3_error",
             "high_error",
             "tense_error",
             "back_error",
