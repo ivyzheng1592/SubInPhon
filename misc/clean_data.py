@@ -1,6 +1,7 @@
 import gc
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 RUN_KEY_COLUMNS = [
@@ -132,6 +133,15 @@ def _map_tense(series: pd.Series) -> pd.Series:
 
 def _map_back(series: pd.Series) -> pd.Series:
     return series.map(lambda value: 0 if value in FRONT_VOWELS else 1 if value in BACK_VOWELS else pd.NA)
+
+
+def build_v_high(first: pd.Series, second: pd.Series, directionality: pd.Series) -> pd.Series:
+    l2r = first.astype("Int64").astype(str) + second.astype("Int64").astype(str)
+    r2l = second.astype("Int64").astype(str) + first.astype("Int64").astype(str)
+    return pd.Series(
+        np.where(directionality == "right-to-left", r2l, l2r),
+        index=first.index,
+    )
 
 
 def clean_v_run_df(run_df: pd.DataFrame) -> pd.DataFrame:
@@ -350,9 +360,10 @@ def summarize_v_height_run(run_df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
 
     input_height_df = harmony_df.copy()
-    input_height_df["v_high"] = (
-        input_height_df["sr_v1_high"].astype("Int64").astype(str)
-        + input_height_df["sr_v2_high"].astype("Int64").astype(str)
+    input_height_df["v_high"] = build_v_high(
+        input_height_df["sr_v1_high"],
+        input_height_df["sr_v2_high"],
+        input_height_df["directionality"],
     )
     input_height_df["v_agree"] = pd.NA
     input_height_df.loc[input_height_df["sr_v1_high"] == input_height_df["sr_v2_high"], "v_agree"] = 1
@@ -382,8 +393,11 @@ def summarize_v_height_run(run_df: pd.DataFrame) -> pd.DataFrame:
 
     output_height_df = harmony_df.copy()
     output_height_df["v_high"] = (
-        output_height_df["pred_sr_v1_high"].astype("Int64").astype(str)
-        + output_height_df["pred_sr_v2_high"].astype("Int64").astype(str)
+        build_v_high(
+            output_height_df["pred_sr_v1_high"],
+            output_height_df["pred_sr_v2_high"],
+            output_height_df["directionality"],
+        )
     )
     output_height_df["v_agree"] = pd.NA
     output_height_df.loc[
