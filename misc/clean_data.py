@@ -694,6 +694,7 @@ def clean_v_pred(results_dir: Path, data_dir: Path, included_run_df: pd.DataFram
             if not is_included_run(run_df, included_run_df):
                 continue
             run_df = ensure_columns(run_df, V_REQUIRED_COLUMNS)
+            run_df["v3_error"] = pd.to_numeric(run_df["v3_error"], errors="coerce").fillna(0).astype(int)
             run_df = relabel_columns(run_df)
             run_df = run_df.rename(columns={"record_type": "subset"})
             run_df = clean_v_run_df(run_df)
