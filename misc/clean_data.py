@@ -39,20 +39,7 @@ TENSE_VOWELS = {"i", "u", "e", "o"}
 LAX_VOWELS = {"ɪ", "ʊ", "ɛ", "ɔ"}
 FRONT_VOWELS = {"i", "ɪ", "e", "ɛ"}
 BACK_VOWELS = {"u", "ʊ", "o", "ɔ"}
-
-
-def filter_included_runs(df: pd.DataFrame, included_run_df: pd.DataFrame) -> pd.DataFrame:
-    if df.empty or included_run_df.empty:
-        return df.copy()
-
-    filtered_df = df.copy()
-    filtered_df["property"] = filtered_df["property"].fillna("")
-    filtered_df = filtered_df.merge(
-        included_run_df[RUN_KEY_COLUMNS].drop_duplicates(),
-        on=RUN_KEY_COLUMNS,
-        how="inner",
-    )
-    return filtered_df.reset_index(drop=True)
+KNOWN_VOWELS = HIGH_VOWELS | MID_VOWELS
 
 
 def append_csv(df: pd.DataFrame, output_file: Path, first_write: bool) -> bool:
@@ -60,8 +47,6 @@ def append_csv(df: pd.DataFrame, output_file: Path, first_write: bool) -> bool:
         return first_write
 
     df.to_csv(output_file, mode="w" if first_write else "a", index=False, header=first_write)
-    del df
-    gc.collect()
     return False
 
 
@@ -121,6 +106,31 @@ def ensure_columns(df: pd.DataFrame, required_columns: list[str]) -> pd.DataFram
         if column not in normalized_df.columns:
             normalized_df[column] = pd.NA
     return normalized_df
+
+
+def validate_vowel_symbols(df: pd.DataFrame, columns: list[str]) -> None:
+    unexpected_symbols: dict[str, list[str]] = {}
+
+    for column in columns:
+        if column not in df.columns:
+            continue
+        values = (
+            df[column]
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
+        )
+        bad_values = sorted(value for value in values if value not in KNOWN_VOWELS)
+        if bad_values:
+            unexpected_symbols[column] = bad_values
+
+    if unexpected_symbols:
+        details = ", ".join(
+            f"{column}={values}"
+            for column, values in unexpected_symbols.items()
+        )
+        raise ValueError(f"Unexpected vowel symbols found: {details}")
 
 
 def _map_high(series: pd.Series) -> pd.Series:
@@ -286,6 +296,11 @@ def build_v_acc_df(filtered_acc_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def summarize_v_run(run_df: pd.DataFrame, v_acc_df: pd.DataFrame) -> pd.DataFrame:
+    run_df = run_df.copy()
+    if "v3_error" not in run_df.columns:
+        raise ValueError("summarize_v_run requires a v3_error column")
+    run_df["v3_error"] = pd.to_numeric(run_df["v3_error"], errors="coerce").fillna(0).astype(int)
+
     run_acc_df = v_acc_df[
         (v_acc_df["model"] == run_df["model"].iat[0])
         & (v_acc_df["directionality"] == run_df["directionality"].iat[0])
@@ -537,26 +552,6 @@ def summarize_cv_run(run_df: pd.DataFrame, cv_acc_df: pd.DataFrame) -> pd.DataFr
     ].reset_index(drop=True)
 
 
-def filter_failed_runs(df: pd.DataFrame, failed_run_df: pd.DataFrame) -> pd.DataFrame:
-    if df.empty or failed_run_df.empty:
-        return df.copy()
-
-    filtered_df = df.copy()
-    filtered_df["property"] = filtered_df["property"].fillna("")
-    filtered_df = filtered_df.merge(
-        failed_run_df[RUN_KEY_COLUMNS].drop_duplicates(),
-        on=RUN_KEY_COLUMNS,
-        how="left",
-        indicator=True,
-    )
-    filtered_df = (
-        filtered_df[filtered_df["_merge"] == "left_only"]
-        .drop(columns="_merge")
-        .reset_index(drop=True)
-    )
-    return filtered_df
-
-
 def clean_acc(
     results_dir: Path,
     data_dir: Path,
@@ -695,6 +690,10 @@ def clean_v_pred(results_dir: Path, data_dir: Path, included_run_df: pd.DataFram
                 continue
             run_df = ensure_columns(run_df, V_REQUIRED_COLUMNS)
             run_df["v3_error"] = pd.to_numeric(run_df["v3_error"], errors="coerce").fillna(0).astype(int)
+            validate_vowel_symbols(
+                run_df,
+                ["sr_v1", "sr_v2", "sr_v3", "pred_sr_v1", "pred_sr_v2", "pred_sr_v3"],
+            )
             run_df = relabel_columns(run_df)
             run_df = run_df.rename(columns={"record_type": "subset"})
             run_df = clean_v_run_df(run_df)
@@ -722,6 +721,8 @@ def clean_v_pred(results_dir: Path, data_dir: Path, included_run_df: pd.DataFram
                     f"condition={run_df['condition'].iat[0]}, "
                     f"run_num={run_df['run_num'].iat[0]}"
                 )
+            del summary_df, v_height_df, run_df
+            gc.collect()
 
     print(f"Saved v summary data to: {output_file}")
     print(f"Saved v height data to: {v_height_file}")
@@ -745,6 +746,7 @@ def clean_cv_pred(results_dir: Path, data_dir: Path, included_run_df: pd.DataFra
             if not is_included_run(run_df, included_run_df):
                 continue
             run_df = ensure_columns(run_df, CV_REQUIRED_COLUMNS)
+            validate_vowel_symbols(run_df, ["pred_sr_v1", "pred_sr_v2"])
             run_df = relabel_columns(run_df)
             run_df = run_df.rename(columns={"record_type": "subset"})
             run_df = clean_cv_run_df(run_df)
@@ -760,6 +762,8 @@ def clean_cv_pred(results_dir: Path, data_dir: Path, included_run_df: pd.DataFra
                     f"condition={run_df['condition'].iat[0]}, "
                     f"run_num={run_df['run_num'].iat[0]}"
                 )
+            del summary_df, run_df
+            gc.collect()
 
     print(f"Saved cv summary data to: {output_file}")
 
