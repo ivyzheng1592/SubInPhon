@@ -275,8 +275,8 @@ def plot_embed(
         fig = plt.figure(figsize=(6, 2.5))
         focus_ax = fig.add_subplot(121, projection="3d")
         all_ax = fig.add_subplot(122, projection="3d")
-        focus_ax.set_position([0.02, 0.15, 0.40, 0.75])
-        all_ax.set_position([0.38, 0.15, 0.76, 0.75])
+        focus_ax.set_position([0.00, 0.15, 0.35, 0.75])
+        all_ax.set_position([0.35, 0.15, 0.35, 0.75])
 
         for i in focus_reduced_df.index:
             focus_ax.scatter(
@@ -328,7 +328,7 @@ def plot_embed(
         fig.legend(
             handles=legend_handles,
             loc="center left",
-            bbox_to_anchor=(0.78, 0.5),
+            bbox_to_anchor=(0.80, 0.5),
             ncol=2,
             frameon=False,
             fontsize=5,
