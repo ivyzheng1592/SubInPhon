@@ -272,8 +272,8 @@ def plot_embed(
             for phoneme, color in _build_color_map(EMBED_NEW_IDX, COLOR_PALETTE).items()
         }
 
-        fig = plt.figure(figsize=(6, 2.5))
-        fig.subplots_adjust(wspace=0.01)
+        fig = plt.figure(figsize=(8, 2.5))
+        fig.subplots_adjust(wspace=0)
         focus_ax = fig.add_subplot(121, projection="3d")
         all_ax = fig.add_subplot(122, projection="3d")
 
