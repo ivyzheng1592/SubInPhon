@@ -273,7 +273,7 @@ def plot_embed(
         }
 
         fig = plt.figure(figsize=(6, 2.5))
-        fig.subplots_adjust(wspace=0.05)
+        fig.subplots_adjust(wspace=0.01)
         focus_ax = fig.add_subplot(121, projection="3d")
         all_ax = fig.add_subplot(122, projection="3d")
 
