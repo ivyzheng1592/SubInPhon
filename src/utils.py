@@ -273,6 +273,7 @@ def plot_embed(
         }
 
         fig = plt.figure(figsize=(6, 2.5))
+        fig.subplots_adjust(wspace=0.05)
         focus_ax = fig.add_subplot(121, projection="3d")
         all_ax = fig.add_subplot(122, projection="3d")
 
@@ -334,7 +335,7 @@ def plot_embed(
             columnspacing=0.5,
         )
     else:
-        fig = plt.figure(figsize=(6, 2.5))
+        fig = plt.figure(figsize=(2.5, 2))
         ax = fig.add_subplot(111, projection="3d")
         ax.set_position([0.08, 0.18, 0.72, 0.72])
         for i in focus_reduced_df.index:
@@ -354,23 +355,10 @@ def plot_embed(
                 ha="left",
                 va="bottom",
             )
-        ax.set_title("Vowel embedding")
         ax.set_xlabel("pc1")
         ax.set_ylabel("pc2")
         ax.set_zlabel("pc3")
         push_text_free(fig, ax)
-
-        legend_handles = _build_legend_handles(FOCUS_EMBED_NEW_IDX, focus_embed_colors, marker_size=3)
-        fig.legend(
-            handles=legend_handles,
-            loc="upper center",
-            bbox_to_anchor=(0.5, 0.98),
-            ncol=len(FOCUS_EMBED_NEW_IDX),
-            frameon=False,
-            fontsize=5,
-            handletextpad=0.2,
-            columnspacing=0.5,
-        )
 
     plt.savefig(embed_plot, dpi=300)
     plt.close()
