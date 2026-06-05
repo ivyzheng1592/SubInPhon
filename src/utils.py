@@ -191,11 +191,11 @@ def plot_aud_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
 def plot_txt_att(ur: Sequence[str], sr: Sequence[str], attention: torch.Tensor, att_plot: str) -> None:
     attention = attention.cpu().numpy()
 
-    fig, ax = plt.subplots(1, 1, figsize=(3, 3))
+    fig, ax = plt.subplots(1, 1, figsize=(3, 2.25))
     im = ax.matshow(attention, cmap="bone")
     ax.set_xticks(ticks=np.arange(len(ur)), labels=ur)
     ax.set_yticks(ticks=np.arange(len(sr)), labels=sr)
-    ax.tick_params(axis="both", labelsize=8)
+    ax.tick_params(axis="both", labelsize=5)
     fig.colorbar(im)
     plt.savefig(att_plot, dpi=300)
     plt.close()
@@ -332,7 +332,7 @@ def plot_embed(
             columnspacing=0.5,
         )
     else:
-        fig = plt.figure(figsize=(2.5, 2))
+        fig = plt.figure(figsize=(6, 2.5))
         ax = fig.add_subplot(111, projection="3d")
         ax.set_position([0.08, 0.18, 0.72, 0.72])
         for i in focus_reduced_df.index:
