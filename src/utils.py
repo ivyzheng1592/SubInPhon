@@ -272,7 +272,7 @@ def plot_embed(
             for phoneme, color in _build_color_map(EMBED_NEW_IDX, COLOR_PALETTE).items()
         }
 
-        fig = plt.figure(figsize=(5.5, 2.5))
+        fig = plt.figure(figsize=(6, 2.5))
         focus_ax = fig.add_subplot(121, projection="3d")
         all_ax = fig.add_subplot(122, projection="3d")
 
@@ -336,7 +336,7 @@ def plot_embed(
     else:
         fig = plt.figure(figsize=(6, 2.5))
         ax = fig.add_subplot(111, projection="3d")
-        ax.set_position([0.08, 0.18, 0.58, 0.72])
+        ax.set_position([0.08, 0.18, 0.72, 0.72])
         for i in focus_reduced_df.index:
             ax.scatter(
                 xs=focus_reduced_df.loc[i, "pc1"],
@@ -363,9 +363,9 @@ def plot_embed(
         legend_handles = _build_legend_handles(FOCUS_EMBED_NEW_IDX, focus_embed_colors, marker_size=3)
         fig.legend(
             handles=legend_handles,
-            loc="center left",
-            bbox_to_anchor=(0.7, 0.5),
-            ncol=2,
+            loc="upper center",
+            bbox_to_anchor=(0.5, 0.98),
+            ncol=len(FOCUS_EMBED_NEW_IDX),
             frameon=False,
             fontsize=5,
             handletextpad=0.2,
