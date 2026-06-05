@@ -195,7 +195,7 @@ def plot_txt_att(ur: Sequence[str], sr: Sequence[str], attention: torch.Tensor, 
     im = ax.matshow(attention, cmap="bone")
     ax.set_xticks(ticks=np.arange(len(ur)), labels=ur)
     ax.set_yticks(ticks=np.arange(len(sr)), labels=sr)
-    ax.tick_params(axis="both", labelsize=10)
+    ax.tick_params(axis="both", labelsize=8)
     fig.colorbar(im)
     plt.savefig(att_plot, dpi=300)
     plt.close()
@@ -291,7 +291,7 @@ def plot_embed(
                 ha="left",
                 va="bottom",
             )
-        focus_ax.set_title("Focus embedding")
+        focus_ax.set_title("Vowel embedding")
         focus_ax.set_xlabel("pc1")
         focus_ax.set_ylabel("pc2")
         focus_ax.set_zlabel("pc3")
@@ -323,9 +323,9 @@ def plot_embed(
         legend_handles = _build_legend_handles(EMBED_NEW_IDX, all_embed_colors, marker_size=3)
         fig.legend(
             handles=legend_handles,
-            loc="upper center",
-            bbox_to_anchor=(0.76, 0.98),
-            ncol=13,
+            loc="center left",
+            bbox_to_anchor=(0.98, 0.5),
+            ncol=2,
             frameon=False,
             fontsize=5,
             handletextpad=0.2,
@@ -352,7 +352,7 @@ def plot_embed(
                 ha="left",
                 va="bottom",
             )
-        ax.set_title("Focus embedding")
+        ax.set_title("Vowel embedding")
         ax.set_xlabel("pc1")
         ax.set_ylabel("pc2")
         ax.set_zlabel("pc3")
