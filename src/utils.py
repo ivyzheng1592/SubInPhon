@@ -191,12 +191,14 @@ def plot_aud_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
 def plot_txt_att(ur: Sequence[str], sr: Sequence[str], attention: torch.Tensor, att_plot: str) -> None:
     attention = attention.cpu().numpy()
 
+    plt.rcParams.update({"font.size": 5})
     fig, ax = plt.subplots(1, 1, figsize=(3, 2.25))
     im = ax.matshow(attention, cmap="bone")
     ax.set_xticks(ticks=np.arange(len(ur)), labels=ur)
     ax.set_yticks(ticks=np.arange(len(sr)), labels=sr)
     ax.tick_params(axis="both", labelsize=5)
-    fig.colorbar(im)
+    colorbar = fig.colorbar(im)
+    colorbar.ax.tick_params(labelsize=5)
     plt.savefig(att_plot, dpi=300)
     plt.close()
 
@@ -334,7 +336,7 @@ def plot_embed(
     else:
         fig = plt.figure(figsize=(6, 2.5))
         ax = fig.add_subplot(111, projection="3d")
-        ax.set_position([0.08, 0.18, 0.72, 0.72])
+        ax.set_position([0.08, 0.18, 0.58, 0.72])
         for i in focus_reduced_df.index:
             ax.scatter(
                 xs=focus_reduced_df.loc[i, "pc1"],
@@ -361,9 +363,9 @@ def plot_embed(
         legend_handles = _build_legend_handles(FOCUS_EMBED_NEW_IDX, focus_embed_colors, marker_size=3)
         fig.legend(
             handles=legend_handles,
-            loc="upper center",
-            bbox_to_anchor=(0.5, 0.98),
-            ncol=len(FOCUS_EMBED_NEW_IDX),
+            loc="center left",
+            bbox_to_anchor=(0.7, 0.5),
+            ncol=2,
             frameon=False,
             fontsize=5,
             handletextpad=0.2,
