@@ -328,7 +328,7 @@ def plot_embed(
         fig.legend(
             handles=legend_handles,
             loc="center left",
-            bbox_to_anchor=(0.80, 0.5),
+            bbox_to_anchor=(0.78, 0.5),
             ncol=2,
             frameon=False,
             fontsize=5,
