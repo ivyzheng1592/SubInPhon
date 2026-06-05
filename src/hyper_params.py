@@ -49,7 +49,7 @@ n_samples = 24000
 n_mels = 128
 
 # Dataset hyperparameters
-data_proportion = 1.0
+data_proportion = 1.0  # 1.0 for shortened, 0.1 for full, 0.2 for reduced (nonidentical), 0.0001 for expanded
 text_data_split_ratio = [0.8, 0.1, 0.1]
 audio_data_split_ratio = [0.8, 0.1, 0.1]
 
@@ -81,14 +81,14 @@ learning_rate = 1e-4
 batch_size = 32
 
 # Reproducibility
-base_seed = 1234
+base_seed = 1234  # 1234 for first five runs, 2345 for next five runs
 
 # Audio data root
 #audio_root = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon"
 audio_root = "/mnt/data/Projects/subinphon/dataset"
 
 # Experiment settings
-lang_name = "EnglishBH_shortened"
+lang_name = "EnglishBH"
 # Property options: "nonidentical," where identical surface vowels are avoided
 property = ""
 directionality = ["l2r", "r2l"]
