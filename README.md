@@ -209,7 +209,7 @@ Typical outputs include:
 - `*_model_files/`: saved checkpoints
 - `*_acc_plots/`: training curves
 - `*_att_plots/`: attention visualizations
-- `*_embed_plots/`: phoneme embedding plots and CSV exports
+- `*_embed_plots/`: phoneme embedding plots
 
 Audio runs additionally produce:
 

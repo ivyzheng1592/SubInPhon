@@ -236,14 +236,10 @@ class TextTrainer:
             phone_space = self.recorder.dataset.sr_alphabet.embed2fea(embed)
             phone_spaces[file_name] = phone_space
 
-            embed_file = os.path.join(self.recorder.embed_plot_dir,
-                                      file_name.replace("_seq2seq.pth", "_embedding.csv"))
             embed_plot = os.path.join(self.recorder.embed_plot_dir,
-                                      file_name.replace("_seq2seq.pth", "_embedding.png"))
+                                      file_name.replace("_seq2seq.pth", "_embed.png"))
             # plot embedding
-            utils.plot_embed(phone_space, focus, embed_plot)
-            # save embedding recording to file
-            utils.save_to_file(phone_space, embed_file)
+            utils.plot_embed(phone_space, focus, embed_plot, plot_option="all")
 
         # plot embedding
         utils.plot_embed_updated(phone_spaces, focus, self.recorder.embed_plot)
