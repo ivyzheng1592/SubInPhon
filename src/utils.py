@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, List, Mapping, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
@@ -429,23 +429,30 @@ def plot_embed_updated(
         plot_df: pd.DataFrame,
         label: str,
         color: str,
-        visible: bool,
+        visible: Optional[bool] = None,
+        showlegend: Optional[bool] = None,
     ) -> go.Scatter3d:
-        return go.Scatter3d(
-            x=plot_df["pc1"],
-            y=plot_df["pc2"],
-            z=plot_df["pc3"],
-            mode="markers",
-            name=label,
-            legendgroup=label,
-            marker={"size": 4, "color": color},
-            text=plot_df["phoneme"].astype(str),
-            hovertemplate=(
+        trace_kwargs = {
+            "x": plot_df["pc1"],
+            "y": plot_df["pc2"],
+            "z": plot_df["pc3"],
+            "mode": "markers",
+            "name": label,
+            "legendgroup": label,
+            "marker": {"size": 4, "color": color},
+            "text": plot_df["phoneme"].astype(str),
+            "hovertemplate": (
                 "phoneme=%{text}<br>"
                 "pc1=%{x}<br>pc2=%{y}<br>pc3=%{z}<extra></extra>"
             ),
-            visible=visible,
-            showlegend=visible,
+        }
+        if visible is not None:
+            trace_kwargs["visible"] = visible
+        if showlegend is not None:
+            trace_kwargs["showlegend"] = showlegend
+
+        return go.Scatter3d(
+            **trace_kwargs,
         )
 
     initial_epoch = epochs[0]
@@ -455,10 +462,26 @@ def plot_embed_updated(
     traces = []
     for phoneme_label in phoneme_labels:
         plot_df = initial_phoneme_df[initial_phoneme_df["phoneme"] == phoneme_label]
-        traces.append(build_trace(plot_df, phoneme_label, phoneme_colors[phoneme_label], True))
+        traces.append(
+            build_trace(
+                plot_df,
+                phoneme_label,
+                phoneme_colors[phoneme_label],
+                visible=True,
+                showlegend=True,
+            )
+        )
     for vowel_label in vowel_labels:
         plot_df = initial_vowel_df[initial_vowel_df["phoneme"] == vowel_label]
-        traces.append(build_trace(plot_df, vowel_label, vowel_colors[vowel_label], False))
+        traces.append(
+            build_trace(
+                plot_df,
+                vowel_label,
+                vowel_colors[vowel_label],
+                visible=False,
+                showlegend=False,
+            )
+        )
 
     phoneme_trace_count = len(phoneme_labels)
     vowel_trace_count = len(vowel_labels)
@@ -471,10 +494,10 @@ def plot_embed_updated(
         frame_traces = []
         for phoneme_label in phoneme_labels:
             plot_df = epoch_phoneme_df[epoch_phoneme_df["phoneme"] == phoneme_label]
-            frame_traces.append(build_trace(plot_df, phoneme_label, phoneme_colors[phoneme_label], True))
+            frame_traces.append(build_trace(plot_df, phoneme_label, phoneme_colors[phoneme_label]))
         for vowel_label in vowel_labels:
             plot_df = epoch_vowel_df[epoch_vowel_df["phoneme"] == vowel_label]
-            frame_traces.append(build_trace(plot_df, vowel_label, vowel_colors[vowel_label], False))
+            frame_traces.append(build_trace(plot_df, vowel_label, vowel_colors[vowel_label]))
         frames.append(
             go.Frame(
                 name=str(epoch),
