@@ -85,10 +85,10 @@ base_seed = 1234  # 1234 for first five runs, 2345 for next five runs
 
 # Audio data root
 #audio_root = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon"
-audio_root = "/mnt/data/Projects/subinphon/dataset"
+audio_root = "/mnt/data/Projects/SubInPhon/dataset"
 
 # Experiment settings
-lang_name = "EnglishBH"
+lang_name = "EnglishBH_shortened"
 # Property options: "nonidentical," where identical surface vowels are avoided
 property = ""
 directionality = ["l2r", "r2l"]
