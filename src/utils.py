@@ -338,7 +338,7 @@ def plot_embed(
     else:
         fig = plt.figure(figsize=(2.5, 2))
         ax = fig.add_subplot(111, projection="3d")
-        ax.set_position([0.08, 0.18, 0.72, 0.72])
+        ax.set_position([0.0, 0.15, 0.7, 0.7])
         for i in focus_reduced_df.index:
             ax.scatter(
                 xs=focus_reduced_df.loc[i, "pc1"],
@@ -359,6 +359,17 @@ def plot_embed(
         ax.set_xlabel("pc1")
         ax.set_ylabel("pc2")
         ax.set_zlabel("pc3")
+        legend_handles = _build_legend_handles(FOCUS_EMBED_NEW_IDX, focus_embed_colors, marker_size=3)
+        fig.legend(
+            handles=legend_handles,
+            loc="center left",
+            bbox_to_anchor=(0.72, 0.5),
+            ncol=2,
+            frameon=False,
+            fontsize=5,
+            handletextpad=0.2,
+            columnspacing=0.5,
+        )
         push_text_free(fig, ax)
 
     plt.savefig(embed_plot, dpi=300)
@@ -636,7 +647,7 @@ def plot_aud_embed(
     plt.rcParams.update({"font.size": 5})
     fig = plt.figure(figsize=(2.5, 2))
     ax = fig.add_subplot(111, projection="3d")
-    ax.set_position([0.08, 0.18, 0.72, 0.72])
+    ax.set_position([0.0, 0.15, 0.7, 0.7])
     for vowel_label in FOCUS_EMBED_NEW_IDX:
         plot_df = reduced_df[reduced_df["vowel_label"] == vowel_label]
         if len(plot_df) == 0:
@@ -656,9 +667,9 @@ def plot_aud_embed(
     legend_handles = _build_legend_handles(FOCUS_EMBED_NEW_IDX, colors, marker_size=3)
     fig.legend(
         handles=legend_handles,
-        loc="upper center",
-        bbox_to_anchor=(0.5, 0.98),
-        ncol=len(FOCUS_EMBED_NEW_IDX),
+        loc="center left",
+        bbox_to_anchor=(0.72, 0.5),
+        ncol=2,
         frameon=False,
         fontsize=5,
         handletextpad=0.2,
