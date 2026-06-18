@@ -347,6 +347,7 @@ class AudioTrainer:
         static_embed_item_count = utils.plot_aud_embed(
             self.recorder.aud_embed_store,
             self.recorder.pred_embed_plot,
+            self.recorder.pred_embed_plot_pc2,
         )
         embed_item_count = utils.plot_aud_embed_updated(
             self.recorder.aud_embed_store,

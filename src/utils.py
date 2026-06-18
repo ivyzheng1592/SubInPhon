@@ -363,7 +363,7 @@ def plot_embed(
         fig.legend(
             handles=legend_handles,
             loc="center left",
-            bbox_to_anchor=(0.85, 0.4),
+            bbox_to_anchor=(0.85, 0.6),
             ncol=1,
             frameon=False,
             fontsize=5,
@@ -611,6 +611,7 @@ def plot_embed_updated(
 def plot_aud_embed(
     aud_embed_store: Mapping[str, Sequence[Any]],
     embed_plot: str,
+    embed_plot_pc2: Optional[str] = None,
 ) -> int:
     combined_df = pd.DataFrame(aud_embed_store)
 
@@ -668,7 +669,7 @@ def plot_aud_embed(
     fig.legend(
         handles=legend_handles,
         loc="center left",
-        bbox_to_anchor=(0.85, 0.4),
+        bbox_to_anchor=(0.85, 0.6),
         ncol=1,
         frameon=False,
         fontsize=5,
@@ -678,6 +679,10 @@ def plot_aud_embed(
     push_text_free(fig, ax)
 
     plt.savefig(embed_plot, dpi=300)
+    if embed_plot_pc2 is not None:
+        # View from the pc1 side so pc2 reads horizontally in the second static plot.
+        ax.view_init(elev=30, azim=0)
+        plt.savefig(embed_plot_pc2, dpi=300)
     plt.close()
     return int(pred_df["item_index"].nunique())
 

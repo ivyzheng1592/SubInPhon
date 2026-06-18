@@ -67,6 +67,10 @@ class AudioRecorder(TextRecorder):
         self.aud_embed_file = os.path.join(self.audio_embed_dir, self.run_root + "_aud_embed.csv")
         self.aud_vowel_relation_file = os.path.join(self.audio_embed_dir, self.run_root + "_aud_vowel_relation.csv")
         self.pred_embed_plot = os.path.join(self.audio_embed_dir, self.run_root + "_pred_embed.png")
+        self.pred_embed_plot_pc2 = os.path.join(
+            self.audio_embed_dir,
+            self.run_root + "_pred_embed_pc2_horizontal.png",
+        )
         self.aud_embed_plot = os.path.join(self.audio_embed_dir, self.run_root + "_aud_embed.html")
         self.aud_vowel_relation_plot = os.path.join(
             self.audio_embed_dir,
