@@ -39,7 +39,22 @@ class AudioTrainer:
         spec: torch.Tensor,
         trg_txt: torch.Tensor,
         trg_aud: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        pred_durations: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+
+        duration_loss = torch.zeros((), device=spec.device)
+
+        if pred_durations is not None:
+            # summarize total duration of predicted phonemes, ignoring padding and special tokens
+            text_mask = torch.ne(trg_txt, hp.special_tokens.index(hp.pad_token))
+            text_mask = torch.logical_and(text_mask, torch.ne(trg_txt, hp.special_tokens.index(hp.sos_token)))
+            text_mask = torch.logical_and(text_mask, torch.ne(trg_txt, hp.special_tokens.index(hp.eos_token)))
+            pred_total_durations = (pred_durations.squeeze(-1) * text_mask.to(pred_durations.dtype)).sum(dim=0)
+            # summarize total duration of target audio, ignoring padding (-100)
+            valid_frames = torch.any(torch.ne(trg_aud, -100), dim=2).squeeze(1)
+            target_total_durations = valid_frames.sum(dim=1).to(trg_aud.dtype)
+
+            duration_loss = F.mse_loss(pred_total_durations, target_total_durations)
 
         # remove the <SOS> token from output and target and reshape for loss calculation
         txt_dim = output.shape[2]
@@ -54,7 +69,7 @@ class AudioTrainer:
         rec_loss = F.l1_loss(spec, trg_aud, reduction='mean', weight=weight)
         pred_loss = F.cross_entropy(output, trg_txt, ignore_index=hp.special_tokens.index(hp.pad_token))
 
-        return rec_loss, pred_loss
+        return rec_loss, pred_loss, duration_loss
 
     # a function that completes one repetition of training and evaluation
     def run(
@@ -72,9 +87,9 @@ class AudioTrainer:
         # at each epoch, display progress bar
         for epoch in tqdm.tqdm(range(self.start_epoch, hp.n_epochs)):
             # update loss
-            train_rec_loss, train_pred_loss, train_src, train_trg, train_pred = (
+            train_rec_loss, train_pred_loss, train_duration_loss, train_src, train_trg, train_pred = (
                 self.train_one_epoch(train_dataloader, hp.text_teacher_forcing, hp.audio_teacher_forcing))
-            eval_rec_loss, eval_pred_loss, eval_src, eval_trg, eval_pred = (
+            eval_rec_loss, eval_pred_loss, eval_duration_loss, eval_src, eval_trg, eval_pred = (
                 self.evaluate_one_epoch(eval_dataloader))
 
             # record predictions and prediction correctness
@@ -86,9 +101,11 @@ class AudioTrainer:
 
             print(f"Epoch {epoch} Train Reconstruction Task Loss: {train_rec_loss:7.3f} "
                   f"| Train Prediction Task Loss: {train_pred_loss:7.3f} "
+                  f"| Train Duration Loss: {train_duration_loss:7.3f} "
                   f"| Train Prediction Acc: {train_acc:7.3f}")
             print(f"Epoch {epoch} {eval_record_type.capitalize()} Reconstruction Task Loss: {eval_rec_loss:7.3f} "
                   f"| {eval_record_type.capitalize()} Prediction Task Loss: {eval_pred_loss:7.3f} "
+                  f"| {eval_record_type.capitalize()} Duration Loss: {eval_duration_loss:7.3f} "
                   f"| {eval_record_type.capitalize()} Prediction Acc: {eval_acc:7.3f}")
 
             # save model every other save_epochs
@@ -113,10 +130,11 @@ class AudioTrainer:
         data_loader: Any,
         txt_teacher_forcing: float,
         aud_teacher_forcing: float,
-    ) -> Tuple[float, float, List[Any], List[Any], List[Any]]:
+    ) -> Tuple[float, float, float, List[Any], List[Any], List[Any]]:
         self.seq2seq.train()  # enable dropout in training
         epoch_pred_loss = 0
         epoch_rec_loss = 0
+        epoch_duration_loss = 0
 
         # storing text predictions
         src_txts = []
@@ -132,7 +150,12 @@ class AudioTrainer:
             # trg_aud = [batch_size, n_channels, n_freq, aud_trg_len]
 
             self.optimizer.zero_grad()  # reset gradient at each iteration to 0
-            output, pred, spec, _, _ = self.seq2seq(input, txt_teacher_forcing, aud_teacher_forcing)
+            model_output = self.seq2seq(input, txt_teacher_forcing, aud_teacher_forcing)
+            if len(model_output) == 6:
+                output, pred, spec, _, _, pred_durations = model_output
+            else:
+                output, pred, spec, _, _ = model_output
+                pred_durations = None
             # output = [txt_trg_len, batch_size, txt_output_dim]
             # pred = [txt_trg_len, batch_size]
             # spec = [batch_size, 1, aud_output_dim, aud_trg_len]
@@ -142,10 +165,13 @@ class AudioTrainer:
             trg_txts.append(trg_txt)
             pred_txts.append(pred)
 
-            rec_loss, pred_loss = self.compute_loss(output, spec, trg_txt, trg_aud)
-            batch_loss = rec_loss + pred_loss  # calculate batch loss
+            rec_loss, pred_loss, duration_loss = self.compute_loss(
+                output, spec, trg_txt, trg_aud, pred_durations=pred_durations
+            )
+            batch_loss = rec_loss + pred_loss + duration_loss
             epoch_rec_loss += rec_loss.item()
             epoch_pred_loss += pred_loss.item()  # add to epoch loss
+            epoch_duration_loss += duration_loss.item()
             batch_loss.backward()  # backpropagate loss
             nn.utils.clip_grad_norm_(self.seq2seq.parameters(), max_norm=1.0)
             # clip the gradients to prevent exploding, uncomment if necessary
@@ -154,13 +180,15 @@ class AudioTrainer:
         # average loss over all batches
         epoch_rec_loss = epoch_rec_loss / len(data_loader)
         epoch_pred_loss = epoch_pred_loss / len(data_loader)
-        return epoch_rec_loss, epoch_pred_loss, src_txts, trg_txts, pred_txts
+        epoch_duration_loss = epoch_duration_loss / len(data_loader)
+        return epoch_rec_loss, epoch_pred_loss, epoch_duration_loss, src_txts, trg_txts, pred_txts
 
     # a function that manages evaluation at one epoch
-    def evaluate_one_epoch(self, data_loader: Any) -> Tuple[float, float, List[Any], List[Any], List[Any]]:
+    def evaluate_one_epoch(self, data_loader: Any) -> Tuple[float, float, float, List[Any], List[Any], List[Any]]:
         self.seq2seq.eval()  # disable dropout in evaluation
         epoch_rec_loss = 0
         epoch_pred_loss = 0
+        epoch_duration_loss = 0
 
         # storing text predictions
         src_txts = []
@@ -176,7 +204,12 @@ class AudioTrainer:
                 # trg_txt = [txt_trg_len, batch_size]
                 # trg_aud = [batch_size, n_channels, n_freq, aud_trg_len]
 
-                output, pred, spec, _, _ = self.seq2seq(input, 0, 0)  # turn off teacher forcing
+                model_output = self.seq2seq(input, 0, 0)
+                if len(model_output) == 6:
+                    output, pred, spec, _, _, pred_durations = model_output
+                else:
+                    output, pred, spec, _, _ = model_output
+                    pred_durations = None
                 # output = [txt_trg_len, batch_size, txt_output_dim]
                 # pred = [txt_trg_len, batch_size]
                 # spec = [batch_size, 1, aud_output_dim, aud_trg_len]
@@ -186,14 +219,18 @@ class AudioTrainer:
                 trg_txts.append(trg_txt)
                 pred_txts.append(pred)
 
-                rec_loss, pred_loss = self.compute_loss(output, spec, trg_txt, trg_aud)  # calculate batch loss
+                rec_loss, pred_loss, duration_loss = self.compute_loss(
+                    output, spec, trg_txt, trg_aud, pred_durations=pred_durations
+                )
                 epoch_rec_loss += rec_loss.item()
                 epoch_pred_loss += pred_loss.item()  # add to epoch loss
+                epoch_duration_loss += duration_loss.item()
 
         # average loss and accuracy over all batches
         epoch_rec_loss = epoch_rec_loss / len(data_loader)
         epoch_pred_loss = epoch_pred_loss / len(data_loader)
-        return epoch_rec_loss, epoch_pred_loss, src_txts, trg_txts, pred_txts
+        epoch_duration_loss = epoch_duration_loss / len(data_loader)
+        return epoch_rec_loss, epoch_pred_loss, epoch_duration_loss, src_txts, trg_txts, pred_txts
 
     # a function that manages evaluation of one random batch
     def evaluate_attention(
@@ -215,7 +252,11 @@ class AudioTrainer:
 
         with torch.no_grad():  # disable gradient tracking
             # get predicted sr and attention weights
-            _, pred, spec, txt_atts, aud_atts = self.seq2seq(input, 0, 0)  # turn off teacher forcing
+            model_output = self.seq2seq(input, 0, 0)
+            if len(model_output) == 6:
+                _, pred, spec, txt_atts, aud_atts, _ = model_output
+            else:
+                _, pred, spec, txt_atts, aud_atts = model_output
             # pred = [txt_trg_len, batch_size]
             # spec = [batch_size, 1, aud_output_dim, aud_trg_len]
             # txt_atts = [txt_trg_len, batch_size, aud_src_len]
@@ -311,7 +352,11 @@ class AudioTrainer:
         with torch.no_grad():
             for i, input in enumerate(dataloader):
                 src_txt, src_aud, trg_txt, trg_aud = input
-                _, pred_txt, pred_spec, _, _ = self.seq2seq(input, 0, 0)
+                model_output = self.seq2seq(input, 0, 0)
+                if len(model_output) == 6:
+                    _, pred_txt, pred_spec, _, _, _ = model_output
+                else:
+                    _, pred_txt, pred_spec, _, _ = model_output
 
                 for j in range(hp.batch_size):
                     # Recover the word strings for direct audio-reference lookup.

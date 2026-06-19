@@ -34,8 +34,9 @@ The same high-level loop is used across text, feature, and audio experiments, wi
 - `src/languages_config.json`: language inventory and syllable/word-structure specifications
 - `src/language_generator.py`: language/pattern generation logic
 - `src/text_dataset.py`, `src/feature_dataset.py`, `src/audio_dataset.py`: dataset loaders
-- `src/text_network.py`, `src/feature_network.py`: symbolic seq2seq models
-- `src/audio_network_t1.py`, `src/audio_network_t2.py`: audio seq2seq models
+- `src/text_network.py`, `src/feature_network.py`: Bahdanau seq2seq models for symbolic and feature-based experiments
+- `src/audio_network_t1.py`: audio seq2seq model based on Google Translatotron 1
+- `src/audio_network_t2.py`: audio seq2seq model based on Google Translatotron 2
 - `src/text_trainer.py`, `src/audio_trainer.py`: training, evaluation, checkpoint loading, and inspection
 - `src/text_recorder.py`, `src/audio_recorder.py`: accuracy/prediction logging and plot bookkeeping
 - `src/utils.py`: plotting and file-saving helpers
@@ -215,6 +216,7 @@ Audio runs additionally produce:
 
 - `*_aud_embed.csv`
 - `*_aud_vowel_relation.csv`
+- `*_pred_embed.png`
 - `*_aud_embed.html`
 - `*_aud_vowel_relation.html`
 
@@ -237,9 +239,9 @@ The experiment runner seeds:
 
 At the time of writing, `src/hyper_params.py` defaults to:
 
-- `lang_name = "EnglishBH_shortened"`
+- `lang_name = "EnglishBH"`
 - `property = ""`
-- `directionality = ["l2r"]`
+- `directionality = ["l2r", "r2l"]`
 - `conditions = ["harmony", "disharmony"]`
 - `run_mode = "train and evaluate"`
 - `pred_log = "vowel_only_error"`
@@ -251,7 +253,6 @@ These are defaults, not requirements.
 
 - Checkpoints can now be reloaded with `map_location=hp.device`, so moving between CPU and CUDA runs is supported through the configured device setting.
 - The audio pipeline chooses the `aud_vowel` variant automatically when the selected language defines one.
-- `EnglishBH_expanded` uses three-syllable outputs, and the prediction recorder includes third-syllable logging fields for that entry.
 
 ## Minimal Example Workflow
 

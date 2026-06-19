@@ -214,13 +214,22 @@ class GaussianUpsampling(nn.Module):
     def forward(
         self,
         input: torch.Tensor,
+        trg_txt: torch.Tensor,
         aud_trg_len: int,
         durations: torch.Tensor,
         ranges: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         # input = [txt_len, batch_size, hidden_dim * 3]
+        # trg_txt = [txt_len, batch_size]
         # durations = [txt_len, batch_size, 1]
         # ranges = [txt_len, batch_size, 1]
+
+        mask = torch.ne(trg_txt, hp.special_tokens.index(hp.pad_token))
+        mask = torch.logical_and(mask, torch.ne(trg_txt, hp.special_tokens.index(hp.sos_token)))
+        mask = torch.logical_and(mask, torch.ne(trg_txt, hp.special_tokens.index(hp.eos_token)))
+        mask = mask.unsqueeze(-1).to(input.dtype)
+
+        durations = durations * mask
         
         # Build one acoustic timeline [0, 1, ..., aud_trg_len - 1] that every text slot
         # will be aligned against.
@@ -236,6 +245,9 @@ class GaussianUpsampling(nn.Module):
         # Nearby frames get high weight; distant frames get low weight.
         weights = torch.exp(-0.5 * ((time - centers) / ranges) ** 2)
         # weights = [txt_len, batch_size, aud_trg_len]
+        
+        weights = weights * mask
+        
         # Normalize over text slots so each acoustic frame becomes a weighted average
         # of all text-slot representations.
         weights = weights / weights.sum(dim=0, keepdim=True).clamp_min(1e-8)
@@ -364,7 +376,7 @@ class AudioSeq2Seq(nn.Module):
         input: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
         txt_teacher_forcing: float = hp.text_teacher_forcing,
         aud_teacher_forcing: float = hp.audio_teacher_forcing,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         src_txt, src_aud, trg_txt, trg_aud = input
         # src_txt = [txt_src_len, batch_size]
         # src_aud = [batch_size, n_channels, n_freq, aud_src_len]
@@ -427,8 +439,9 @@ class AudioSeq2Seq(nn.Module):
         # durations = [txt_len, batch_size, 1]
         pred_ranges = self.range_predictor(upsample_input, pred_durations)
         # ranges = [txt_len, batch_size, 1]
+
         upsamples, gaussian_weights = self.gaussian_upsample(
-            upsample_input, aud_trg_len, pred_durations, pred_ranges
+            upsample_input, trg_txt, aud_trg_len, pred_durations, pred_ranges
         )
         # gaussian_weights = [txt_trg_len, batch_size, aud_trg_len]
         # upsamples = [batch_size, aud_trg_len, hidden_dim * 3]
@@ -474,6 +487,7 @@ class AudioSeq2Seq(nn.Module):
             postnet_outputs,
             decoder_attentions,
             synthesizer_attentions,
+            pred_durations,
         )
 
 
