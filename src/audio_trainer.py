@@ -379,14 +379,14 @@ class AudioTrainer:
 
                     # Record one row per vowel token into the audio embedding store.
                     item_index = i * hp.batch_size + j
-                    self.recorder.record_audio_embedding("source", src_aud[j, 0], src_textgrid, ur_ref, item_index)
-                    self.recorder.record_audio_embedding("target", trg_aud[j, 0], trg_textgrid, sr_ref, item_index)
-                    self.recorder.record_audio_embedding("pred", pred_spec[j, 0], trg_textgrid, sr_ref, item_index)
+                    self.recorder.record_audio_embedding("source", src_aud[j, 0], src_textgrid, ur_string, item_index)
+                    self.recorder.record_audio_embedding("target", trg_aud[j, 0], trg_textgrid, sr_string, item_index)
+                    self.recorder.record_audio_embedding("pred", pred_spec[j, 0], trg_textgrid, sr_string, item_index)
 
-        # Save the embedding store and the derived vowel relation store to CSV files.
-        self.recorder.record_vowel_relation()
+        # Save the embedding store and the derived vowel distance store to CSV files.
+        self.recorder.record_vowel_distance()
         utils.save_to_file(self.recorder.aud_embed_store, self.recorder.aud_embed_file)
-        utils.save_to_file(self.recorder.aud_vowel_relation_store, self.recorder.aud_vowel_relation_file)
+        utils.save_to_file(self.recorder.aud_vowel_distance_store, self.recorder.aud_vowel_distance_file)
 
         # Plot the predicted vowel embeddings and the interactive audio embedding views.
         static_embed_item_count = utils.plot_aud_embed(
@@ -398,14 +398,14 @@ class AudioTrainer:
             self.recorder.aud_embed_store,
             self.recorder.aud_embed_plot,
         )
-        relation_item_count = utils.plot_aud_vowel_relation(
-            self.recorder.aud_vowel_relation_store,
-            self.recorder.aud_vowel_relation_plot,
+        distance_item_count = utils.plot_aud_vowel_distance(
+            self.recorder.aud_vowel_distance_store,
+            self.recorder.aud_vowel_distance_plot,
         )
 
         print(
             f"Run {self.recorder.run_num} source, target, and predicted audio embedding plots are saved "
             f"({static_embed_item_count} items in plot_aud_embed; "
             f"{embed_item_count} items in plot_aud_embed_updated; "
-            f"{relation_item_count} items in plot_aud_vowel_relation)"
+            f"{distance_item_count} items in plot_aud_vowel_distance)"
         )

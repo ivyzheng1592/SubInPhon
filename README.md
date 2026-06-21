@@ -215,10 +215,10 @@ Typical outputs include:
 Audio runs additionally produce:
 
 - `*_aud_embed.csv`
-- `*_aud_vowel_relation.csv`
+- `*_aud_vowel_distance.csv`
 - `*_pred_embed.png`
 - `*_aud_embed.html`
-- `*_aud_vowel_relation.html`
+- `*_aud_vowel_distance.html`
 
 ## Reproducibility
 

@@ -44,7 +44,7 @@ class AudioRecorder(TextRecorder):
         }
         for mel_idx in range(dataset.n_mels):
             self.aud_embed_store[f"mel_{mel_idx}"] = []
-        self.aud_vowel_relation_store = {
+        self.aud_vowel_distance_store = {
             "spectrogram_type": [],
             "item_index": [],
             "word_ref": [],
@@ -65,16 +65,16 @@ class AudioRecorder(TextRecorder):
 
         # Build the audio embedding files and plots.
         self.aud_embed_file = os.path.join(self.audio_embed_dir, self.run_root + "_aud_embed.csv")
-        self.aud_vowel_relation_file = os.path.join(self.audio_embed_dir, self.run_root + "_aud_vowel_relation.csv")
+        self.aud_vowel_distance_file = os.path.join(self.audio_embed_dir, self.run_root + "_aud_vowel_distance.csv")
         self.pred_embed_plot = os.path.join(self.audio_embed_dir, self.run_root + "_pred_embed.png")
         self.pred_embed_plot_pc2 = os.path.join(
             self.audio_embed_dir,
             self.run_root + "_pred_embed_pc2_horizontal.png",
         )
         self.aud_embed_plot = os.path.join(self.audio_embed_dir, self.run_root + "_aud_embed.html")
-        self.aud_vowel_relation_plot = os.path.join(
+        self.aud_vowel_distance_plot = os.path.join(
             self.audio_embed_dir,
-            self.run_root + "_aud_vowel_relation.html",
+            self.run_root + "_aud_vowel_distance.html",
         )
 
     # a function that records accuracy rates into a dictionary
@@ -183,76 +183,94 @@ class AudioRecorder(TextRecorder):
         end_frame = max(start_frame + 1, min(end_frame, max_frames))
         return start_frame, end_frame
 
-    # Read the TextGrid intervals and add one row per vowel token to the audio embedding store.
+    # Validate that the vowel labels read from the TextGrid match the vowel sequence in the word string.
+    def validate_vowel_label(
+        self,
+        vowel_labels: List[str],
+        word_string: str,
+    ) -> Any:
+        expected_vowel_labels = [char for char in word_string if char in self.language.focus.keys()]
+        if vowel_labels != expected_vowel_labels:
+            return [False, False]
+        return vowel_labels
+
+    # Read TextGrid vowel intervals and add one row per vowel token to the audio embedding store.
     def record_audio_embedding(
         self,
         embedding_type: str,
         spectrogram: torch.Tensor,
         textgrid_file: str,
-        word_ref: str,
+        word_string: str,
         item_index: int,
     ) -> None:
         # Read the vowel intervals from the TextGrid file.
         intervals = self.read_vowel_intervals(textgrid_file)
         
-        # Add placeholder rows if the TextGrid does not provide exactly two vowel intervals.
+        # Use placeholder rows when the TextGrid does not provide exactly two vowels.
         if len(intervals) != 2:
             for vowel_index in range(2):
                 self.aud_embed_store["spectrogram_type"].append(embedding_type)
                 self.aud_embed_store["item_index"].append(item_index)
-                self.aud_embed_store["word_ref"].append(word_ref)
+                self.aud_embed_store["word_ref"].append(word_string)
                 self.aud_embed_store["vowel_index"].append(vowel_index)
-                self.aud_embed_store["vowel_label"].append("NA")
+                self.aud_embed_store["vowel_label"].append(None)
                 for mel_idx in range(self.dataset.n_mels):
-                    self.aud_embed_store[f"mel_{mel_idx}"].append("NA")
+                    self.aud_embed_store[f"mel_{mel_idx}"].append(None)
             return
+
+        # Check that the two vowel labels from the TextGrid match the intended vowel sequence in the word.
+        validated_vowel_labels = self.validate_vowel_label(
+            [vowel_label for _, _, vowel_label in intervals],
+            word_string,
+        )
         
         max_frames = spectrogram.shape[1]
-        # Otherwise, convert each vowel interval into one mean mel embedding row.
-        for vowel_index, (start_time, end_time, vowel_label) in enumerate(intervals):
+        # Convert each vowel interval into mel-frame boundaries and average over that span.
+        for vowel_index, (start_time, end_time, _) in enumerate(intervals):
             start_frame, end_frame = self.time_to_mel_frame(start_time, end_time, max_frames)
             vowel_slice = spectrogram[:, start_frame:end_frame]
+            # This collapses the vowel's time frames into one fixed-length mel vector.
             vowel_embed = vowel_slice.mean(dim=1).cpu().tolist()
 
-            # Append the vowel metadata and mel values to the selected store.
+            # Append the vowel metadata and mean mel values to the audio embedding store.
             self.aud_embed_store["spectrogram_type"].append(embedding_type)
             self.aud_embed_store["item_index"].append(item_index)
-            self.aud_embed_store["word_ref"].append(word_ref)
+            self.aud_embed_store["word_ref"].append(word_string)
             self.aud_embed_store["vowel_index"].append(vowel_index)
-            self.aud_embed_store["vowel_label"].append(vowel_label)
+            self.aud_embed_store["vowel_label"].append(validated_vowel_labels[vowel_index])
             for mel_idx, value in enumerate(vowel_embed):
                 self.aud_embed_store[f"mel_{mel_idx}"].append(value)
 
     # Calculate within-word vowel distances from the recorded audio embedding store.
-    def record_vowel_relation(self) -> None:
+    def record_vowel_distance(self) -> None:
         embed_df = pd.DataFrame(self.aud_embed_store)
 
-        # Drop placeholder rows and stop early if no real vowel embeddings were recorded.
-        embed_df = embed_df[embed_df["vowel_label"] != "NA"].copy()
-        if len(embed_df) == 0:
-            return
+        # Drop placeholder and mismatched rows before building within-word vowel pairs.
+        embed_df = embed_df[~embed_df["vowel_label"].isin([None, False])].copy()
 
         spectrogram_types = ["source", "target", "pred"]
         feature_cols = [col for col in embed_df.columns if col.startswith("mel_")]
+        # Count how many valid vowel rows each item still has for source, target, and pred.
+        spectrogram_counts = (
+            embed_df.groupby(["item_index", "spectrogram_type"])
+            .size()
+            .unstack(fill_value=0)
+            .reindex(columns=spectrogram_types, fill_value=0)
+        )
 
-        # Go through all spectrogram types of all evaluated word items and record one relation row per type.
+        # Keep only items that still provide two vowels for source, target, and pred.
+        valid_item_indices = spectrogram_counts.index[(spectrogram_counts == 2).all(axis=1)].tolist()
+
+        # Restrict the dataframe to complete items before computing pairwise vowel distances.
+        embed_df = embed_df[embed_df["item_index"].isin(valid_item_indices)].copy()
+
+        # Go through all retained word items and record one distance row per spectrogram type.
         for item_index in sorted(embed_df["item_index"].unique()):
             for spectrogram_type in spectrogram_types:
                 word_df = embed_df[
                     (embed_df["item_index"] == item_index)
                     & (embed_df["spectrogram_type"] == spectrogram_type)
                 ].sort_values("vowel_index")
-                if len(word_df) < 2:
-                    # Add a placeholder row when this spectrogram type does not provide a full vowel pair.
-                    self.aud_vowel_relation_store["spectrogram_type"].append(spectrogram_type)
-                    self.aud_vowel_relation_store["item_index"].append(item_index)
-                    self.aud_vowel_relation_store["word_ref"].append("NA")
-                    self.aud_vowel_relation_store["first_vowel"].append("NA")
-                    self.aud_vowel_relation_store["second_vowel"].append("NA")
-                    self.aud_vowel_relation_store["vowel_pair"].append("NA")
-                    self.aud_vowel_relation_store["euclidean"].append("NA")
-                    self.aud_vowel_relation_store["cosine"].append("NA")
-                    continue
 
                 # Pull out the first and second vowel embeddings for this word-level pair.
                 first_vowel = word_df.iloc[0]
@@ -266,14 +284,14 @@ class AudioRecorder(TextRecorder):
                     np.linalg.norm(first_embed) * np.linalg.norm(second_embed)
                 )
 
-                # Append the metadata and distance measures for this pair to the relation store.
-                self.aud_vowel_relation_store["spectrogram_type"].append(spectrogram_type)
-                self.aud_vowel_relation_store["item_index"].append(item_index)
-                self.aud_vowel_relation_store["word_ref"].append(first_vowel["word_ref"])
-                self.aud_vowel_relation_store["first_vowel"].append(first_vowel["vowel_label"])
-                self.aud_vowel_relation_store["second_vowel"].append(second_vowel["vowel_label"])
-                self.aud_vowel_relation_store["vowel_pair"].append(
+                # Append the metadata and distance measures for this pair to the distance store.
+                self.aud_vowel_distance_store["spectrogram_type"].append(spectrogram_type)
+                self.aud_vowel_distance_store["item_index"].append(item_index)
+                self.aud_vowel_distance_store["word_ref"].append(first_vowel["word_ref"])
+                self.aud_vowel_distance_store["first_vowel"].append(first_vowel["vowel_label"])
+                self.aud_vowel_distance_store["second_vowel"].append(second_vowel["vowel_label"])
+                self.aud_vowel_distance_store["vowel_pair"].append(
                     f"{first_vowel['vowel_label']}_{second_vowel['vowel_label']}"
                 )
-                self.aud_vowel_relation_store["euclidean"].append(euclidean)
-                self.aud_vowel_relation_store["cosine"].append(cosine)
+                self.aud_vowel_distance_store["euclidean"].append(euclidean)
+                self.aud_vowel_distance_store["cosine"].append(cosine)

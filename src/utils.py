@@ -616,7 +616,7 @@ def plot_aud_embed(
     combined_df = pd.DataFrame(aud_embed_store)
 
     # Remove any item that has an NA placeholder row so only complete source/target/pred triplets remain.
-    invalid_item_indices = combined_df.loc[combined_df["vowel_label"] == "NA", "item_index"].unique()
+    invalid_item_indices = combined_df.loc[combined_df["vowel_label"].isin([None, False]), "item_index"].unique()
     combined_df = combined_df[~combined_df["item_index"].isin(invalid_item_indices)].copy()
     if len(combined_df) == 0:
         return 0
@@ -696,7 +696,7 @@ def plot_aud_embed_updated(
     spectrogram_types = ["source", "target", "pred"]
 
     # Remove any item that has an NA placeholder row so only complete source/target/pred triplets remain.
-    invalid_item_indices = combined_df.loc[combined_df["vowel_label"] == "NA", "item_index"].unique()
+    invalid_item_indices = combined_df.loc[combined_df["vowel_label"].isin([None, False]), "item_index"].unique()
     combined_df = combined_df[~combined_df["item_index"].isin(invalid_item_indices)].copy()
     if len(combined_df) == 0:
         return 0
@@ -799,21 +799,15 @@ def plot_aud_embed_updated(
 
 
 # Plot within-word distance and similarity between first and second vowel embeddings.
-def plot_aud_vowel_relation(
-    vowel_relation_store: Mapping[str, Sequence[Any]],
+def plot_aud_vowel_distance(
+    vowel_distance_store: Mapping[str, Sequence[Any]],
     embed_plot: str,
 ) -> int:
     spectrogram_types = ["source", "target", "pred"]
     spectrogram_dtype = pd.CategoricalDtype(categories=spectrogram_types, ordered=True)
 
-    # Convert the recorded vowel-relation store into a dataframe for plotting.
-    pair_df = pd.DataFrame(vowel_relation_store)
-    if len(pair_df) == 0:
-        return 0
-
-    # Remove any item that has an NA placeholder row so only complete source/target/pred triplets remain.
-    invalid_item_indices = pair_df.loc[pair_df["vowel_pair"] == "NA", "item_index"].unique()
-    pair_df = pair_df[~pair_df["item_index"].isin(invalid_item_indices)].copy()
+    # Convert the recorded vowel-distance store into a dataframe for plotting.
+    pair_df = pd.DataFrame(vowel_distance_store)
     if len(pair_df) == 0:
         return 0
 
