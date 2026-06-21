@@ -615,7 +615,7 @@ def plot_aud_embed(
 ) -> int:
     combined_df = pd.DataFrame(aud_embed_store)
 
-    # Remove any item that has an NA placeholder row so only complete source/target/pred triplets remain.
+    # Remove any item that has a placeholder or mismatched vowel row so only complete source/target/pred triplets remain.
     invalid_item_indices = combined_df.loc[combined_df["vowel_label"].isin([None, False]), "item_index"].unique()
     combined_df = combined_df[~combined_df["item_index"].isin(invalid_item_indices)].copy()
     if len(combined_df) == 0:
@@ -695,7 +695,7 @@ def plot_aud_embed_updated(
     combined_df = pd.DataFrame(aud_embed_store)
     spectrogram_types = ["source", "target", "pred"]
 
-    # Remove any item that has an NA placeholder row so only complete source/target/pred triplets remain.
+    # Remove any item that has a placeholder or mismatched vowel row so only complete source/target/pred triplets remain.
     invalid_item_indices = combined_df.loc[combined_df["vowel_label"].isin([None, False]), "item_index"].unique()
     combined_df = combined_df[~combined_df["item_index"].isin(invalid_item_indices)].copy()
     if len(combined_df) == 0:

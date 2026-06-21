@@ -245,24 +245,11 @@ class AudioRecorder(TextRecorder):
     def record_vowel_distance(self) -> None:
         embed_df = pd.DataFrame(self.aud_embed_store)
 
-        # Drop placeholder and mismatched rows before building within-word vowel pairs.
-        embed_df = embed_df[~embed_df["vowel_label"].isin([None, False])].copy()
-
+        # Remove any item that has a placeholder or mismatched vowel row so only complete source/target/pred triplets remain.
+        invalid_item_indices = embed_df.loc[embed_df["vowel_label"].isin([None, False]), "item_index"].unique()
+        embed_df = embed_df[~embed_df["item_index"].isin(invalid_item_indices)].copy()
         spectrogram_types = ["source", "target", "pred"]
         feature_cols = [col for col in embed_df.columns if col.startswith("mel_")]
-        # Count how many valid vowel rows each item still has for source, target, and pred.
-        spectrogram_counts = (
-            embed_df.groupby(["item_index", "spectrogram_type"])
-            .size()
-            .unstack(fill_value=0)
-            .reindex(columns=spectrogram_types, fill_value=0)
-        )
-
-        # Keep only items that still provide two vowels for source, target, and pred.
-        valid_item_indices = spectrogram_counts.index[(spectrogram_counts == 2).all(axis=1)].tolist()
-
-        # Restrict the dataframe to complete items before computing pairwise vowel distances.
-        embed_df = embed_df[embed_df["item_index"].isin(valid_item_indices)].copy()
 
         # Go through all retained word items and record one distance row per spectrogram type.
         for item_index in sorted(embed_df["item_index"].unique()):
