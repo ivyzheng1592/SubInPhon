@@ -54,7 +54,7 @@ class AudioTrainer:
             valid_frames = torch.any(torch.ne(trg_aud, -100), dim=2).squeeze(1)
             target_total_durations = valid_frames.sum(dim=1).to(trg_aud.dtype)
 
-            duration_loss = F.mse_loss(pred_total_durations, target_total_durations)
+            duration_loss = 0.01 * F.mse_loss(pred_total_durations, target_total_durations)
 
         # remove the <SOS> token from output and target and reshape for loss calculation
         txt_dim = output.shape[2]
