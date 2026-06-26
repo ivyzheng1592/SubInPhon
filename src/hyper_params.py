@@ -27,13 +27,14 @@ When {property} is empty, that segment is omitted from file names.
                 - {lang_name} + "_{property}_" + {modality} + "_" + {directionality} + "_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_" + {src} + "_" + {trg} + "_aud.png"
         - {lang_name} + "_{property}_" + {modality} + "_embed_plots"
             - {lang_name} + "_{property}_" + {modality} + "_" + {directionality} + "_" + {condition} + "_run" + {run_num} + "_embed.html"
+            - {lang_name} + "_{property}_" + {modality} + "_" + {directionality} + "_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_embed.csv"
             - {lang_name} + "_{property}_" + {modality} + "_" + {directionality} + "_" + {condition} + "_run" + {run_num} + "_epoch" + {epoch} + "_embed.png"
         - {lang_name} + "_{property}_" + {modality} + "_aud_embed_plots"
-            - {lang_name} + "_{property}_" + {modality} + "_" + {directionality} + "_" + {condition} + "_run" + {run_num} + "_aud_embed.csv"
-            - {lang_name} + "_{property}_" + {modality} + "_" + {directionality} + "_" + {condition} + "_run" + {run_num} + "_aud_vowel_distance.csv"
-            - {lang_name} + "_{property}_" + {modality} + "_" + {directionality} + "_" + {condition} + "_run" + {run_num} + "_pred_embed.png"
             - {lang_name} + "_{property}_" + {modality} + "_" + {directionality} + "_" + {condition} + "_run" + {run_num} + "_aud_embed.html"
+            - {lang_name} + "_{property}_" + {modality} + "_" + {directionality} + "_" + {condition} + "_run" + {run_num} + "_aud_embed.csv"
+            - {lang_name} + "_{property}_" + {modality} + "_" + {directionality} + "_" + {condition} + "_run" + {run_num} + "_pred_embed.png"
             - {lang_name} + "_{property}_" + {modality} + "_" + {directionality} + "_" + {condition} + "_run" + {run_num} + "_aud_vowel_distance.html"
+            - {lang_name} + "_{property}_" + {modality} + "_" + {directionality} + "_" + {condition} + "_run" + {run_num} + "_aud_vowel_distance.csv"
 """
 
 # Alphabet
