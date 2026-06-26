@@ -238,8 +238,12 @@ class TextTrainer:
 
             embed_plot = os.path.join(self.recorder.embed_plot_dir,
                                       file_name.replace("_seq2seq.pth", "_embed.png"))
+            embed_file = os.path.join(self.recorder.embed_plot_dir,
+                                      file_name.replace("_seq2seq.pth", "_embed.csv"))
             # plot embedding
             utils.plot_embed(phone_space, focus, embed_plot, plot_option="all")
+            # save embedding recording to file
+            utils.save_to_file(phone_space, embed_file)
 
         # plot embedding
         utils.plot_embed_updated(phone_spaces, focus, self.recorder.embed_plot)
