@@ -34,7 +34,7 @@ def main() -> None:
     # output_file: spreadsheet where the frame counts will be saved.
     # max_name_length: optional filename-length filter for quick subset checks.
     check_audio_lengths(
-        Path("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/EnglishBH").expanduser().resolve(),
+        Path("/mnt/data/Projects/SubInPhon/audio/EnglishBH").expanduser().resolve(),
         Path("audio_length.xlsx").expanduser().resolve(),
         max_name_length=None,
     )

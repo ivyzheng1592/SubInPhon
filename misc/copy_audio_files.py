@@ -48,8 +48,8 @@ def main() -> None:
     # Final argument: which CSV column to use as the audio reference.
     copy_audio_files(
         Path("/mnt/data/Projects/subinphon/dataset/EnglishBH_shortened_harmony.csv").expanduser().resolve(),
-        Path("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/EnglishBH").expanduser().resolve(),
-        Path("/mnt/data/Projects/subinphon/dataset").expanduser().resolve(),
+        Path("/mnt/data/Projects/SubInPhon/audio/EnglishBH").expanduser().resolve(),
+        Path("/mnt/data/Projects/SubInPhon/audio/EnglishBH_shortened").expanduser().resolve(),
         "ur_var",
     )
 

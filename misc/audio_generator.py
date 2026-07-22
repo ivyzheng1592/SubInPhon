@@ -81,7 +81,7 @@ def main() -> None:
     # voice_id: Polly voice used for synthesis.
     # convert_to_wav: whether generated MP3 files should also be converted to WAV.
     csv_file = Path("EnglishBH_aud_harmony.csv").expanduser().resolve()
-    output_dir = Path("audio/English").expanduser().resolve()
+    output_dir = Path("/mnt/data/Projects/SubInPhon/audio/EnglishBH").expanduser().resolve()
     columns = list(DEFAULT_COLUMNS)
     limit = None
     voice_id = "Danielle"
