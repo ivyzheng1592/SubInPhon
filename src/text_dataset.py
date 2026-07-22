@@ -158,7 +158,7 @@ if __name__ == "__main__":
         sample_proportion=hp.data_proportion,
         property=hp.property,
         directionality=hp.directionality[0],
-        output_dir="data",
+        output_dir="dataset",
     )[hp.conditions[0]]
     annotations = pd.read_csv(annotations_file)
     print(f"Dataset size: {len(annotations)}")

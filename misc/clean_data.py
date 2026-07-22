@@ -553,15 +553,16 @@ def summarize_cv_run(run_df: pd.DataFrame, cv_acc_df: pd.DataFrame) -> pd.DataFr
 
 
 def clean_acc(
-    results_dir: Path,
+    output_dir: Path,
     data_dir: Path,
     min_acc: float,
     max_loss: float,
+    output_prefix: str,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    acc_files = sorted(results_dir.rglob("*acc.csv"))
+    acc_files = sorted(output_dir.rglob("*acc.csv"))
 
     if not acc_files:
-        print(f"No acc.csv files found under: {results_dir}")
+        print(f"No acc.csv files found under: {output_dir}")
         empty_df = pd.DataFrame()
         return empty_df, empty_df
 
@@ -569,7 +570,7 @@ def clean_acc(
     for file_path in acc_files:
         print(f"Reading acc file: {file_path}")
         this_df = pd.read_csv(file_path)
-        top_level_folder = file_path.relative_to(results_dir).parts[0]
+        top_level_folder = file_path.relative_to(output_dir).parts[0]
         this_df["error_record"] = "cv" if "_cv" in top_level_folder else "v"
         frames.append(this_df)
 
@@ -593,7 +594,7 @@ def clean_acc(
         .sort_values(RUN_KEY_COLUMNS + ["record_type"])
         .reset_index(drop=True)
     )
-    failed_run_file = data_dir / "cleaned_260531_EnglishBH_failed_run.csv"
+    failed_run_file = data_dir / f"{output_prefix}_failed_run.csv"
     failed_run_df.to_csv(failed_run_file, index=False)
     print(f"Saved {len(failed_run_df)} failed runs to: {failed_run_file}")
 
@@ -626,7 +627,7 @@ def clean_acc(
             "acc",
         ]
     ]
-    filtered_acc_file = data_dir / "cleaned_260531_EnglishBH_all_acc.csv"
+    filtered_acc_file = data_dir / f"{output_prefix}_all_acc.csv"
     filtered_acc_df.to_csv(filtered_acc_file, index=False)
 
     filtered_run_df = (
@@ -656,7 +657,7 @@ def clean_acc(
         .size()
         .rename(columns={"size": "n"})
     )
-    filtered_run_file = data_dir / "cleaned_260531_EnglishBH_run_list.csv"
+    filtered_run_file = data_dir / f"{output_prefix}_run_list.csv"
     filtered_run_df.to_csv(filtered_run_file, index=False)
 
     print(
@@ -668,19 +669,25 @@ def clean_acc(
     return filtered_acc_df, included_run_df
 
 
-def clean_v_pred(results_dir: Path, data_dir: Path, included_run_df: pd.DataFrame, filtered_acc_df: pd.DataFrame) -> None:
-    v_dirs = sorted(path for path in results_dir.iterdir() if path.is_dir() and path.name.endswith("_v"))
+def clean_v_pred(
+    output_dir: Path,
+    data_dir: Path,
+    included_run_df: pd.DataFrame,
+    filtered_acc_df: pd.DataFrame,
+    output_prefix: str,
+) -> None:
+    v_dirs = sorted(path for path in output_dir.iterdir() if path.is_dir() and path.name.endswith("_v"))
     pred_files = sorted(file_path for folder in v_dirs for file_path in folder.rglob("*pred.csv"))
     v_acc_df = build_v_acc_df(filtered_acc_df)
-    output_file = data_dir / "cleaned_260531_EnglishBH_v_pred.csv"
-    v_height_file = data_dir / "cleaned_260531_EnglishBH_v_height.csv"
+    output_file = data_dir / f"{output_prefix}_v_pred.csv"
+    v_height_file = data_dir / f"{output_prefix}_v_height.csv"
     output_file.unlink(missing_ok=True)
     v_height_file.unlink(missing_ok=True)
     first_write = True
     first_v_height_write = True
 
     if not pred_files:
-        print(f"No pred.csv files found under v folders in: {results_dir}")
+        print(f"No pred.csv files found under v folders in: {output_dir}")
         return
 
     for file_path in pred_files:
@@ -728,16 +735,22 @@ def clean_v_pred(results_dir: Path, data_dir: Path, included_run_df: pd.DataFram
     print(f"Saved v height data to: {v_height_file}")
 
 
-def clean_cv_pred(results_dir: Path, data_dir: Path, included_run_df: pd.DataFrame, filtered_acc_df: pd.DataFrame) -> None:
-    cv_dirs = sorted(path for path in results_dir.iterdir() if path.is_dir() and path.name.endswith("_cv"))
+def clean_cv_pred(
+    output_dir: Path,
+    data_dir: Path,
+    included_run_df: pd.DataFrame,
+    filtered_acc_df: pd.DataFrame,
+    output_prefix: str,
+) -> None:
+    cv_dirs = sorted(path for path in output_dir.iterdir() if path.is_dir() and path.name.endswith("_cv"))
     pred_files = sorted(file_path for folder in cv_dirs for file_path in folder.rglob("*pred.csv"))
     cv_acc_df = build_cv_acc_df(filtered_acc_df)
-    output_file = data_dir / "cleaned_260531_EnglishBH_cv_pred.csv"
+    output_file = data_dir / f"{output_prefix}_cv_pred.csv"
     output_file.unlink(missing_ok=True)
     first_write = True
 
     if not pred_files:
-        print(f"No pred.csv files found under cv folders in: {results_dir}")
+        print(f"No pred.csv files found under cv folders in: {output_dir}")
         return
 
     for file_path in pred_files:
@@ -769,23 +782,27 @@ def clean_cv_pred(results_dir: Path, data_dir: Path, included_run_df: pd.DataFra
 
 
 def main() -> None:
-    # Edit these paths as needed for a given run.
-    results_dir = Path("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/results")
-    data_dir = Path("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/data")
+    # Edit these paths and settings as needed for the current run.
+    output_dir = Path("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/output").expanduser().resolve()
+    data_dir = Path("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/dataset").expanduser().resolve()
+    output_prefix = "cleaned"
     min_acc = 0.8
     max_loss = 0.1
 
-    results_dir = results_dir.expanduser().resolve()
-    data_dir = data_dir.expanduser().resolve()
-
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Reading files from: {results_dir}")
+    print(f"Reading files from: {output_dir}")
     print(f"Saving files to: {data_dir}")
 
-    filtered_acc_df, included_run_df = clean_acc(results_dir, data_dir, min_acc, max_loss)
-    clean_v_pred(results_dir, data_dir, included_run_df, filtered_acc_df)
-    clean_cv_pred(results_dir, data_dir, included_run_df, filtered_acc_df)
+    filtered_acc_df, included_run_df = clean_acc(
+        output_dir,
+        data_dir,
+        min_acc,
+        max_loss,
+        output_prefix,
+    )
+    clean_v_pred(output_dir, data_dir, included_run_df, filtered_acc_df, output_prefix)
+    clean_cv_pred(output_dir, data_dir, included_run_df, filtered_acc_df, output_prefix)
 
 
 if __name__ == "__main__":

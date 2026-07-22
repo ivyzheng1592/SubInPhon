@@ -128,7 +128,7 @@ def txt_ipa_to_arpabet(ipa_string: str) -> str:
 
 
 if __name__ == "__main__":
-    data_dir = "data"
+    data_dir = "dataset"
     csv_file = os.path.join(data_dir, "EnglishBH_shortened_l2r_harmony.csv")
     wordlist_file = os.path.join(data_dir, "EnglishBH_wordlist.txt")
     textgrid_file = os.path.join(data_dir, "EnglishBH_textgrid.txt")

@@ -1,31 +1,16 @@
 #!/usr/bin/env python3
 """
-Script to create TextGrid files for each .wav file in a folder.
-Each TextGrid will have one interval tier containing an English-letter label.
-The mapping file path is configured inline in the main() function.
+Create TextGrid files for each WAV file in a folder.
 """
 
 import csv
 from pathlib import Path
+
 import torchaudio
 
 
-def create_textgrid(wav_filename, output_path, duration=1.0, label=None):
-    """
-    Create a TextGrid file with one interval tier.
-
-    Args:
-        wav_filename (str): Name of the wav file (without path, e.g., "pipi.wav")
-        output_path (str): Full path where to save the TextGrid file
-        duration (float): Duration of the interval tier (default 1.0 seconds)
-        label (str, optional): Text label to fill into the interval tier.
-            If omitted, the filename stem is used.
-    """
-    # Extract the label from filename if not provided
-    if label is None:
-        label = Path(wav_filename).stem
-
-    # TextGrid content in Praat format
+def create_textgrid(wav_filename: str, output_path: Path, duration: float, label: str) -> None:
+    # TextGrid content in Praat format with one interval tier covering the whole file.
     textgrid_content = f"""File type = "ooTextFile"
 Object class = "TextGrid"
 
@@ -46,39 +31,21 @@ item []:
             text = "{label}"
 """
 
-    # Write the TextGrid file
-    with open(output_path, 'w') as f:
-        f.write(textgrid_content)
+    # Write the TextGrid file to disk.
+    output_path.write_text(textgrid_content, encoding="utf-8")
 
 
-def get_wav_duration(wav_path):
-    """
-    Get the duration of a .wav file in seconds.
-
-    Args:
-        wav_path (str): Path to the .wav file
-
-    Returns:
-        float: Duration in seconds
-    """
-    waveform, sample_rate = torchaudio.load(wav_path)
-    duration = waveform.shape[1] / sample_rate
-    return duration
+def get_wav_duration(wav_path: Path) -> float:
+    # Measure the wav duration so the TextGrid spans the entire audio file.
+    waveform, sample_rate = torchaudio.load(str(wav_path))
+    return waveform.shape[1] / sample_rate
 
 
-def load_textgrid_mapping(mapping_path):
-    """
-    Load a mapping from wav filename stem to English-letter label.
-
-    Args:
-        mapping_path (str): Path to the EnglishBH_textgrid.txt file
-
-    Returns:
-        dict[str, str]: Mapping from sound name to English text
-    """
-    mapping = {}
-    with open(mapping_path, 'r', encoding='utf-8') as f:
-        reader = csv.reader(f, delimiter='\t')
+def load_textgrid_mapping(mapping_path: Path) -> dict[str, str]:
+    # Load a tab-separated mapping from wav stem to the English-letter label.
+    mapping: dict[str, str] = {}
+    with mapping_path.open("r", encoding="utf-8") as f:
+        reader = csv.reader(f, delimiter="\t")
         for row in reader:
             if len(row) < 2:
                 continue
@@ -89,60 +56,48 @@ def load_textgrid_mapping(mapping_path):
     return mapping
 
 
-def create_textgrids_for_folder(wav_folder, mapping_file):
-    """
-    Create TextGrid files for all .wav files in a folder.
-
-    Args:
-        wav_folder (str): Folder containing .wav files (TextGrids will be saved here)
-        mapping_file (str): Path to the EnglishBH_textgrid.txt file.
-    """
-    wav_folder = Path(wav_folder)
-    mapping_path = Path(mapping_file)
-
+def create_textgrids_for_folder(wav_folder: Path, mapping_file: Path | None) -> None:
+    # Validate that the WAV folder exists before scanning it.
     if not wav_folder.exists():
         raise ValueError(f"WAV folder not found: {wav_folder}")
 
-    if not mapping_path.exists():
-        raise ValueError(f"Mapping file not found: {mapping_path}")
+    mapping = {}
+    # Load the optional label mapping; otherwise fall back to wav stem labels.
+    if mapping_file is not None:
+        if not mapping_file.exists():
+            raise ValueError(f"Mapping file not found: {mapping_file}")
+        print(f"Loading mapping from {mapping_file}")
+        mapping = load_textgrid_mapping(mapping_file)
 
-    output_folder = wav_folder
-
-    print(f"Loading English-text mapping from {mapping_path}")
-    mapping = load_textgrid_mapping(str(mapping_path))
-
-    # Find all .wav files
+    # Find all WAV files that need a matching TextGrid.
     wav_files = sorted(wav_folder.glob("*.wav"))
-
     if not wav_files:
         print(f"No .wav files found in {wav_folder}")
         return
 
     created_count = 0
-
     for wav_file in wav_files:
-        # Get the duration of the wav file
-        wav_duration = get_wav_duration(str(wav_file))
-
-        # Determine the label from the mapping or fallback to filename stem
+        # Use the actual wav duration and the mapped label when available.
+        wav_duration = get_wav_duration(wav_file)
         label = mapping.get(wav_file.stem, wav_file.stem)
-
-        # Create corresponding TextGrid filename
-        textgrid_filename = wav_file.stem + ".TextGrid"
-        textgrid_path = output_folder / textgrid_filename
-
-        create_textgrid(wav_file.name, str(textgrid_path), duration=wav_duration, label=label)
-        print(f"Created: {textgrid_filename} (duration: {wav_duration:.2f}s)")
+        textgrid_path = wav_folder / f"{wav_file.stem}.TextGrid"
+        create_textgrid(wav_file.name, textgrid_path, wav_duration, label)
+        print(f"Created: {textgrid_path.name} (duration: {wav_duration:.2f}s)")
         created_count += 1
 
     print(f"\nTotal TextGrid files created: {created_count}")
 
 
-def main():
-    # Configure these paths inline:
-    wav_folder = "/mnt/data/Projects/subinphon/dataset/EnglishBH_shortened"
-    mapping_file = "/mnt/data/Projects/subinphon/dataset/EnglishBH_textgrid.txt"
-    create_textgrids_for_folder(wav_folder, mapping_file=mapping_file)
+def main() -> None:
+    # Edit these paths as needed for the current run.
+    # wav_folder: location of the WAV files that need TextGrids.
+    # mapping_file: optional TSV file mapping wav stems to display labels.
+    wav_folder = Path("/mnt/data/Projects/subinphon/audio/EnglishBH_shortened").expanduser().resolve()
+    mapping_file = Path("/mnt/data/Projects/subinphon/dataset/EnglishBH_textgrid.txt").expanduser().resolve()
+    create_textgrids_for_folder(
+        wav_folder,
+        mapping_file,
+    )
 
 
 if __name__ == "__main__":

@@ -1,6 +1,11 @@
-data/
-results/
-.idea
+dataset/*
+!dataset/.gitkeep
+!dataset/*.xlsx
+!dataset/*.txt
+output/*
+!output/.gitkeep
+.DS_Store
+.idea/
 .venv/
 __pycache__/
 *.py[cod]

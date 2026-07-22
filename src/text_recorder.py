@@ -85,7 +85,7 @@ class TextRecorder:
             if part
         )
         output_dir = os.path.join(
-            "results",
+            "output",
             "_".join(part for part in [trial_num, self.lang_name, self.property, modality] if part),
         )
 

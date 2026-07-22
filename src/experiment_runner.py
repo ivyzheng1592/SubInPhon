@@ -38,7 +38,7 @@ def prepare_annotations_file(
     condition: str,
 ) -> str:
     output_dir = os.path.join(
-        "data",
+        "dataset",
         "_".join(part for part in [trial_num, hp.lang_name, hp.property, "generated_data"] if part),
     )
     os.makedirs(output_dir, exist_ok=True)
@@ -57,7 +57,7 @@ def prepare_annotations_file(
 
 def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -> None:
     os.makedirs(os.path.join(
-        "results",
+        "output",
         "_".join(part for part in [trial_num, hp.lang_name, hp.property, "txt"] if part),
     ),
                 exist_ok=True)
@@ -138,7 +138,7 @@ def text(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -
 
 def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -> None:
     os.makedirs(os.path.join(
-        "results",
+        "output",
         "_".join(part for part in [trial_num, hp.lang_name, hp.property, "fea"] if part),
     ),
                 exist_ok=True)
@@ -147,7 +147,7 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
         for condition in hp.conditions:
             print(" - Instantiating language pattern:")
             language = languages[hp.lang_name]
-            feature_file = os.path.join("data", f"{language.lang_name}_features.xlsx")
+            feature_file = os.path.join("dataset", f"{language.lang_name}_features.xlsx")
 
             for run_num in runs:
                 set_seed(hp.base_seed + run_num)
@@ -223,7 +223,7 @@ def feature(trial_num: str, runs: range, resume_model_file: Optional[str] = None
 
 def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) -> None:
     os.makedirs(os.path.join(
-        "results",
+        "output",
         "_".join(part for part in [trial_num, hp.lang_name, hp.property, "aud"] if part),
     ),
                 exist_ok=True)

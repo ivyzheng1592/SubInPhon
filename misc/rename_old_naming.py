@@ -162,11 +162,11 @@ def cleanup_empty_dirs(root: Path, apply: bool) -> None:
 
 def migrate_data_root(project_root: Path, apply: bool) -> Set[Path]:
     changed_roots: Set[Path] = set()
-    data_root = project_root / "data"
-    if not data_root.exists():
+    dataset_root = project_root / "dataset"
+    if not dataset_root.exists():
         return changed_roots
 
-    for directory in sorted(p for p in data_root.iterdir() if p.is_dir()):
+    for directory in sorted(p for p in dataset_root.iterdir() if p.is_dir()):
         parsed = parse_old_generated_dir(directory.name)
         if not parsed:
             continue
@@ -176,7 +176,7 @@ def migrate_data_root(project_root: Path, apply: bool) -> Set[Path]:
             if not file_info:
                 continue
             property_label = file_info["property"]
-            target_dir = data_root / join_name_parts([trial_num, lang_name, property_label, "generated_data"])
+            target_dir = dataset_root / join_name_parts([trial_num, lang_name, property_label, "generated_data"])
             target_file = target_dir / build_new_generated_name(file_info)
             move_file(file_path, target_file, apply)
             changed_roots.add(directory)
@@ -184,13 +184,13 @@ def migrate_data_root(project_root: Path, apply: bool) -> Set[Path]:
     return changed_roots
 
 
-def migrate_results_root(project_root: Path, apply: bool) -> Set[Path]:
+def migrate_output_root(project_root: Path, apply: bool) -> Set[Path]:
     changed_roots: Set[Path] = set()
-    results_root = project_root / "results"
-    if not results_root.exists():
+    output_root = project_root / "output"
+    if not output_root.exists():
         return changed_roots
 
-    for directory in sorted(p for p in results_root.iterdir() if p.is_dir()):
+    for directory in sorted(p for p in output_root.iterdir() if p.is_dir()):
         parsed = parse_old_results_dir(directory.name)
         if not parsed:
             continue
@@ -204,7 +204,7 @@ def migrate_results_root(project_root: Path, apply: bool) -> Set[Path]:
             relative_parts = file_path.relative_to(directory).parts
             if len(relative_parts) == 1 and file_path.name in {old_result_root + "_acc.csv", old_result_root + "_pred.csv"}:
                 property_label = property_from_csv(file_path) or ""
-                target_dir = results_root / join_name_parts([trial_num, lang_name, property_label, modality])
+                target_dir = output_root / join_name_parts([trial_num, lang_name, property_label, modality])
                 target_root = join_name_parts([lang_name, property_label, modality])
                 if file_path.name.endswith("_acc.csv"):
                     target_file = target_dir / f"{target_root}_acc.csv"
@@ -221,7 +221,7 @@ def migrate_results_root(project_root: Path, apply: bool) -> Set[Path]:
             if property_label is None:
                 property_label = ""
 
-            target_dir = results_root / join_name_parts([trial_num, lang_name, property_label, modality])
+            target_dir = output_root / join_name_parts([trial_num, lang_name, property_label, modality])
             transformed_parts = [
                 transform_old_result_component(component, lang_name, modality, property_label)
                 for component in relative_parts
@@ -239,7 +239,7 @@ def main() -> None:
     parser.add_argument(
         "--project-root",
         default=".",
-        help="Project root containing the data/ and results/ folders.",
+        help="Project root containing the dataset/ and output/ folders.",
     )
     parser.add_argument(
         "--apply",
@@ -251,7 +251,7 @@ def main() -> None:
     project_root = Path(args.project_root).resolve()
     changed_roots = set()
     changed_roots.update(migrate_data_root(project_root, args.apply))
-    changed_roots.update(migrate_results_root(project_root, args.apply))
+    changed_roots.update(migrate_output_root(project_root, args.apply))
 
     for root in sorted(changed_roots):
         cleanup_empty_dirs(root, args.apply)

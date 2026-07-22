@@ -5,13 +5,13 @@ When {property} is empty, that segment is omitted from file names.
     - {language_root}  # e.g., EnglishBH
         - {src} + ".mp3"
         - {src} + ".wav"
-- "data"
+- "dataset"
     - {base_lang_name} + "_features.xlsx"
     - {trial_num} + "_" + {lang_name} + "_{property}" + "_generated_data"
         - {lang_name} + "_{property}_" + {directionality} + "_run" + {run_num} + "_harmony.csv"
         - {lang_name} + "_{property}_" + {directionality} + "_run" + {run_num} + "_disharmony.csv"
         - {lang_name} + "_{property}_" + {directionality} + "_run" + {run_num} + "_template_counts.xlsx"
-- "results"
+- "output"
     - {trial_num} + "_" + {lang_name} + "_{property}_" + {modality}
         - {lang_name} + "_{property}_" + {modality} + "_acc.csv"
         - {lang_name} + "_{property}_" + {modality} + "_pred.csv"
@@ -86,7 +86,7 @@ base_seed = 1234  # 1234 for first five runs, 2345 for next five runs
 
 # Audio data root
 #audio_root = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon"
-audio_root = "/mnt/data/Projects/SubInPhon/dataset"
+audio_root = "/mnt/data/Projects/subinphon/audio"
 
 # Experiment settings
 lang_name = "EnglishBH_shortened"

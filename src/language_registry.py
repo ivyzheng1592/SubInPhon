@@ -110,8 +110,8 @@ if __name__ == "__main__":
     variant = "aud_vowel" if "aud_vowel" in language.variants else None
 
     # Example: generate a standalone sampled dataset outside the experiment loop.
-    # This writes harmony/disharmony CSVs plus a template-count Excel report to data/.
-    example_output_dir = os.path.join("data", "standalone_generation_example")
+    # This writes harmony/disharmony CSVs plus a template-count Excel report to dataset/.
+    example_output_dir = os.path.join("dataset", "standalone_generation_example")
     sampled_files = language.generate_stimuli(
         seed=hp.base_seed,
         sample_proportion=hp.data_proportion,

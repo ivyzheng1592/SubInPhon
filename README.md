@@ -17,11 +17,11 @@ The project currently centers on generated datasets for two pattern families:
 For each run, the project:
 
 1. builds a language object from `src/languages_config.json`
-2. generates harmony/disharmony annotation files under `data/`
+2. generates harmony/disharmony annotation files under `dataset/`
 3. loads one generated CSV for the selected condition
 4. splits the dataset into train/validation/test subsets
 5. trains or inspects a seq2seq model
-6. writes checkpoints, prediction logs, accuracy files, attention plots, and embedding plots under `results/`
+6. writes checkpoints, prediction logs, accuracy files, attention plots, and embedding plots under `output/`
 
 The same high-level loop is used across text, feature, and audio experiments, with modality-specific datasets, models, and recorders.
 
@@ -153,7 +153,7 @@ You will usually also want to be aware of the current defaults for:
 Each run writes generated annotation files under:
 
 ```text
-data/{trial_num}_{lang_name}_generated_data/
+dataset/{trial_num}_{lang_name}_generated_data/
 ```
 
 Depending on the language and condition, these include:
@@ -169,7 +169,7 @@ Text and feature experiments read `ur_string` and `sr_string` from these generat
 Feature experiments expect a spreadsheet at:
 
 ```text
-data/EnglishBH_features.xlsx
+dataset/EnglishBH_features.xlsx
 ```
 
 ### Audio experiments
@@ -193,7 +193,7 @@ The audio embedding inspection path also expects TextGrid segmentations under:
 Each experiment writes to:
 
 ```text
-results/{trial_num}_{lang_name}_{modality_suffix}/
+output/{trial_num}_{lang_name}_{modality_suffix}/
 ```
 
 where the modality suffix is:
@@ -259,5 +259,5 @@ These are defaults, not requirements.
 1. choose a language entry
 2. set any remaining non-CLI settings in `src/hyper_params.py`
 3. run `python3 src/main.py` with modality-specific overrides
-4. inspect generated data under `data/`
-5. inspect metrics, checkpoints, and plots under `results/`
+4. inspect generated data under `dataset/`
+5. inspect metrics, checkpoints, and plots under `output/`

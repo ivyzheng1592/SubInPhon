@@ -1,65 +1,58 @@
 #!/usr/bin/env python3
 """
-Script to copy audio files based on ur_ref column in CSV file.
-Copies files from source_dir to target_dir where filenames match ur_ref + '.wav'
+Copy audio files referenced by a dataset CSV into a target directory.
 """
 
-import os
 import shutil
+from pathlib import Path
+
 import pandas as pd
-import argparse
 
-def copy_audio_files(csv_file, source_dir, target_dir):
-    """
-    Copy audio files based on ur_ref column in CSV.
 
-    Args:
-        csv_file (str): Path to the CSV file containing ur_ref column
-        source_dir (str): Source directory containing the .wav files
-        target_dir (str): Target directory to copy files to
-    """
-    # Read the CSV file
+def copy_audio_files(csv_file: Path, source_dir: Path, target_dir: Path, column: str) -> None:
+    # Read the dataset CSV and use one reference column to decide which files to copy.
     df = pd.read_csv(csv_file)
 
-    # Check if ur_ref column exists
-    if 'ur_ref' not in df.columns:
-        raise ValueError(f"Column 'ur_ref' not found in {csv_file}")
+    # Check that the chosen reference column exists.
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in {csv_file}")
 
-    # Create target directory if it doesn't exist
-    os.makedirs(target_dir, exist_ok=True)
-
-    # Get unique ur_ref values
-    ur_refs = df['ur_ref'].unique()
+    # Create the target folder if needed.
+    target_dir.mkdir(parents=True, exist_ok=True)
 
     copied_count = 0
     missing_count = 0
+    # Copy one WAV file per unique reference value in the selected column.
+    for audio_ref in df[column].dropna().astype(str).unique():
+        source_path = source_dir / f"{audio_ref}.wav"
+        target_path = target_dir / f"{audio_ref}.wav"
 
-    for ur_ref in ur_refs:
-        # Construct source and target paths
-        source_path = os.path.join(source_dir, f"{ur_ref}.wav")
-        target_path = os.path.join(target_dir, f"{ur_ref}.wav")
-
-        if os.path.exists(source_path):
+        if source_path.exists():
             shutil.copy2(source_path, target_path)
-            print(f"Copied: {ur_ref}.wav")
+            print(f"Copied: {audio_ref}.wav")
             copied_count += 1
         else:
-            print(f"Warning: Source file not found: {source_path}")
+            print(f"Warning: source file not found: {source_path}")
             missing_count += 1
 
-    print(f"\nSummary:")
+    print("\nSummary:")
     print(f"Files copied: {copied_count}")
     print(f"Files missing: {missing_count}")
 
-if __name__ == "__main__":
-    """
-    parser = argparse.ArgumentParser(description="Copy audio files based on ur_ref column in CSV")
-    parser.add_argument("csv_file", help="Path to the CSV file")
-    parser.add_argument("source_dir", help="Source directory containing .wav files")
-    parser.add_argument("target_dir", help="Target directory to copy files to")
 
-    args = parser.parse_args()
-    """
-    copy_audio_files("/mnt/data/Projects/subinphon/dataset/EnglishBH_shortened_harmony.csv", 
-                     "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/EnglishBH",
-                     "/mnt/data/Projects/subinphon/dataset")
+def main() -> None:
+    # Edit these paths and settings as needed for the current run.
+    # First path: dataset CSV to read.
+    # Second path: source folder containing the full audio inventory.
+    # Third path: target folder for the copied subset.
+    # Final argument: which CSV column to use as the audio reference.
+    copy_audio_files(
+        Path("/mnt/data/Projects/subinphon/dataset/EnglishBH_shortened_harmony.csv").expanduser().resolve(),
+        Path("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/EnglishBH").expanduser().resolve(),
+        Path("/mnt/data/Projects/subinphon/dataset").expanduser().resolve(),
+        "ur_var",
+    )
+
+
+if __name__ == "__main__":
+    main()
