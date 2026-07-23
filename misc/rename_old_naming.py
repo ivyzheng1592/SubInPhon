@@ -1,4 +1,3 @@
-import argparse
 import csv
 import re
 import shutil
@@ -160,13 +159,12 @@ def cleanup_empty_dirs(root: Path, apply: bool) -> None:
         pass
 
 
-def migrate_data_root(project_root: Path, apply: bool) -> Set[Path]:
+def migrate_generated_root(source_root: Path, target_root: Path, apply: bool) -> Set[Path]:
     changed_roots: Set[Path] = set()
-    dataset_root = project_root / "dataset"
-    if not dataset_root.exists():
+    if not source_root.exists():
         return changed_roots
 
-    for directory in sorted(p for p in dataset_root.iterdir() if p.is_dir()):
+    for directory in sorted(p for p in source_root.iterdir() if p.is_dir()):
         parsed = parse_old_generated_dir(directory.name)
         if not parsed:
             continue
@@ -176,7 +174,7 @@ def migrate_data_root(project_root: Path, apply: bool) -> Set[Path]:
             if not file_info:
                 continue
             property_label = file_info["property"]
-            target_dir = dataset_root / join_name_parts([trial_num, lang_name, property_label, "generated_data"])
+            target_dir = target_root / join_name_parts([trial_num, lang_name, property_label, "generated_data"])
             target_file = target_dir / build_new_generated_name(file_info)
             move_file(file_path, target_file, apply)
             changed_roots.add(directory)
@@ -184,13 +182,12 @@ def migrate_data_root(project_root: Path, apply: bool) -> Set[Path]:
     return changed_roots
 
 
-def migrate_output_root(project_root: Path, apply: bool) -> Set[Path]:
+def migrate_result_root(source_root: Path, target_root: Path, apply: bool) -> Set[Path]:
     changed_roots: Set[Path] = set()
-    output_root = project_root / "output"
-    if not output_root.exists():
+    if not source_root.exists():
         return changed_roots
 
-    for directory in sorted(p for p in output_root.iterdir() if p.is_dir()):
+    for directory in sorted(p for p in source_root.iterdir() if p.is_dir()):
         parsed = parse_old_results_dir(directory.name)
         if not parsed:
             continue
@@ -204,7 +201,7 @@ def migrate_output_root(project_root: Path, apply: bool) -> Set[Path]:
             relative_parts = file_path.relative_to(directory).parts
             if len(relative_parts) == 1 and file_path.name in {old_result_root + "_acc.csv", old_result_root + "_pred.csv"}:
                 property_label = property_from_csv(file_path) or ""
-                target_dir = output_root / join_name_parts([trial_num, lang_name, property_label, modality])
+                target_dir = target_root / join_name_parts([trial_num, lang_name, property_label, modality])
                 target_root = join_name_parts([lang_name, property_label, modality])
                 if file_path.name.endswith("_acc.csv"):
                     target_file = target_dir / f"{target_root}_acc.csv"
@@ -221,7 +218,7 @@ def migrate_output_root(project_root: Path, apply: bool) -> Set[Path]:
             if property_label is None:
                 property_label = ""
 
-            target_dir = output_root / join_name_parts([trial_num, lang_name, property_label, modality])
+            target_dir = target_root / join_name_parts([trial_num, lang_name, property_label, modality])
             transformed_parts = [
                 transform_old_result_component(component, lang_name, modality, property_label)
                 for component in relative_parts
@@ -235,28 +232,22 @@ def migrate_output_root(project_root: Path, apply: bool) -> Set[Path]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Rename old SubInPhon output paths to the new property-aware scheme.")
-    parser.add_argument(
-        "--project-root",
-        default=".",
-        help="Project root containing the dataset/ and output/ folders.",
-    )
-    parser.add_argument(
-        "--apply",
-        action="store_true",
-        help="Perform the renaming. Without this flag, the script runs in dry-run mode.",
-    )
-    args = parser.parse_args()
+    # Edit these settings as needed for the current run.
+    # source_root: folder containing the old naming scheme to migrate from.
+    # target_root: folder to migrate the renamed files into. This may be the same as source_root.
+    # apply: set to True to perform the renaming, or False for a dry run.
+    source_root = Path(".").resolve()
+    target_root = Path(".").resolve()
+    apply = False
 
-    project_root = Path(args.project_root).resolve()
     changed_roots = set()
-    changed_roots.update(migrate_data_root(project_root, args.apply))
-    changed_roots.update(migrate_output_root(project_root, args.apply))
+    changed_roots.update(migrate_generated_root(source_root, target_root, apply))
+    changed_roots.update(migrate_result_root(source_root, target_root, apply))
 
     for root in sorted(changed_roots):
-        cleanup_empty_dirs(root, args.apply)
+        cleanup_empty_dirs(root, apply)
 
-    if not args.apply:
+    if not apply:
         print("Dry run only. Re-run with --apply to perform the renaming.")
 
 

@@ -783,8 +783,8 @@ def clean_cv_pred(
 
 def main() -> None:
     # Edit these paths and settings as needed for the current run.
-    output_dir = Path("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/output").expanduser().resolve()
-    data_dir = Path("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/dataset").expanduser().resolve()
+    output_dir = Path("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/output")
+    data_dir = Path("/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon/dataset")
     output_prefix = "cleaned"
     min_acc = 0.8
     max_loss = 0.1

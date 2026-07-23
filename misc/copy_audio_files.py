@@ -47,9 +47,9 @@ def main() -> None:
     # Third path: target folder for the copied subset.
     # Final argument: which CSV column to use as the audio reference.
     copy_audio_files(
-        Path("/mnt/data/Projects/subinphon/dataset/EnglishBH_shortened_harmony.csv").expanduser().resolve(),
-        Path("/mnt/data/Projects/SubInPhon/audio/EnglishBH").expanduser().resolve(),
-        Path("/mnt/data/Projects/SubInPhon/audio/EnglishBH_shortened").expanduser().resolve(),
+        Path("/mnt/data/Projects/subinphon/dataset/EnglishBH_shortened_harmony.csv"),
+        Path("/mnt/data/Projects/SubInPhon/audio/EnglishBH"),
+        Path("/mnt/data/Projects/SubInPhon/audio/EnglishBH_shortened"),
         "ur_var",
     )
 

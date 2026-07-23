@@ -1,52 +1,36 @@
 #!/usr/bin/env python3
-"""
-Generate audio stimuli with Amazon Polly from a dataset CSV.
+"""Generate audio stimuli with Amazon Polly."""
 
-Edit the paths in main() for the current run.
-"""
-
-import os
 import subprocess
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable
 
 import pandas as pd
 from pydub import AudioSegment
 
 
-DEFAULT_COLUMNS = ("ur_var", "sr_var")
-
-
-def collect_words(csv_file: Path, columns: Iterable[str], limit: int | None = None) -> List[str]:
-    # Read the dataset CSV and collect the audio-reference forms used for synthesis.
-    df = pd.read_csv(csv_file)
-
-    # Validate that the expected reference columns are present.
-    missing_columns = [column for column in columns if column not in df.columns]
+def collect_words(stimuli_file: Path, columns: Iterable[str]) -> list[str]:
+    """Collect unique audio forms from the selected columns."""
+    stimuli = pd.read_csv(stimuli_file)
+    missing_columns = [column for column in columns if column not in stimuli.columns]
     if missing_columns:
-        raise ValueError(
-            f"Missing required columns in {csv_file}: {', '.join(missing_columns)}"
-        )
+        raise ValueError(f"Missing required columns in {stimuli_file}: {', '.join(missing_columns)}")
 
-    # Optionally restrict the script to the first N rows for quick tests.
-    if limit is not None:
-        df = df.head(limit)
-
-    # Keep unique forms only so the same audio file is not generated twice.
-    words: List[str] = []
+    words: list[str] = []
     seen = set()
     for column in columns:
-        for value in df[column].dropna().astype(str):
+        for value in stimuli[column].dropna().astype(str):
             if value and value not in seen:
                 words.append(value)
                 seen.add(value)
+    print(f"Found {len(words)} unique forms in {stimuli_file.name}")
     return words
 
 
-def synthesize_word(word: str, output_mp3: Path, voice_id: str) -> None:
-    # Wrap the IPA form in SSML so Polly reads the intended pronunciation.
+def synthesize_word(word: str, output_file: Path, voice_id: str) -> None:
+    """Synthesize one IPA form with Amazon Polly."""
     ssml = f'<speak><phoneme alphabet="ipa" ph="{word}"></phoneme></speak>'
-    cmd = [
+    command = [
         "aws",
         "polly",
         "synthesize-speech",
@@ -60,60 +44,65 @@ def synthesize_word(word: str, output_mp3: Path, voice_id: str) -> None:
         "mp3",
         "--voice-id",
         voice_id,
-        str(output_mp3),
+        str(output_file),
     ]
-    subprocess.run(cmd, check=True)
+    subprocess.run(command, check=True)
 
 
 def convert_mp3_to_wav(mp3_file: str, wav_file: str) -> None:
-    # Load one MP3 file and export it as WAV.
+    """Convert one MP3 file to WAV."""
     audio = AudioSegment.from_file(mp3_file, format="mp3")
     audio.export(wav_file, format="wav")
-    print(f"MP3 file '{mp3_file}' converted to WAV file '{wav_file}'.")
 
 
-def main() -> None:
-    # Edit these paths and settings as needed for the current run.
-    # csv_file: stimulus file whose ur_var/sr_var entries will be synthesized.
-    # output_dir: folder where MP3 and WAV files will be written.
-    # columns: dataset columns to read as audio reference forms.
-    # limit: optional row cap for a quick smoke test.
-    # voice_id: Polly voice used for synthesis.
-    # convert_to_wav: whether generated MP3 files should also be converted to WAV.
-    csv_file = Path("EnglishBH_aud_harmony.csv").expanduser().resolve()
-    output_dir = Path("/mnt/data/Projects/SubInPhon/audio/EnglishBH").expanduser().resolve()
-    columns = list(DEFAULT_COLUMNS)
-    limit = None
-    voice_id = "Danielle"
-    convert_to_wav = True
+def generate_audio(words: list[str], audio_dir: Path, voice_id: str) -> None:
+    """Generate MP3 files with Amazon Polly."""
+    audio_dir.mkdir(parents=True, exist_ok=True)
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    print(" - Reading stimulus list:")
-    words = collect_words(csv_file, columns, limit=limit)
-    print(f"Found {len(words)} unique forms in {csv_file.name}")
-
-    print(" - Generating MP3 files with Amazon Polly:")
-    # Generate one MP3 file per unique audio reference.
     for word in words:
-        mp3_file = output_dir / f"{word}.mp3"
-        if mp3_file.exists():
-            print(f"Skipping existing MP3: {mp3_file.name}")
+        mp3_file = audio_dir / f"{word}.mp3"
+        wav_file = audio_dir / f"{word}.wav"
+        if mp3_file.exists() or wav_file.exists():
+            print(f"Skipping existing audio: {word}")
             continue
         synthesize_word(word, mp3_file, voice_id)
         print(f"Generated {mp3_file.name}")
 
-    if convert_to_wav:
-        print(" - Converting MP3 files to WAV:")
-        # Convert all MP3 files in the folder so the training code can use WAV input.
-        for mp3_file in sorted(output_dir.glob("*.mp3")):
-            wav_file = output_dir / f"{mp3_file.stem}.wav"
-            if wav_file.exists():
-                print(f"Skipping existing WAV: {wav_file.name}")
-                continue
-            convert_mp3_to_wav(str(mp3_file), str(wav_file))
-    else:
-        print(" - Skipping MP3 to WAV conversion.")
+
+def convert_audio(audio_dir: Path) -> None:
+    """Convert generated MP3 files to WAV."""
+    for mp3_file in sorted(audio_dir.glob("*.mp3")):
+        wav_file = audio_dir / f"{mp3_file.stem}.wav"
+        if wav_file.exists():
+            print(f"Skipping existing WAV: {wav_file.name}")
+            continue
+        convert_mp3_to_wav(str(mp3_file), str(wav_file))
+        print(f"Generated {wav_file.name}")
+
+
+def main() -> None:
+    # Set the stimulus list used to collect audio forms.
+    stimuli_csv = Path("EnglishBH_aud_harmony.csv").expanduser().resolve()
+    # Set the external directory where MP3 and WAV files will be written.
+    audio_dir = Path("/mnt/data/Projects/SubInPhon/audio/EnglishBH")
+    # Set the dataset columns to read as audio reference forms.
+    columns = ("ur_var", "sr_var")
+    # Set the Amazon Polly voice.
+    voice_id = "Danielle"
+    # convert_to_wav: whether generated MP3 files should also be converted to WAV.
+    convert_to_wav = True
+
+    print(" - Finding words:")
+    words = collect_words(stimuli_csv, columns)
+
+    print(" - Generating MP3 files with Amazon Polly:")
+    generate_audio(words, audio_dir, voice_id)
+
+    if not convert_to_wav:
+        return
+
+    print(" - Converting MP3 files to WAV:")
+    convert_audio(audio_dir)
 
 
 if __name__ == "__main__":
