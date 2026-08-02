@@ -336,7 +336,7 @@ def plot_embed(
             columnspacing=0.5,
         )
     else:
-        fig = plt.figure(figsize=(2.5, 2))
+        fig = plt.figure(figsize=(3, 2.5))
         ax = fig.add_subplot(111, projection="3d")
         ax.set_position([0.0, 0.25, 0.7, 0.7])
         for i in focus_reduced_df.index:
@@ -646,7 +646,7 @@ def plot_aud_embed(
     }
 
     plt.rcParams.update({"font.size": 5})
-    fig = plt.figure(figsize=(2.5, 2))
+    fig = plt.figure(figsize=(3, 2.5))
     ax = fig.add_subplot(111, projection="3d")
     ax.set_position([0.0, 0.25, 0.7, 0.7])
     for vowel_label in FOCUS_EMBED_NEW_IDX:
