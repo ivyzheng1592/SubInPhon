@@ -85,8 +85,7 @@ batch_size = 32
 base_seed = 1234  # 1234 for first five runs, 2345 for next five runs
 
 # Audio data root
-#audio_root = "/media/ldlmdl/A2AAE4B1AAE482E1/SSD_Documents/subinphon"
-audio_root = "/mnt/data/Projects/subinphon/audio"
+audio_root = "/mnt/data/Projects/SubInPhon/audio"
 
 # Experiment settings
 lang_name = "EnglishBH_shortened"
