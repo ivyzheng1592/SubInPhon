@@ -1,12 +1,14 @@
 import os
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
+from matplotlib import font_manager
+font_manager.fontManager.addfont("/usr/share/fonts/truetype/doulos/DoulosSIL-Regular.ttf")
+
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
 from nooverlap import push_text_free
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from sklearn.decomposition import PCA
