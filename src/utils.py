@@ -288,7 +288,7 @@ def plot_embed(
                     xs=focus_reduced_df.loc[i, "pc1"],
                     ys=focus_reduced_df.loc[i, "pc2"],
                     zs=focus_reduced_df.loc[i, "pc3"],
-                    s=12.25,
+                    s=20.25,
                     linewidths=0,
                     color=focus_embed_colors[focus_reduced_df.loc[i, "phoneme"]],
                     label=focus_reduced_df.loc[i, "phoneme"],
@@ -311,7 +311,7 @@ def plot_embed(
                     xs=all_reduced_df.loc[i, "pc1"],
                     ys=all_reduced_df.loc[i, "pc2"],
                     zs=all_reduced_df.loc[i, "pc3"],
-                    s=12.25,
+                    s=20.25,
                     linewidths=0,
                     color=all_embed_colors[all_reduced_df.loc[i, "phoneme"]],
                     label=all_reduced_df.loc[i, "phoneme"],
@@ -329,7 +329,7 @@ def plot_embed(
             all_ax.set_zlabel("pc3")
             push_text_free(fig, all_ax)
 
-            legend_handles = _build_legend_handles(EMBED_NEW_IDX, all_embed_colors, marker_size=3)
+            legend_handles = _build_legend_handles(EMBED_NEW_IDX, all_embed_colors, marker_size=4)
             fig.legend(
                 handles=legend_handles,
                 loc="center right",
