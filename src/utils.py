@@ -191,8 +191,8 @@ def plot_aud_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
 def plot_txt_att(ur: Sequence[str], sr: Sequence[str], attention: torch.Tensor, att_plot: str) -> None:
     attention = attention.cpu().numpy()
 
-    with plt.rc_context({"font.family": "Times New Roman", "font.size": 10}):
-        fig, ax = plt.subplots(1, 1, figsize=(5.4, 4.5), layout="constrained")
+    with plt.rc_context({"font.family": "Doulos SIL", "font.size": 10}):
+        fig, ax = plt.subplots(1, 1, figsize=(4, 3.5), layout="constrained")
         im = ax.matshow(attention, cmap="bone")
         ax.set_xticks(ticks=np.arange(len(ur)), labels=ur)
         ax.set_yticks(ticks=np.arange(len(sr)), labels=sr)
@@ -272,14 +272,14 @@ def plot_embed(
             for phoneme, color in _build_color_map(EMBED_NEW_IDX, COLOR_PALETTE).items()
         }
 
-        with plt.rc_context({"font.family": "Times New Roman", "font.size": 10}):
+        with plt.rc_context({"font.family": "Doulos SIL", "font.size": 10}):
             fig = plt.figure(figsize=(5.4, 8))
             all_ax = fig.add_subplot(211, projection="3d")
             focus_ax = fig.add_subplot(212, projection="3d")
-            all_ax.set_position([0.04, 0.57, 0.70, 0.40])
-            focus_ax.set_position([0.04, 0.08, 0.70, 0.40])
-            fig.text(0.39, 0.51, "(a) Phoneme embedding", ha="center")
-            fig.text(0.39, 0.02, "(b) Vowel embedding", ha="center")
+            all_ax.set_position([0.00, 0.60, 0.70, 0.40])
+            focus_ax.set_position([0.00, 0.10, 0.70, 0.40])
+            fig.text(0.35, 0.54, "(a) Phoneme embedding", ha="center")
+            fig.text(0.35, 0.04, "(b) Vowel embedding", ha="center")
 
             for i in focus_reduced_df.index:
                 focus_ax.scatter(
@@ -331,7 +331,7 @@ def plot_embed(
             fig.legend(
                 handles=legend_handles,
                 loc="center right",
-                bbox_to_anchor=(0.99, 0.52),
+                bbox_to_anchor=(0.95, 0.55),
                 ncol=2,
                 frameon=False,
                 fontsize=10,
