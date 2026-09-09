@@ -191,16 +191,16 @@ def plot_aud_acc(acc_store: Mapping[str, Any], acc_plot: str) -> None:
 def plot_txt_att(ur: Sequence[str], sr: Sequence[str], attention: torch.Tensor, att_plot: str) -> None:
     attention = attention.cpu().numpy()
 
-    plt.rcParams.update({"font.size": 5})
-    fig, ax = plt.subplots(1, 1, figsize=(3, 2.25))
-    im = ax.matshow(attention, cmap="bone")
-    ax.set_xticks(ticks=np.arange(len(ur)), labels=ur)
-    ax.set_yticks(ticks=np.arange(len(sr)), labels=sr)
-    ax.tick_params(axis="both", labelsize=5)
-    colorbar = fig.colorbar(im)
-    colorbar.ax.tick_params(labelsize=5)
-    plt.savefig(att_plot, dpi=300)
-    plt.close()
+    with plt.rc_context({"font.family": "Times New Roman", "font.size": 10}):
+        fig, ax = plt.subplots(1, 1, figsize=(5.4, 4.5), layout="constrained")
+        im = ax.matshow(attention, cmap="bone")
+        ax.set_xticks(ticks=np.arange(len(ur)), labels=ur)
+        ax.set_yticks(ticks=np.arange(len(sr)), labels=sr)
+        ax.tick_params(axis="both", labelsize=10)
+        colorbar = fig.colorbar(im)
+        colorbar.ax.tick_params(labelsize=10)
+        plt.savefig(att_plot, dpi=300)
+        plt.close()
 
 
 # Plot audio/text attention for one example.
@@ -272,69 +272,72 @@ def plot_embed(
             for phoneme, color in _build_color_map(EMBED_NEW_IDX, COLOR_PALETTE).items()
         }
 
-        fig = plt.figure(figsize=(6, 2.5))
-        all_ax = fig.add_subplot(121, projection="3d")
-        focus_ax = fig.add_subplot(122, projection="3d")
-        all_ax.set_position([0.00, 0.25, 0.35, 0.75])
-        focus_ax.set_position([0.40, 0.25, 0.35, 0.75])
-        fig.text(0.175, 0.05, "(a) Phoneme embedding", ha="center")
-        fig.text(0.575, 0.05, "(b) Vowel embedding", ha="center")
+        with plt.rc_context({"font.family": "Times New Roman", "font.size": 10}):
+            fig = plt.figure(figsize=(5.4, 8))
+            all_ax = fig.add_subplot(211, projection="3d")
+            focus_ax = fig.add_subplot(212, projection="3d")
+            all_ax.set_position([0.04, 0.57, 0.70, 0.40])
+            focus_ax.set_position([0.04, 0.08, 0.70, 0.40])
+            fig.text(0.39, 0.51, "(a) Phoneme embedding", ha="center")
+            fig.text(0.39, 0.02, "(b) Vowel embedding", ha="center")
 
-        for i in focus_reduced_df.index:
-            focus_ax.scatter(
-                xs=focus_reduced_df.loc[i, "pc1"],
-                ys=focus_reduced_df.loc[i, "pc2"],
-                zs=focus_reduced_df.loc[i, "pc3"],
-                s=5,
-                color=focus_embed_colors[focus_reduced_df.loc[i, "phoneme"]],
-                label=focus_reduced_df.loc[i, "phoneme"],
-            )
-            focus_ax.text(
-                x=focus_reduced_df.loc[i, "pc1"],
-                y=focus_reduced_df.loc[i, "pc2"],
-                z=focus_reduced_df.loc[i, "pc3"],
-                s=focus_reduced_df.loc[i, "phoneme"],
-                ha="left",
-                va="bottom",
-            )
-        focus_ax.set_xlabel("pc1")
-        focus_ax.set_ylabel("pc2")
-        focus_ax.set_zlabel("pc3")
-        push_text_free(fig, focus_ax)
+            for i in focus_reduced_df.index:
+                focus_ax.scatter(
+                    xs=focus_reduced_df.loc[i, "pc1"],
+                    ys=focus_reduced_df.loc[i, "pc2"],
+                    zs=focus_reduced_df.loc[i, "pc3"],
+                    s=9,
+                    linewidths=0,
+                    color=focus_embed_colors[focus_reduced_df.loc[i, "phoneme"]],
+                    label=focus_reduced_df.loc[i, "phoneme"],
+                )
+                focus_ax.text(
+                    x=focus_reduced_df.loc[i, "pc1"],
+                    y=focus_reduced_df.loc[i, "pc2"],
+                    z=focus_reduced_df.loc[i, "pc3"],
+                    s=focus_reduced_df.loc[i, "phoneme"],
+                    ha="left",
+                    va="bottom",
+                )
+            focus_ax.set_xlabel("pc1")
+            focus_ax.set_ylabel("pc2")
+            focus_ax.set_zlabel("pc3")
+            push_text_free(fig, focus_ax)
 
-        for i in all_reduced_df.index:
-            all_ax.scatter(
-                xs=all_reduced_df.loc[i, "pc1"],
-                ys=all_reduced_df.loc[i, "pc2"],
-                zs=all_reduced_df.loc[i, "pc3"],
-                s=5,
-                color=all_embed_colors[all_reduced_df.loc[i, "phoneme"]],
-                label=all_reduced_df.loc[i, "phoneme"],
-            )
-            all_ax.text(
-                x=all_reduced_df.loc[i, "pc1"],
-                y=all_reduced_df.loc[i, "pc2"],
-                z=all_reduced_df.loc[i, "pc3"],
-                s=all_reduced_df.loc[i, "phoneme"],
-                ha="left",
-                va="bottom",
-            )
-        all_ax.set_xlabel("pc1")
-        all_ax.set_ylabel("pc2")
-        all_ax.set_zlabel("pc3")
-        push_text_free(fig, all_ax)
+            for i in all_reduced_df.index:
+                all_ax.scatter(
+                    xs=all_reduced_df.loc[i, "pc1"],
+                    ys=all_reduced_df.loc[i, "pc2"],
+                    zs=all_reduced_df.loc[i, "pc3"],
+                    s=9,
+                    linewidths=0,
+                    color=all_embed_colors[all_reduced_df.loc[i, "phoneme"]],
+                    label=all_reduced_df.loc[i, "phoneme"],
+                )
+                all_ax.text(
+                    x=all_reduced_df.loc[i, "pc1"],
+                    y=all_reduced_df.loc[i, "pc2"],
+                    z=all_reduced_df.loc[i, "pc3"],
+                    s=all_reduced_df.loc[i, "phoneme"],
+                    ha="left",
+                    va="bottom",
+                )
+            all_ax.set_xlabel("pc1")
+            all_ax.set_ylabel("pc2")
+            all_ax.set_zlabel("pc3")
+            push_text_free(fig, all_ax)
 
-        legend_handles = _build_legend_handles(EMBED_NEW_IDX, all_embed_colors, marker_size=3)
-        fig.legend(
-            handles=legend_handles,
-            loc="center left",
-            bbox_to_anchor=(0.85, 0.5),
-            ncol=2,
-            frameon=False,
-            fontsize=5,
-            handletextpad=0.2,
-            columnspacing=0.5,
-        )
+            legend_handles = _build_legend_handles(EMBED_NEW_IDX, all_embed_colors, marker_size=3)
+            fig.legend(
+                handles=legend_handles,
+                loc="center right",
+                bbox_to_anchor=(0.99, 0.52),
+                ncol=2,
+                frameon=False,
+                fontsize=10,
+                handletextpad=0.2,
+                columnspacing=0.5,
+            )
     else:
         fig = plt.figure(figsize=(3, 2.5))
         ax = fig.add_subplot(111, projection="3d")
