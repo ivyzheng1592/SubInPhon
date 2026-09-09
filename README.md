@@ -1,7 +1,6 @@
 # SubInPhon
 
-SubInPhon is a research codebase for learning phonological patterns with sequence-to-sequence neural networks.
-It supports three experiment modalities:
+SubInPhon is a research codebase for learning phonological patterns with sequence-to-sequence neural networks. It supports three experiment modalities:
 
 - `text`: UR-to-SR prediction from symbolic strings
 - `feature`: UR-to-SR prediction with phonological feature embeddings
@@ -10,7 +9,7 @@ It supports three experiment modalities:
 The project currently centers on generated datasets for two pattern families:
 
 - backness harmony
-- final devoicing
+- final devoicing (under-construction)
 
 ## What The Pipeline Does
 
@@ -34,7 +33,7 @@ The same high-level loop is used across text, feature, and audio experiments, wi
 - `src/languages_config.json`: language inventory and syllable/word-structure specifications
 - `src/language_generator.py`: language/pattern generation logic
 - `src/text_dataset.py`, `src/feature_dataset.py`, `src/audio_dataset.py`: dataset loaders
-- `src/text_network.py`, `src/feature_network.py`: Bahdanau seq2seq models for symbolic and feature-based experiments
+- `src/text_network.py`, `src/feature_network.py`: Bahdanau seq2seq models for text and feature experiments
 - `src/audio_network_t1.py`: audio seq2seq model based on Google Translatotron 1
 - `src/audio_network_t2.py`: audio seq2seq model based on Google Translatotron 2
 - `src/text_trainer.py`, `src/audio_trainer.py`: training, evaluation, checkpoint loading, and inspection
@@ -44,7 +43,7 @@ The same high-level loop is used across text, feature, and audio experiments, wi
 
 ## Installation
 
-Use Python `3.8` to `3.11`.
+Use Python `3.10`.
 
 Install dependencies with:
 
@@ -54,35 +53,24 @@ pip install -r requirements.txt
 
 ## Quick Start
 
-Run the default experiment:
+Run commands from the repository root. Defaults are audio, T1, and `EnglishBH_shortened`.
+
+For text and feature experiments, set `directionality = ["l2r", "r2l"]` in `src/hyper_params.py`. Run the EnglishBH configuration used in the papers with:
 
 ```bash
-python3 src/main.py
+python3 src/main.py --modality text --lang-name EnglishBH --property "" --data-proportion 0.1
+python3 src/main.py --modality feature --lang-name EnglishBH --property "" --data-proportion 0.1
 ```
 
-Run a text experiment on CPU:
+For the other text and feature configurations, use the language, property, and sampling proportion in the table below. Add `--device cpu` to use CPU instead of CUDA.
+
+For the audio experiment, first set `directionality = ["l2r"]` and configure `audio_root` in `src/hyper_params.py`. Supply the WAV files and TextGrids described under Data Expectations, then run:
 
 ```bash
-python3 src/main.py --modality text --lang-name EnglishBH_shortened --runs 0:2 --device cpu
+python3 src/main.py --modality audio --lang-name EnglishBH_shortened --property "" --data-proportion 1.0
 ```
 
-Run a feature-based experiment:
-
-```bash
-python3 src/main.py --modality feature --lang-name EnglishBH_shortened
-```
-
-Run an audio experiment with the second audio model:
-
-```bash
-python3 src/main.py --modality audio --audio-model t2
-```
-
-Resume from a saved checkpoint:
-
-```bash
-python3 src/main.py --modality audio --resume-model-file /path/to/model_seq2seq.pth
-```
+The audio model defaults to `t1`; `--audio-model t2` selects the other implementation. These commands use the default two runs. Set `--runs` and `--trial-num` as needed.
 
 ## Current Language Entries
 
@@ -91,17 +79,32 @@ The language registry currently includes:
 - `EnglishBH`
 - `EnglishBH_shortened`
 - `EnglishBH_expanded`
-- `EnglishFD`
+- `EnglishFD`: under-construction
 
 These entries are defined in `src/languages_config.json`.
 
-`EnglishBH_shortened` also includes an `aud_vowel` variant used by the audio pipeline when available.
+`EnglishBH_shortened` includes the `aud_vowel` variant (`e` → `eɪ`, `o` → `oʊ`). Generation adds `ur_var` and `sr_var` for audio file references; text and feature experiments use the unchanged base strings.
 
-## Run Modes
+## Configurations Used in the Papers
 
-- `train and evaluate`: train on the train split, evaluate on the test split, then run attention and embedding inspection on the test split
-- `tuning`: train on the train split, evaluate on the validation split, then run attention and embedding inspection on the validation split
-- `inspection`: skip training and run attention/embedding inspection from saved checkpoints
+The text, feature, and audio experiments used the following settings:
+
+| Experiment | `lang_name` | `property` | `data_proportion` | `directionality` |
+| --- | --- | --- | --- | --- |
+| text and feature | `EnglishBH` | `""` (none) | `0.1` | `["l2r", "r2l"]` |
+| text and feature | `EnglishBH_expanded` | `""` (none) | `0.0001` | `["l2r", "r2l"]` |
+| text and feature | `EnglishBH` | `"nonidentical"` | `0.2` | `["l2r", "r2l"]` |
+| audio | `EnglishBH_shortened` | `""` (none) | `1.0` | `["l2r"]` |
+
+## Run Modes and Checkpoints
+
+- `train and evaluate`: train on the train split and evaluate on the test split each epoch.
+- `tuning`: train on the train split and evaluate on the validation split each epoch.
+- `inspection`: skip training and inspect existing checkpoints.
+
+Training is followed by attention and embedding inspection. Inspection mode requires the original trial ID, matching settings, and saved checkpoints in the expected output directories.
+
+Use `--resume-model-file PATH` to continue training from a saved model. It restores weights and the next epoch number, but not optimizer state; `--n-epochs` is the total epoch limit.
 
 ## Command-Line Options
 
@@ -128,23 +131,22 @@ Notes:
 - `--runs 0:2` and `--runs 1:5:2` follow Python range-style semantics
 - `--trial-num` defaults to a timestamp in `YYYYMMDDHHMM` format
 
-## Settings Still Controlled In `hyper_params.py`
+## Configuration and Defaults
 
-Some experiment settings are still edited directly in `src/hyper_params.py` rather than exposed as CLI flags:
+CLI options override settings in `src/hyper_params.py`. Edit that file directly for `directionality`, `conditions`, `audio_root`, split ratios, batch size, and model dimensions.
 
-- `directionality`
-- `conditions`
-- `audio_root`
+Current defaults in `src/hyper_params.py` include:
 
-You will usually also want to be aware of the current defaults for:
+- `lang_name = "EnglishBH_shortened"`
+- `property = ""`
+- `data_proportion = 1.0`
+- `directionality = ["l2r", "r2l"]`
+- `conditions = ["harmony", "disharmony"]`
+- `run_mode = "train and evaluate"`
+- `pred_log = "vowel_only_error"`
+- `device = "cuda"`
 
-- `lang_name`
-- `property`
-- `run_mode`
-- `pred_log`
-- `device`
-- `batch_size`
-- `n_epochs`
+Use the configurations above to reproduce the dataset settings used in the papers.
 
 ## Data Expectations
 
@@ -153,10 +155,10 @@ You will usually also want to be aware of the current defaults for:
 Each run writes generated annotation files under:
 
 ```text
-dataset/{trial_num}_{lang_name}_generated_data/
+dataset/{trial_num}_{lang_name}[_{property}]_generated_data/
 ```
 
-Depending on the language and condition, these include:
+Here and in the output path below, `[_{property}]` is included only when the property is nonempty; the brackets are not literal. Each direction and run produces:
 
 - `*_harmony.csv`
 - `*_disharmony.csv`
@@ -166,7 +168,7 @@ Text and feature experiments read `ur_string` and `sr_string` from these generat
 
 ### Feature experiments
 
-Feature experiments expect a spreadsheet at:
+All three backness harmony entries use the base language name `EnglishBH` to locate the feature spreadsheet:
 
 ```text
 dataset/EnglishBH_features.xlsx
@@ -180,7 +182,7 @@ Audio experiments expect a local audio directory shaped like:
 {audio_root}/{lang_name}/
 ```
 
-with `.wav` files referenced by the generated CSVs.
+with `<ur_var>.wav` and `<sr_var>.wav` files referenced by the generated CSVs. Use `EnglishBH_shortened` for the current audio experiment; the other registry entries do not generate the variant columns required by the audio loader.
 
 The audio embedding inspection path also expects TextGrid segmentations under:
 
@@ -193,14 +195,10 @@ The audio embedding inspection path also expects TextGrid segmentations under:
 Each experiment writes to:
 
 ```text
-output/{trial_num}_{lang_name}_{modality_suffix}/
+output/{trial_num}_{lang_name}[_{property}]_{modality_suffix}/
 ```
 
-where the modality suffix is:
-
-- `txt`
-- `fea`
-- `aud`
+The suffix is `txt` for text, `fea` for feature, and `aud` for audio.
 
 Typical outputs include:
 
@@ -228,36 +226,4 @@ Each run is seeded with:
 base_seed + run_num
 ```
 
-The experiment runner seeds:
-
-- `random`
-- `numpy`
-- `torch`
-- `torch.cuda` when CUDA is available
-
-## Default Configuration Snapshot
-
-At the time of writing, `src/hyper_params.py` defaults to:
-
-- `lang_name = "EnglishBH"`
-- `property = ""`
-- `directionality = ["l2r", "r2l"]`
-- `conditions = ["harmony", "disharmony"]`
-- `run_mode = "train and evaluate"`
-- `pred_log = "vowel_only_error"`
-- `device = "cuda"`
-
-These are defaults, not requirements.
-
-## Practical Notes
-
-- Checkpoints can now be reloaded with `map_location=hp.device`, so moving between CPU and CUDA runs is supported through the configured device setting.
-- The audio pipeline chooses the `aud_vowel` variant automatically when the selected language defines one.
-
-## Minimal Example Workflow
-
-1. choose a language entry
-2. set any remaining non-CLI settings in `src/hyper_params.py`
-3. run `python3 src/main.py` with modality-specific overrides
-4. inspect generated data under `dataset/`
-5. inspect metrics, checkpoints, and plots under `output/`
+The runner seeds Python, NumPy, and PyTorch, including CUDA when available.
