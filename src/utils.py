@@ -194,7 +194,7 @@ def plot_txt_att(ur: Sequence[str], sr: Sequence[str], attention: torch.Tensor, 
     attention = attention.cpu().numpy()
 
     with plt.rc_context({"font.family": "Doulos SIL", "font.size": 10}):
-        fig, ax = plt.subplots(1, 1, figsize=(4, 3.5), layout="constrained")
+        fig, ax = plt.subplots(1, 1, figsize=(4.5, 4), layout="constrained")
         im = ax.matshow(attention, cmap="bone")
         ax.set_xticks(ticks=np.arange(len(ur)), labels=ur)
         ax.set_yticks(ticks=np.arange(len(sr)), labels=sr)
