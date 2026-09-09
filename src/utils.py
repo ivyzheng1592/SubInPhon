@@ -275,10 +275,10 @@ def plot_embed(
         fig = plt.figure(figsize=(6, 2.5))
         all_ax = fig.add_subplot(121, projection="3d")
         focus_ax = fig.add_subplot(122, projection="3d")
-        all_ax.set_position([0.00, 0.23, 0.35, 0.75])
-        focus_ax.set_position([0.42, 0.23, 0.35, 0.75])
-        fig.text(0.175, 0.03, "(a) Phoneme embedding", ha="center")
-        fig.text(0.595, 0.03, "(b) Vowel embedding", ha="center")
+        all_ax.set_position([0.00, 0.25, 0.35, 0.75])
+        focus_ax.set_position([0.40, 0.25, 0.35, 0.75])
+        fig.text(0.175, 0.05, "(a) Phoneme embedding", ha="center")
+        fig.text(0.575, 0.05, "(b) Vowel embedding", ha="center")
 
         for i in focus_reduced_df.index:
             focus_ax.scatter(
@@ -328,7 +328,7 @@ def plot_embed(
         fig.legend(
             handles=legend_handles,
             loc="center left",
-            bbox_to_anchor=(0.84, 0.5),
+            bbox_to_anchor=(0.85, 0.5),
             ncol=2,
             frameon=False,
             fontsize=5,
