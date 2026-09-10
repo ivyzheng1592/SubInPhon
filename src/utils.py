@@ -6,8 +6,10 @@ font_manager.fontManager.addfont("/usr/share/fonts/truetype/doulos/DoulosSIL-Reg
 
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+from matplotlib.ticker import MaxNLocator
+from mpl_toolkits.mplot3d import proj3d
 import numpy as np
-from nooverlap import push_text_free
+from adjustText import adjust_text
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -194,9 +196,12 @@ def plot_txt_att(ur: Sequence[str], sr: Sequence[str], attention: torch.Tensor, 
     attention = attention.cpu().numpy()
 
     with plt.rc_context({"font.family": "Doulos SIL", "font.size": 10}):
-        fig, ax = plt.subplots(1, 1, figsize=(4.5, 4), layout="constrained")
+        fig, ax = plt.subplots(1, 1, figsize=(3.5, 3.25), layout="constrained")
         im = ax.matshow(attention, cmap="bone")
         ax.set_xticks(ticks=np.arange(len(ur)), labels=ur)
+        for label in ax.get_xticklabels():
+            if label.get_text() in ("<SOS>", "<EOS>"):
+                label.set_rotation(90)
         ax.set_yticks(ticks=np.arange(len(sr)), labels=sr)
         ax.tick_params(axis="both", labelsize=10)
         colorbar = fig.colorbar(im)
@@ -242,6 +247,24 @@ def plot_aud_att(
 
 # Embedding plots
 
+# Place labels in the fixed camera's projected view without moving the 3D points.
+def _place_projected_labels(fig, ax) -> None:
+    fig.canvas.draw()
+    labels = list(ax.texts)
+    projected = np.array([proj3d.proj_transform(*text.get_position_3d(), ax.get_proj())[:2]
+                          for text in labels])
+    texts = []
+    for text, (x, y) in zip(labels, projected):
+        texts.append(ax.text2D(x, y, text.get_text(), ha="center", va="center"))
+        text.remove()
+    adjust_text(texts, x=projected[:, 0], y=projected[:, 1], ax=ax, iter_lim=200)
+    for text, xy in zip(texts, projected):
+        offset = ax.transData.transform(text.get_position()) - ax.transData.transform(xy)
+        if np.linalg.norm(offset) > 8 * fig.dpi / 72:
+            ax.annotate("", xy, xytext=text.get_position(),
+                        arrowprops={"arrowstyle": "-", "color": "0.5", "lw": 0.4})
+
+
 # Plot one static 3D embedding snapshot.
 def plot_embed(
     embed_store: Mapping[str, Any],
@@ -280,8 +303,8 @@ def plot_embed(
             focus_ax = fig.add_subplot(212, projection="3d")
             all_ax.set_position([0.00, 0.60, 0.70, 0.40])
             focus_ax.set_position([0.00, 0.10, 0.70, 0.40])
-            fig.text(0.35, 0.54, "(a) Phoneme embedding", ha="center")
-            fig.text(0.35, 0.04, "(b) Vowel embedding", ha="center")
+            fig.text(0.35, 0.53, "(a) Phoneme embedding", ha="center")
+            fig.text(0.35, 0.03, "(b) Vowel embedding", ha="center")
 
             for i in focus_reduced_df.index:
                 focus_ax.scatter(
@@ -304,7 +327,6 @@ def plot_embed(
             focus_ax.set_xlabel("pc1")
             focus_ax.set_ylabel("pc2")
             focus_ax.set_zlabel("pc3")
-            push_text_free(fig, focus_ax)
 
             for i in all_reduced_df.index:
                 all_ax.scatter(
@@ -327,19 +349,22 @@ def plot_embed(
             all_ax.set_xlabel("pc1")
             all_ax.set_ylabel("pc2")
             all_ax.set_zlabel("pc3")
-            push_text_free(fig, all_ax)
 
             legend_handles = _build_legend_handles(EMBED_NEW_IDX, all_embed_colors, marker_size=4)
             fig.legend(
                 handles=legend_handles,
                 loc="center right",
-                bbox_to_anchor=(0.95, 0.55),
+                bbox_to_anchor=(0.95, 0.5),
                 ncol=1,
                 frameon=False,
                 fontsize=10,
                 handletextpad=0.2,
                 columnspacing=0.5,
             )
+            for ax in (all_ax, focus_ax):
+                for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
+                    axis.set_major_locator(MaxNLocator(nbins=4, prune="both"))
+                _place_projected_labels(fig, ax)
     else:
         fig = plt.figure(figsize=(3, 2.5))
         ax = fig.add_subplot(111, projection="3d")
@@ -375,7 +400,6 @@ def plot_embed(
             handletextpad=0.2,
             columnspacing=0.5,
         )
-        push_text_free(fig, ax)
 
     plt.savefig(embed_plot, dpi=300)
     plt.close()
@@ -681,7 +705,6 @@ def plot_aud_embed(
         handletextpad=0.2,
         columnspacing=0.5,
     )
-    push_text_free(fig, ax)
 
     plt.savefig(embed_plot, dpi=300)
     if embed_plot_pc2 is not None:
