@@ -362,6 +362,7 @@ def plot_embed(
                 columnspacing=0.5,
             )
             for ax in (all_ax, focus_ax):
+                ax.tick_params(axis="both", which="major", pad=0)
                 for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
                     axis.set_major_locator(MaxNLocator(nbins=4, prune="both"))
                 _place_projected_labels(fig, ax)
