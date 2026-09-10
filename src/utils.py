@@ -275,7 +275,7 @@ def plot_embed(
         }
 
         with plt.rc_context({"font.family": "Doulos SIL", "font.size": 10}):
-            fig = plt.figure(figsize=(5, 7))
+            fig = plt.figure(figsize=(4, 5.5))
             all_ax = fig.add_subplot(211, projection="3d")
             focus_ax = fig.add_subplot(212, projection="3d")
             all_ax.set_position([0.00, 0.60, 0.70, 0.40])
@@ -334,7 +334,7 @@ def plot_embed(
                 handles=legend_handles,
                 loc="center right",
                 bbox_to_anchor=(0.95, 0.55),
-                ncol=2,
+                ncol=1,
                 frameon=False,
                 fontsize=10,
                 handletextpad=0.2,
