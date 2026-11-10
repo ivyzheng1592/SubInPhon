@@ -47,6 +47,8 @@ special_tokens = [sos_token, eos_token, unk_token, pad_token]
 # Audio preprocessing hyperparameters
 sample_rate = 24000
 n_samples = 24000
+hop_length = 256
+n_frames = 94  # maximum mel spectrogram frame count
 n_mels = 128
 
 # Dataset hyperparameters

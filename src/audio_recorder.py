@@ -177,8 +177,8 @@ class AudioRecorder(TextRecorder):
         end_time: float,
         max_frames: int,
     ) -> Tuple[int, int]:
-        start_frame = int(round(start_time * hp.sample_rate / 256)) + 1
-        end_frame = int(round(end_time * hp.sample_rate / 256)) + 1
+        start_frame = int(round(start_time * hp.sample_rate / hp.hop_length))
+        end_frame = int(round(end_time * hp.sample_rate / hp.hop_length))
         start_frame = max(0, min(start_frame, max_frames - 1))
         end_frame = max(start_frame + 1, min(end_frame, max_frames))
         return start_frame, end_frame

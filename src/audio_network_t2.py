@@ -214,47 +214,44 @@ class GaussianUpsampling(nn.Module):
     def forward(
         self,
         input: torch.Tensor,
-        trg_txt: torch.Tensor,
+        selected_slots: torch.Tensor,
         aud_trg_len: int,
         durations: torch.Tensor,
         ranges: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         # input = [txt_len, batch_size, hidden_dim * 3]
-        # trg_txt = [txt_len, batch_size]
+        # selected_slots = [txt_len, batch_size]
         # durations = [txt_len, batch_size, 1]
         # ranges = [txt_len, batch_size, 1]
 
-        mask = torch.ne(trg_txt, hp.special_tokens.index(hp.pad_token))
-        mask = torch.logical_and(mask, torch.ne(trg_txt, hp.special_tokens.index(hp.sos_token)))
-        mask = torch.logical_and(mask, torch.ne(trg_txt, hp.special_tokens.index(hp.eos_token)))
-        mask = mask.unsqueeze(-1).to(input.dtype)
+        selected_mask = selected_slots.unsqueeze(-1)
 
-        durations = durations * mask
+        durations = durations * selected_mask
         
-        # Build one acoustic timeline [0, 1, ..., aud_trg_len - 1] that every text slot
-        # will be aligned against.
-        time = torch.arange(aud_trg_len, device=self.device, dtype=input.dtype).view(1, 1, aud_trg_len)
+        # Construct frame coordinates 1 through aud_trg_len (NAT Section 3.1).
+        time = torch.arange(1, aud_trg_len + 1, device=self.device, dtype=input.dtype).view(1, 1, aud_trg_len)
         # time = [1, 1, aud_trg_len]
 
-        # Convert per-slot durations into the center position of each text slot
-        # on the acoustic-frame timeline.
+        # Compute token centers (NAT Equation 4).
         centers = torch.cumsum(durations, dim=0) - 0.5 * durations
         # centers = [txt_len, batch_size, 1]
         
-        # For every text slot and every acoustic frame, compute a Gaussian weight.
-        # Nearby frames get high weight; distant frames get low weight.
-        weights = torch.exp(-0.5 * ((time - centers) / ranges) ** 2)
-        # weights = [txt_len, batch_size, aud_trg_len]
+        # Evaluate Gaussian log densities with ranges as standard deviations (NAT Equation 5).
+        gaussians = torch.distributions.Normal(centers, ranges.clamp_min(1e-3))
+        log_weights = gaussians.log_prob(time)
+        # log_weights = [txt_len, batch_size, aud_trg_len]
         
-        weights = weights * mask
-        
-        # Normalize over text slots so each acoustic frame becomes a weighted average
-        # of all text-slot representations.
-        weights = weights / weights.sum(dim=0, keepdim=True).clamp_min(1e-8)
+        # Identify examples with at least one valid phoneme slot.
+        has_phonemes = selected_mask.any(dim=0, keepdim=True)
+        # Set invalid slots to negative infinity.
+        log_weights = log_weights.masked_fill(~selected_mask, -torch.inf)
+        # Set log weights to zero for examples with no valid slots.
+        log_weights = torch.where(has_phonemes, log_weights, torch.zeros_like(log_weights))
+        # Normalize across text slots and zero invalid weights.
+        weights = torch.softmax(log_weights, dim=0) * selected_mask.to(input.dtype)
         # weights = [txt_len, batch_size, aud_trg_len]
 
-        # Turn token-level representations into frame-level representations by taking
-        # the weighted sum of all text slots at each acoustic frame.
+        # Compute weighted token representations for every frame (NAT Equation 6).
         upsamples = torch.bmm(weights.permute(1, 2, 0), input.permute(1, 0, 2))
         # upsamples = [batch_size, aud_trg_len, hidden_dim * 3]
         
@@ -391,6 +388,7 @@ class AudioSeq2Seq(nn.Module):
 
         decoder_outputs = torch.zeros(txt_trg_len, hp.batch_size, self.text_output_dim, device=self.device)
         predictions = torch.zeros(txt_trg_len, hp.batch_size, dtype=torch.long, device=self.device)
+        selected_txt = torch.full_like(trg_txt, hp.special_tokens.index(hp.pad_token))
         decoder_states = torch.zeros(txt_trg_len, hp.batch_size, self.hidden_dim, device=self.device)
         context_vectors = torch.zeros(txt_trg_len, hp.batch_size, self.hidden_dim * 2, device=self.device)
         decoder_attentions = torch.zeros(txt_trg_len, hp.batch_size, aud_src_len, device=self.device)
@@ -401,6 +399,7 @@ class AudioSeq2Seq(nn.Module):
         # decoder_attentions = [txt_trg_len, batch_size, aud_src_len]
 
         decoder_input = trg_txt[0] # SOS token
+        selected_txt[0] = trg_txt[0] # store the selected decoder token for acoustic conditioning
         hidden = torch.zeros(self.text_n_layers, hp.batch_size, self.hidden_dim, device=self.device)
         cell = torch.zeros(self.text_n_layers, hp.batch_size, self.hidden_dim, device=self.device)
 
@@ -427,21 +426,31 @@ class AudioSeq2Seq(nn.Module):
 
             decoder_input = trg_txt[t] if random.random() < txt_teacher_forcing else best_guess
             # input = [batch_size]
+            selected_txt[t] = decoder_input # store the selected decoder token for acoustic conditioning
 
         # upsampler
         aud_trg_len = trg_aud.shape[3]
 
         # predict durations and ranges for each text token
         # then perform Gaussian upsampling to get the synthesizer input
-        upsample_input = torch.cat((decoder_states, context_vectors), dim=2)
+
+        # select phoneme slots before the first selected EOS
+        eos = selected_txt.eq(hp.special_tokens.index(hp.eos_token))
+        selected_slots = (
+            eos.cumsum(dim=0).eq(0)
+            & selected_txt.ne(hp.special_tokens.index(hp.sos_token))
+            & selected_txt.ne(hp.special_tokens.index(hp.pad_token))
+        )
+        selected_mask = selected_slots.unsqueeze(-1)
+        upsample_input = torch.cat((decoder_states, context_vectors), dim=2) * selected_mask
         # upsample_input = [txt_trg_len, batch_size, hidden_dim * 3]
-        pred_durations = self.duration_predictor(upsample_input)
+        pred_durations = self.duration_predictor(upsample_input) * selected_mask
         # durations = [txt_len, batch_size, 1]
-        pred_ranges = self.range_predictor(upsample_input, pred_durations)
+        pred_ranges = self.range_predictor(upsample_input, pred_durations) * selected_mask
         # ranges = [txt_len, batch_size, 1]
 
         upsamples, gaussian_weights = self.gaussian_upsample(
-            upsample_input, trg_txt, aud_trg_len, pred_durations, pred_ranges
+            upsample_input, selected_slots, aud_trg_len, pred_durations, pred_ranges
         )
         # gaussian_weights = [txt_trg_len, batch_size, aud_trg_len]
         # upsamples = [batch_size, aud_trg_len, hidden_dim * 3]
@@ -450,7 +459,10 @@ class AudioSeq2Seq(nn.Module):
         synthesizer_outputs = torch.zeros(aud_trg_len, hp.batch_size, self.audio_output_dim).to(self.device)
         # synthesizer_outputs = [aud_trg_len, batch_size, aud_output_dim]
         
-        synthesizer_input = torch.zeros(hp.batch_size, self.audio_output_dim, device=self.device)
+        # first input spectrogram frame is -100
+        synthesizer_input = torch.full(
+            (hp.batch_size, self.audio_output_dim), -100.0, device=self.device
+        )
         # synthesizer_input = [batch_size, n_freq]
         hidden = torch.zeros(self.synthesizer.n_layers, hp.batch_size, self.hidden_dim, device=self.device)
         cell = torch.zeros(self.synthesizer.n_layers, hp.batch_size, self.hidden_dim, device=self.device)

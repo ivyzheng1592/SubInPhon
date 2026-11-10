@@ -321,12 +321,14 @@ class AudioSeq2Seq(nn.Module):
         synthesizer_attentions = torch.zeros(aud_trg_len, hp.batch_size, aud_src_len).to(self.device)
         # attentions = [aud_trg_len, batch_size, aud_src_len]
 
-        # first input spectrogram frame are zeros
-        synthesizer_input = torch.zeros(hp.batch_size, self.audio_output_dim).to(self.device)
+        # first input spectrogram frame is -100
+        synthesizer_input = torch.full(
+            (hp.batch_size, self.audio_output_dim), -100.0, device=self.device
+        )
         hidden = torch.zeros(self.audio_n_layers, hp.batch_size, self.hidden_dim).to(self.device)
         cell = torch.zeros(self.audio_n_layers, hp.batch_size, self.hidden_dim).to(self.device)
         
-        for t in range(1, aud_trg_len):
+        for t in range(aud_trg_len):
             # at every time step,
             # calculate the attention weight with the current decoder hidden (query) and all encoder hidden (key, value)
             context_vector, weight = self.multi_attention(encoder_states, hidden)

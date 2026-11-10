@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 from scipy.io import wavfile
 import torch
-import torchaudio
 import torchaudio.transforms as T
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, random_split, default_collate
@@ -52,6 +51,8 @@ class AudioDataset(Dataset):
         self.sample_rate = hp.sample_rate
         self.n_samples = hp.n_samples
         self.n_mels = hp.n_mels
+        self.hop_length = hp.hop_length
+        self.n_frames = hp.n_frames
 
         # audio transformation
         self.wav2mel = wav2mel
@@ -59,7 +60,7 @@ class AudioDataset(Dataset):
         self.mel_spectrogram = T.MelSpectrogram(
             sample_rate=self.sample_rate,
             n_fft=1024,
-            hop_length=256,
+            hop_length=self.hop_length,
             n_mels=self.n_mels,
         ).to(self.device)
         self.db_spectrogram = T.AmplitudeToDB(stype="power").to(self.device)
@@ -83,10 +84,9 @@ class AudioDataset(Dataset):
         trg_audio, trg_sr = self._load_wav(trg_path)
         trg_audio = trg_audio.to(self.device)
 
-        # pre-process source and target audio
+        # resample source and target audio
         src_audio = self._resampling(src_audio, src_sr)
         trg_audio = self._resampling(trg_audio, trg_sr)
-        src_audio, trg_audio = self._padding(src_audio, trg_audio)
 
         # transform source and target audio
         if self.wav2mel:  # [n_channels, n_freq, dur]
@@ -95,6 +95,8 @@ class AudioDataset(Dataset):
         if self.power2db:
             src_audio = self._power_to_db(src_audio)
             trg_audio = self._power_to_db(trg_audio)
+        # pad source and target audio to the same length
+        src_audio, trg_audio = self._padding(src_audio, trg_audio)
 
         # get source text
         src = self.ur_words[index]
@@ -123,28 +125,29 @@ class AudioDataset(Dataset):
         return signal
 
     def _padding(self, signal1: torch.Tensor, signal2: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        # in this project, we are padding to a maximum length
-        # so we expect all length_signal < self.n_samples
-        length_signal1 = signal1.shape[1]
-        length_signal2 = signal2.shape[1]
-        assert (
-            length_signal1 < self.n_samples and length_signal2 < self.n_samples
-        ), f"All audio data should have less than {self.n_samples} samples!"
+        # select the padded length and padding value.
+        max_length = self.n_frames if self.wav2mel else self.n_samples
+        padding_value = -100.0 if self.power2db else 0.0
 
-        # in this project, src and trg start with one frame of padded 0s
-        # and the rest of padding at the end of the signal
-        signal1 = torch.nn.functional.pad(signal1, (1, self.n_samples - length_signal1 - 1))
-        signal2 = torch.nn.functional.pad(signal2, (1, self.n_samples - length_signal2 - 1))
-        # [1, [1, 1, 1]] -> [1, [0, 1, 1, 1, 0, 0]]
-        # [1, [1, 1]] -> [1, [0, 1, 1, 0, 0, 0]]
+        # in this project, we are padding to a maximum length
+        # so we expect all length_signal < self.n_frames or self.n_samples
+        length_signal1 = signal1.shape[-1]
+        length_signal2 = signal2.shape[-1]
+        assert (
+            length_signal1 <= max_length and length_signal2 <= max_length
+        ), f"Audio must have at most {max_length} positions!"
+
+        # append padding
+        signal1 = torch.nn.functional.pad(signal1, (0, max_length - length_signal1), value=padding_value)
+        signal2 = torch.nn.functional.pad(signal2, (0, max_length - length_signal2), value=padding_value)
         return signal1, signal2
 
     def remove_padding(self, mel: torch.Tensor) -> torch.Tensor:
         # mel = [n_fre, dur]
-        # get the values along n_freq dimension that are not 0s
-        non_zeros = torch.all(torch.where(torch.eq(mel, -100), False, True), dim=0)
-
-        return non_zeros
+        
+        # keep frames containing at least one bin unequal to -100
+        non_padding = mel.ne(-100).any(dim=0)
+        return non_padding
 
     # converting waveform to mel spectrogram
     def _wav_to_mel(self, signal: torch.Tensor) -> torch.Tensor:

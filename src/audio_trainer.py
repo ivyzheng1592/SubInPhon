@@ -45,11 +45,8 @@ class AudioTrainer:
         duration_loss = torch.zeros((), device=spec.device)
 
         if pred_durations is not None:
-            # summarize total duration of predicted phonemes, ignoring padding and special tokens
-            text_mask = torch.ne(trg_txt, hp.special_tokens.index(hp.pad_token))
-            text_mask = torch.logical_and(text_mask, torch.ne(trg_txt, hp.special_tokens.index(hp.sos_token)))
-            text_mask = torch.logical_and(text_mask, torch.ne(trg_txt, hp.special_tokens.index(hp.eos_token)))
-            pred_total_durations = (pred_durations.squeeze(-1) * text_mask.to(pred_durations.dtype)).sum(dim=0)
+            # summarize the masked durations over text slots
+            pred_total_durations = pred_durations.squeeze(-1).sum(dim=0)
             # summarize total duration of target audio, ignoring padding (-100)
             valid_frames = torch.any(torch.ne(trg_aud, -100), dim=2).squeeze(1)
             target_total_durations = valid_frames.sum(dim=1).to(trg_aud.dtype)
