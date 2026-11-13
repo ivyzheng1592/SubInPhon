@@ -89,6 +89,10 @@ base_seed = 1234  # 1234 for first five runs, 2345 for next five runs
 # Audio data root
 audio_root = "/mnt/data/Projects/SubInPhon/audio"
 
+# Interpretability evaluation
+interpretability = False
+interpretability_report = "output/audio_interpretability.html"
+
 # Experiment settings
 lang_name = "EnglishBH_shortened"
 # Property options: "nonidentical," where identical surface vowels are avoided

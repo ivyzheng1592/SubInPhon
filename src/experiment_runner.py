@@ -319,6 +319,9 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                     rep.evaluate_embedding()
                     rep.evaluate_audio_embedding(test_dataloader, eval_epoch=hp.n_epochs - 1)
 
+                if hp.interpretability:
+                    rep.evaluate_representations(test_dataloader)
+
 
 def run_experiment(
     modality: str,

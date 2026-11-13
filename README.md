@@ -124,6 +124,7 @@ Use `--resume-model-file PATH` to continue training from a saved model. It resto
 - `--pred-log {vowel_only_error,consonant_vowel_error,all_correct_syll}`
 - `--device {cpu,cuda}`
 - `--resume-model-file PATH`
+- `--interpretability`: add final-checkpoint vowel PCA/RSA and all-saved-checkpoint classification heatmaps over the test set; report path is set in `hp.interpretability_report`.
 
 Notes:
 

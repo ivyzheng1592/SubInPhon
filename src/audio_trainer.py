@@ -229,6 +229,24 @@ class AudioTrainer:
         epoch_duration_loss = epoch_duration_loss / len(data_loader)
         return epoch_rec_loss, epoch_pred_loss, epoch_duration_loss, src_txts, trg_txts, pred_txts
 
+    def evaluate_representations(
+        self,
+        dataloader: Any,
+        eval_epoch: Optional[int] = None,
+        report_file: Optional[str] = None,
+    ) -> Any:
+        from audio_interpretability import evaluate_representations
+
+        epoch = hp.n_epochs - 1 if eval_epoch is None else eval_epoch
+        checkpoint = os.path.join(
+            self.recorder.model_dir,
+            self.recorder.run_root + "_epoch" + str(epoch) + "_seq2seq.pth",
+        )
+        return evaluate_representations(
+            self.seq2seq, self.recorder, dataloader, checkpoint,
+            hp.interpretability_report if report_file is None else report_file,
+        )
+
     # a function that manages evaluation of one random batch
     def evaluate_attention(
         self,
