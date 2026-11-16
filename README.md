@@ -124,7 +124,7 @@ Use `--resume-model-file PATH` to continue training from a saved model. It resto
 - `--pred-log {vowel_only_error,consonant_vowel_error,all_correct_syll}`
 - `--device {cpu,cuda}`
 - `--resume-model-file PATH`
-- `--run-mode interpretability` (audio only): classify underlying vowel backness/height from final-checkpoint vowel representations; `hp.interpretability_report` sets one shared T1/T2 HTML with condition accuracies averaged across runs and trials, individual vowel RDMs, and within-run baseline/corresponding-component RSA averaged across runs.
+- `--run-mode interpretability` (audio only): classify underlying vowel backness/height from final-checkpoint vowel representations; `hp.interpretability_report` sets one shared T1/T2 HTML with condition accuracies averaged across runs and trials, individual vowel RDMs, and representation-to-baseline RSA averaged across runs in model × condition panels.
 
 Notes:
 

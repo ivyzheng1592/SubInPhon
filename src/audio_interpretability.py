@@ -412,6 +412,7 @@ def _mean_scores(groups, representation, task, architecture, condition):
     scored = [(group, score) for group, score in scored if score is not None]
     return {
         "mean": float(np.mean([score for _, score in scored])) if scored else None,
+        "sd": float(np.std([score for _, score in scored], ddof=1)) if len(scored) > 1 else None,
         "runs": len(scored), "total_runs": len(matching),
         "details": "; ".join(f"{group['info']['trial']} / run {group['info']['run']}: {score:.3f}"
                              for group, score in scored),
@@ -443,21 +444,24 @@ def write_report(archive_dir, report_file):
     rsa_html = _rsa_report(groups)
     conditions = sorted({group["info"]["condition"] for group in groups})
     plots = []
-    for task, label in CLASSIFICATION_TASKS.items():
-        titles = []
-        for name, representation in REPRESENTATIONS.items():
-            for architecture in ("t1", "t2"):
-                title = representation
-                if name == "synthesizer_input":
-                    title = "Synthesizer attention context" if architecture == "t1" else "Upsampled representation"
-                titles.append(f"{architecture.upper()} · {title}")
-        figure = make_subplots(rows=5, cols=2, subplot_titles=titles, vertical_spacing=0.07)
+    columns = [(architecture, feature) for architecture in ("t1", "t2") for feature in ("backness", "height")]
+    for position in ("V1", "V2"):
+        figure = make_subplots(
+            rows=5, cols=4, vertical_spacing=0.07, horizontal_spacing=0.05,
+            column_titles=[f"{architecture.upper()} · {feature.capitalize()}" for architecture, feature in columns],
+            row_titles=list(REPRESENTATIONS.values()),
+        )
+        for annotation in figure.layout.annotations:
+            if annotation.text in REPRESENTATIONS.values():
+                annotation.update(textangle=0, xanchor="left", font=dict(size=11))
         for row, name in enumerate(REPRESENTATIONS, 1):
-            for column, architecture in enumerate(("t1", "t2"), 1):
+            for column, (architecture, feature) in enumerate(columns, 1):
+                task = f"{position}_{feature}"
                 for index, condition in enumerate(conditions):
                     stats = _mean_scores(groups, name, task, architecture, condition)
                     figure.add_trace(go.Bar(
                         x=[condition], y=[stats["mean"]], name=condition, legendgroup=condition,
+                        error_y=dict(type="data", array=[stats["sd"]], visible=True),
                         showlegend=row == 1 and column == 1,
                         marker_color=("#2469b2", "#d87727")[index % 2],
                         text=[f"{stats['mean']:.3f}" if stats["mean"] is not None else ""], textposition="outside",
@@ -469,9 +473,9 @@ def write_report(archive_dir, report_file):
                 figure.update_yaxes(range=[0, 1.08], title_text="Balanced accuracy" if column == 1 else None,
                                     row=row, col=column)
                 figure.update_xaxes(categoryorder="array", categoryarray=conditions, row=row, col=column)
-        figure.update_layout(title=label, height=1450, barmode="group", template="plotly_white",
-                             margin=dict(t=100, b=50), legend=dict(orientation="h", y=1.05))
-        plots.append(figure.to_html(full_html=False, include_plotlyjs=False, div_id=task,
+        figure.update_layout(title=f"{position}: underlying vowel classification", height=1450, barmode="group", template="plotly_white",
+                             margin=dict(t=130, b=50, l=70, r=260), legend=dict(orientation="h", y=1.06))
+        plots.append(figure.to_html(full_html=False, include_plotlyjs=False, div_id=f"classification-{position}",
                                     config={"responsive": True, "displaylogo": False}))
     rows = []
     for group in groups:
@@ -487,8 +491,8 @@ def write_report(archive_dir, report_file):
 <style>body{font:15px system-ui;margin:28px;color:#202630;background:#f7f8fa}section{background:white;margin:24px 0}
 p{max-width:1000px;line-height:1.6}table{border-collapse:collapse}td,th{padding:8px;border:1px solid #ccd2da;text-align:left}
 pre{white-space:pre-wrap} .table{overflow-x:auto}</style><h1>Final-checkpoint vowel classification and RSA</h1>
-<p>Each figure has five representation rows and T1/T2 columns. Bars show the arithmetic mean of per-run balanced accuracies
-for each condition across all included trials. Classifiers are fitted separately for each run and condition using fixed five-fold
+<p>Each classification figure shows one vowel position, with five representation rows and four columns: T1 backness, T1 height, T2 backness, T2 height. Bars show the arithmetic mean of per-run balanced accuracies
+for each condition across all included trials. Error bars show ±1 sample standard deviation across runs (available with at least two scores). Classifiers are fitted separately for each run and condition using fixed five-fold
 word-type cross-validation within the original test set. Repeated underlying words share a fold; standardization is fitted on training folds only.
 The classifier is L2 logistic regression (C=1, balanced class weights). The dotted line marks chance (0.5).
 Hover over bars for contributing run scores and counts. Unavailable scores are excluded from means; missing results have no bar.</p>
@@ -554,23 +558,6 @@ def _rsa_run(vectors, rows):
     return results
 
 
-def _cross_model_rsa(left, right):
-    _check_test_match(left["info"], right["info"])
-    results = {}
-    for position in ("V1", "V2"):
-        left_values, left_rows = _vowel_rdms(left["vectors"], left["info"]["rows"], position)
-        right_values, right_rows = _vowel_rdms(right["vectors"], right["info"]["rows"], position)
-        if [row["stimulus_key"] for row in left_rows] != [row["stimulus_key"] for row in right_rows]:
-            raise ValueError(f"T1/T2 included vowel stimuli do not match for {position}, "
-                             f"condition {left['info']['condition']}, run {left['info']['run']}")
-        results[position] = {
-            name: _correlate_ranks(_rank_rdm(left_values[name], "euclidean"),
-                                   _rank_rdm(right_values[name], "euclidean"), len(left_rows), len(left_rows))
-            for name in REPRESENTATIONS
-        }
-    return results
-
-
 def _rsa_average(items):
     valid = [item for item in items if item["rho"] is not None]
     return {
@@ -590,42 +577,39 @@ def _rsa_report(groups):
     available = [group for group in groups if "rsa" in group]
     if not available:
         return "<h2>Vowel RSA</h2><p>No RSA results yet. Run interpretability for both architectures to collect the new baselines.</p>"
-    paired = []
-    for left in available:
-        if left["info"]["architecture"] != "t1":
-            continue
-        for right in available:
-            if right["info"]["architecture"] == "t2" and _same_run(left["info"], right["info"]):
-                paired.append({"condition": left["info"]["condition"], "results": _cross_model_rsa(left, right)})
+    conditions = list(dict.fromkeys([*hp.conditions, *(group["info"]["condition"] for group in available)]))
     plots = []
-    for condition in sorted({group["info"]["condition"] for group in available}):
-        for position in ("V1", "V2"):
-            means, hover, labels = [], [], []
-            for architecture in ("t1", "t2"):
+    for position in ("V1", "V2"):
+        titles = [f"{architecture.upper()} · {html.escape(condition)}"
+                  for architecture in ("t1", "t2") for condition in conditions]
+        figure = make_subplots(rows=2, cols=len(conditions), subplot_titles=titles,
+                               horizontal_spacing=0.18, vertical_spacing=0.23)
+        for row, architecture in enumerate(("t1", "t2"), 1):
+            for column, condition in enumerate(conditions, 1):
                 selected = [group for group in available if group["info"]["architecture"] == architecture
                             and group["info"]["condition"] == condition]
+                means, hover, labels = [], [], []
                 for name, label in REPRESENTATIONS.items():
+                    if name == "synthesizer_input":
+                        label = "Synthesizer attention context" if architecture == "t1" else "Upsampled representation"
                     stats = [_rsa_average([group["rsa"][position][name][baseline] for group in selected]) for baseline in BASELINES]
-                    labels.append(f"{architecture.upper()} · {label}")
+                    labels.append(label)
                     means.append([item["mean"] for item in stats])
                     hover.append([[item["runs"], item["total"], item["stimuli"], item["excluded"]] for item in stats])
-            figure = go.Figure(go.Heatmap(
-                z=means, x=list(BASELINES.values()), y=labels, zmin=-1, zmax=1, colorscale="RdBu", reversescale=True,
-                customdata=hover, colorbar=dict(title="Spearman rho"), hoverongaps=False,
-                hovertemplate=("%{y}<br>%{x}<br>Mean rho: %{z:.3f}<br>Estimable runs: %{customdata[0]} / %{customdata[1]}"
-                               "<br>Stimuli per run: %{customdata[2]}<br>Excluded per run: %{customdata[3]}<extra></extra>")))
-            figure.update_layout(title=f"{html.escape(condition)} · {position}: representation–baseline RSA",
-                                 height=650, margin=dict(l=320, b=150), yaxis=dict(autorange="reversed"))
-            plots.append(figure.to_html(full_html=False, include_plotlyjs=False, config={"responsive": True}))
-            selected_pairs = [pair for pair in paired if pair["condition"] == condition]
-            stats = [_rsa_average([pair["results"][position][name] for pair in selected_pairs]) for name in REPRESENTATIONS]
-            figure = go.Figure(go.Bar(
-                x=list(REPRESENTATIONS.values()), y=[item["mean"] for item in stats],
-                customdata=[[item["runs"], item["total"], item["stimuli"]] for item in stats],
-                hovertemplate="%{x}<br>Mean rho: %{y:.3f}<br>Estimable run pairs: %{customdata[0]} / %{customdata[1]}<br>Stimuli per pair: %{customdata[2]}<extra></extra>"))
-            figure.update_layout(title=f"{html.escape(condition)} · {position}: corresponding T1–T2 components",
-                                 yaxis=dict(title="Spearman rho", range=[-1, 1]), height=450, margin=dict(b=130))
-            plots.append(figure.to_html(full_html=False, include_plotlyjs=False, config={"responsive": True}))
+                figure.add_trace(go.Heatmap(
+                    z=means, x=list(BASELINES.values()), y=labels, coloraxis="coloraxis",
+                    customdata=hover, hoverongaps=False,
+                    hovertemplate=("%{y}<br>%{x}<br>Mean rho: %{z:.3f}<br>Estimable runs: %{customdata[0]} / %{customdata[1]}"
+                                   "<br>Stimuli per run: %{customdata[2]}<br>Excluded per run: %{customdata[3]}<extra></extra>")),
+                    row=row, col=column)
+                figure.update_yaxes(autorange="reversed", row=row, col=column)
+                figure.update_xaxes(tickangle=-40, row=row, col=column)
+        figure.update_layout(title=f"{position}: representation–baseline RSA", height=1000,
+                             margin=dict(l=230, r=110, b=150),
+                             coloraxis=dict(cmin=-1, cmax=1, colorscale="RdBu", reversescale=True,
+                                            colorbar=dict(title="Spearman rho")))
+        plots.append(figure.to_html(full_html=False, include_plotlyjs=False, div_id=f"rsa-{position}",
+                                    config={"responsive": True}))
     display = []
     diagnostics = []
     for group in available:
@@ -689,9 +673,8 @@ function renderRdm(){
 Input/target/predicted backness and input/target/postnet-predicted mean spectra form six baselines; predicted baselines belong to the selected model.
 Wrong vowel predictions are retained; only undefined backness is omitted from predicted-backness comparisons.
 Correlations are computed per run and condition, separately for V1/V2, then averaged arithmetically across runs.
-Cross-model comparisons use only functionally corresponding components and pair by language, condition, direction, and run number.
-All matching trial pairs are included; their full test sets and included vowel stimuli must match exactly.
-Missing partner runs remain pending. Blank correlations are not estimable (constant RDM or fewer than three valid stimuli).
+Each vowel figure uses model rows and condition columns with one shared correlation scale.
+There are no direct comparisons between T1 and T2 representations. Full test sets are still checked for matching runs across models. Blank correlations are not estimable (constant RDM or fewer than three valid stimuli).
 These are descriptive correspondences, not evidence of uniquely phonological or causal coding; no pairwise p-values are reported.</p>'''
     return (description + "".join(f"<section>{plot}</section>" for plot in plots) + viewer
             + "<details><summary>RSA counts and exclusions</summary><pre>"
