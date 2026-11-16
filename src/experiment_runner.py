@@ -314,12 +314,11 @@ def audio(trial_num: str, runs: range, resume_model_file: Optional[str] = None) 
                     rep.evaluate_attention(valid_dataloader, eval_epoch=hp.n_epochs - 1)
                     rep.evaluate_embedding()
                     rep.evaluate_audio_embedding(valid_dataloader, eval_epoch=hp.n_epochs - 1)
-                else:
+                elif hp.run_mode == "inspection":
                     rep.evaluate_attention(test_dataloader, eval_epoch=hp.n_epochs - 1)
                     rep.evaluate_embedding()
                     rep.evaluate_audio_embedding(test_dataloader, eval_epoch=hp.n_epochs - 1)
-
-                if hp.interpretability:
+                else:
                     rep.evaluate_representations(test_dataloader)
 
 
@@ -329,6 +328,8 @@ def run_experiment(
     runs: range,
     resume_model_file: Optional[str] = None,
 ) -> None:
+    if hp.run_mode == "interpretability" and modality != "audio":
+        raise ValueError("Interpretability mode is available for audio models only")
     if modality == "text":
         text(trial_num, runs, resume_model_file=resume_model_file)
     elif modality == "feature":

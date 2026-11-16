@@ -90,8 +90,7 @@ base_seed = 1234  # 1234 for first five runs, 2345 for next five runs
 audio_root = "/mnt/data/Projects/SubInPhon/audio"
 
 # Interpretability evaluation
-interpretability = False
-interpretability_report = "output/audio_interpretability.html"
+interpretability_report = "output/audio_interpretability.html"  # shared report for all trials and both audio architectures
 
 # Experiment settings
 lang_name = "EnglishBH_shortened"

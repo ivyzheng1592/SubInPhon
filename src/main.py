@@ -119,7 +119,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--run-mode",
-        choices=("train and evaluate", "tuning", "inspection"),
+        choices=("train and evaluate", "tuning", "inspection", "interpretability"),
         default=None,
         help="Override hp.run_mode.",
     )
@@ -139,10 +139,6 @@ def _build_parser() -> argparse.ArgumentParser:
         "--resume-model-file",
         default=None,
         help="Resume from a saved *_seq2seq.pth model file.",
-    )
-    parser.add_argument(
-        "--interpretability", action="store_true",
-        help="Create final-checkpoint PCA/RSA and all-saved-checkpoint classification reports (audio only).",
     )
     return parser
 
@@ -182,9 +178,6 @@ def _write_run_config(args: argparse.Namespace, trial_num: str, runs: range) -> 
 
 def main() -> None:
     args = _build_parser().parse_args()
-    if args.interpretability and args.modality != "audio":
-        raise ValueError("Interpretability evaluation is available for audio models only")
-
     if args.data_proportion is not None:
         hp.data_proportion = args.data_proportion
     if args.audio_model is not None:
@@ -205,8 +198,8 @@ def main() -> None:
         hp.pred_log = args.pred_log
     if args.device is not None:
         hp.device = args.device
-    if args.interpretability:
-        hp.interpretability = True
+    if hp.run_mode == "interpretability" and args.modality != "audio":
+        raise ValueError("Interpretability mode is available for audio models only")
 
     trial_num = _resolve_trial_num(args.trial_num)
     runs = _parse_runs(args.runs)
